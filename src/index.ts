@@ -1,9 +1,13 @@
 export class Badak {
-	constructor () {
-		console.log('Badak.constructor()');
-	}
+	async listen (port : number) : Promise<any> {
+		if (port === undefined) {
+			throw new Error('port should be passed');
+		}
 
-	listen (port) {
-		console.log('Badak.listen()', port);
+		if (typeof port !== 'number') {
+			throw new Error('port should be number type');
+		}
+
+		return {};
 	}
 }
