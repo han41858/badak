@@ -1,11 +1,3 @@
-class Badak {
-	constructor () {
-		console.log('Badak.constructor()');
-	}
-
-	listen (port) {
-		console.log('Badak.listen()', port);
-	}
-}
+const Badak = require('./bundles');
 
 exports = module.exports = Badak;
