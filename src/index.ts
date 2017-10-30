@@ -5,6 +5,10 @@ export class Badak {
 	private _http : Server = null;
 	private _middleware : Promise<Function>[] = [];
 
+	// async route (rule : []) : Promise<void> {
+	//
+	// }
+
 	async use (middleware : Promise<Function>) : Promise<void> {
 		if (middleware === undefined) {
 			throw new Error('middleware function should be passed');
@@ -30,6 +34,8 @@ export class Badak {
 			throw new Error('server is running already');
 		}
 		else {
+			// todo: check route rule
+
 			return new Promise((resolve) => {
 				this._http = http.createServer((req, res) => {
 					res.end('ok');
@@ -44,6 +50,10 @@ export class Badak {
 
 	isRunning () : boolean {
 		return this._http !== null;
+	}
+
+	getHttpServer () : Server {
+		return this._http;
 	}
 
 	async stop () : Promise<any> {
