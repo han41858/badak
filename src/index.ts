@@ -1,7 +1,8 @@
-// import * as http from 'http';
-// import { Server } from 'net';
+import * as http from 'http';
+import { Server } from 'net';
 
 export class Badak {
+	private _http : Server = null;
 	private _middleware : Promise<Function>[] = [];
 
 	async use (middleware : Promise<Function>) : Promise<void> {
@@ -16,7 +17,7 @@ export class Badak {
 		this._middleware.push(middleware);
 	}
 
-	async listen (port : number) : Promise<void> {
+	async listen (port : number) : Promise<any> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
 		}
@@ -24,5 +25,38 @@ export class Badak {
 		if (typeof port !== 'number') {
 			throw new Error('port should be number type');
 		}
+
+		if (this._http !== null) {
+			throw new Error('server is running already');
+		}
+		else {
+			return new Promise((resolve) => {
+				this._http = http.createServer((req, res) => {
+					res.end('ok');
+				});
+
+				this._http.listen(port, () => {
+					resolve();
+				});
+			});
+		}
+	}
+
+	isRunning () : boolean {
+		return this._http !== null;
+	}
+
+	async stop () : Promise<any> {
+		if (this._http === null) {
+			throw new Error('server is not running, call listen() before stop()');
+		}
+
+		return new Promise((resolve) => {
+			this._http.close(() => {
+				this._http = null;
+
+				resolve();
+			});
+		})
 	}
 }

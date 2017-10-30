@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/han41858/badak#readme",
   "dependencies": {
+    "@types/node": "^8.0.47",
     "typescript": "^2.5.3"
   }
 }
