@@ -3,13 +3,13 @@ import { Server } from 'net';
 
 export class Badak {
 	private _http : Server = null;
-	private _middleware : Promise<Function>[] = [];
+	private _middleware : Function[] = [];
 
 	// async route (rule : []) : Promise<void> {
 	//
 	// }
 
-	async use (middleware : Promise<Function>) : Promise<void> {
+	async use (middleware : Function) : Promise<void> {
 		if (middleware === undefined) {
 			throw new Error('middleware function should be passed');
 		}
@@ -36,9 +36,17 @@ export class Badak {
 		else {
 			// todo: check route rule
 
-			return new Promise((resolve) => {
+			return new Promise(resolve => {
 				this._http = http.createServer((req, res) => {
-					res.end('ok');
+
+					(async () => {
+						this._middleware.forEach(async (middleware : Function) => {
+							await middleware();
+						});
+					})()
+						.then(() => {
+							res.end('ok');
+						});
 				});
 
 				this._http.listen(port, () => {
