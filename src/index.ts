@@ -63,14 +63,50 @@ export class Badak {
 		}
 
 		const promiseArr = [];
-		const ruleObj = {};
+
+		const refinedRuleObj = {}; // for abbreviation
+		const resultRuleObj = {};
 
 		keyArr.forEach(key => {
 			const refinedKey = key.replace(/^\/|\/$/gi, '');
 
+			const uriArr = refinedKey.split('/');
+
+			if (uriArr.length == 1) {
+				refinedRuleObj[refinedKey] = rule[key];
+			}
+			else if (uriArr.length > 1) {
+				if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
+					throw new Error('abbreviation valid failed');
+				}
+
+				// convert abbreviation to recursive object
+				let abbrObj = {};
+				let targetObj = abbrObj;
+				uriArr.forEach((uriFrag, i, arr) => {
+					// skip first fragment, it used first key
+					if (i > 0) {
+						if (i === arr.length - 1) {
+							targetObj[uriFrag] = rule[key];
+						}
+						else {
+							targetObj[uriFrag] = {};
+
+							targetObj = targetObj[uriFrag]; // for recursive
+						}
+					}
+				});
+
+				refinedRuleObj[uriArr[0]] = abbrObj;
+			}
+
+			// TODO: check type is RouteRuleSeed
+		});
+
+		Object.keys(refinedRuleObj).forEach((key) => {
 			promiseArr.push(
 				(async () => {
-					const value = rule[key];
+					const value = refinedRuleObj[key];
 
 					if (value === undefined) {
 						throw new Error('route function should be passed');
@@ -78,7 +114,7 @@ export class Badak {
 
 					if (typeof value === 'object' && !!value) {
 						// call recursively
-						ruleObj[refinedKey] = await this._checkRouteRule(value);
+						resultRuleObj[key] = await this._checkRouteRule(value);
 					}
 					else {
 						// check function is async
@@ -86,10 +122,10 @@ export class Badak {
 							throw new Error('route function should be async');
 						}
 
-						ruleObj[refinedKey] = value;
+						resultRuleObj[key] = value;
 					}
 
-					return ruleObj;
+					return resultRuleObj;
 				})()
 			);
 		});
