@@ -1,4 +1,5 @@
 import * as http from 'http';
+import { IncomingMessage, ServerResponse } from 'http';
 import { Server } from 'net';
 
 /**
@@ -162,25 +163,41 @@ export class Badak {
 		}
 		else {
 			return new Promise(resolve => {
-				this._http = http.createServer((req, res) => {
+				this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
 
 					// find route rule
-					// const uri = req.url;
-					// console.log('uri : ', req.url);
-					//
-					// const uriArr = uri.split('/').filter(frag => frag !== '');
-					// console.log('uriArr : ', uriArr);
+					const uri = req.url;
+
+					const uriArr = uri.split('/').filter(frag => frag !== '');
+
+					if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
+						throw new Error('invalid uri');
+					}
+
+					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
+					let targetFnc : Function = null;
+
+					uriArr.forEach((uriFrag, i, arr) => {
+						targetRouteObj = targetRouteObj[uriFrag];
+
+						if (i === arr.length - 1) {
+							targetFnc = targetRouteObj[req.method];
+						}
+					});
+
+					if (targetFnc === undefined) {
+						throw new Error('not defined route function');
+					}
 
 					(async () => {
 						this._middleware.forEach(async (middleware : Function) => {
 							await middleware();
 						});
-					})()
-						.then(() => {
 
-							// run route rule logic
-							res.end('ok');
-						});
+						const resObj = await targetFnc();
+
+						res.end(resObj);
+					})();
 				});
 
 				this._http.listen(port, () => {
