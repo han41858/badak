@@ -66,6 +66,8 @@ export class Badak {
 		const ruleObj = {};
 
 		keyArr.forEach(key => {
+			const refinedKey = key.replace(/^\/|\/$/gi, '');
+
 			promiseArr.push(
 				(async () => {
 					const value = rule[key];
@@ -76,7 +78,7 @@ export class Badak {
 
 					if (typeof value === 'object' && !!value) {
 						// call recursively
-						ruleObj[key] = await this._checkRouteRule(value);
+						ruleObj[refinedKey] = await this._checkRouteRule(value);
 					}
 					else {
 						// check function is async
@@ -84,7 +86,7 @@ export class Badak {
 							throw new Error('route function should be async');
 						}
 
-						ruleObj[key] = value;
+						ruleObj[refinedKey] = value;
 					}
 
 					return ruleObj;
