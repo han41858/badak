@@ -58,8 +58,7 @@ export class Badak {
 		}
 
 		const keyArr = Object.keys(rule);
-
-		if (keyArr.length <= 0) {
+		if (keyArr.length === 0) {
 			throw new Error('no rule in rule object');
 		}
 
@@ -75,6 +74,7 @@ export class Badak {
 
 			if (uriArr.length == 1) {
 				refinedRuleObj[refinedKey] = rule[key];
+
 			}
 			else if (uriArr.length > 1) {
 				if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
@@ -88,6 +88,7 @@ export class Badak {
 					// skip first fragment, it used first key
 					if (i > 0) {
 						if (i === arr.length - 1) {
+							// last one
 							targetObj[uriFrag] = rule[key];
 						}
 						else {
@@ -100,8 +101,6 @@ export class Badak {
 
 				refinedRuleObj[uriArr[0]] = abbrObj;
 			}
-
-			// TODO: check type is RouteRuleSeed
 		});
 
 		Object.keys(refinedRuleObj).forEach((key) => {
@@ -114,10 +113,34 @@ export class Badak {
 					}
 
 					if (typeof value === 'object' && !!value) {
+
+
+						// check before-last depth
+						const beforeLastDepth : boolean = Object.keys(value).every(key => {
+							return value[key].constructor.name !== 'Object';
+						});
+
+						if (beforeLastDepth) {
+							const objKeyArr : string[] = Object.keys(rule);
+							const methodArr : string[] = ['GET', 'POST', 'PUT', 'DELETE'];
+
+							// RouteRuleSeed should have one more of 4-methods
+							const hasRouteRuleSeed = objKeyArr.some(objKey => {
+								return methodArr.some(method => {
+									return Object.keys(rule[objKey]).includes(method);
+								});
+							});
+
+							if (!hasRouteRuleSeed) {
+								throw new Error('route rule should have any of "GET", "POST", "PUT", "DELETE"');
+							}
+						}
+
 						// call recursively
 						resultRuleObj[key] = await this._checkRouteRule(value);
 					}
 					else {
+						// last depth seed function
 						// check function is async
 						if (value.constructor.name !== 'AsyncFunction') {
 							throw new Error('route function should be async');
