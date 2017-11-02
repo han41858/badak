@@ -187,7 +187,6 @@ export class Badak {
 		else {
 			return new Promise(resolve => {
 				this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
-
 					// find route rule
 					const uri = req.url;
 
@@ -209,18 +208,20 @@ export class Badak {
 					});
 
 					if (targetFnc === undefined) {
-						throw new Error('not defined route function');
+						res.statusCode = 404;
+						res.end();
 					}
+					else {
+						(async () => {
+							this._middleware.forEach(async (middleware : Function) => {
+								await middleware();
+							});
 
-					(async () => {
-						this._middleware.forEach(async (middleware : Function) => {
-							await middleware();
-						});
+							const resObj = await targetFnc();
 
-						const resObj = await targetFnc();
-
-						res.end(resObj);
-					})();
+							res.end(resObj);
+						})();
+					}
 				});
 
 				this._http.listen(port, () => {
