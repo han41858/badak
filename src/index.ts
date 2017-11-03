@@ -245,40 +245,62 @@ export class Badak {
 												try {
 													const contentTypeInHeader : string = req.headers['content-type'] as string;
 
-													// ex) 'multipart/form-data; boundary=--------------------------409163730478229095679468'
 													if (!!contentTypeInHeader) {
 														const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
 														const contentType = contentTypeStrArr[0].trim();
 
-														// const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
-														// console.log('boundaryStrArr :', boundaryStrArr);
-														//
-														// const boundaryStr : string = boundaryStrArr[1].trim();
-														// console.log('boundaryStr :', boundaryStr);
-														//
-														// if (!boundaryStr) {
-														// 	throw new Error('invalid content-type');
-														// }
-
 														bodyStr = Buffer.concat(bodyBuffer).toString().replace(/\s/g, '');
 
+														let fieldArr : string[] = null;
+
 														switch (contentType) {
-															// case 'multipart/form-data':
-															// 	console.log('multipart/form-data');
-															//
-															// 	console.log('\n\nbodyStr');
-															// 	console.log(bodyStr);
-															//
-															// 	console.log('\n\nsplit result');
-															// 	const splitArr = bodyStr.split(boundaryStr)
-															// 		.filter(one => {
-															// 			return one.includes('Content-Disposition:form-data') && one.includes('name=');
-															// 		});
-															// 	console.log(splitArr);
-															// 	break;
+															case 'multipart/form-data':
+																const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
+																const boundaryStr : string = boundaryStrArr[1].trim();
+
+																if (!boundaryStr) {
+																	throw new Error('invalid content-type');
+																}
+
+																fieldArr = bodyStr.split(boundaryStr)
+																	.filter(one => {
+																		return one.includes('Content-Disposition:form-data') && one.includes('name=');
+																	})
+																	.map(one => {
+																		// multipart/form-data has redundant '--', remove it
+																		return one.substr(0, one.length - 2);
+																	});
+
+																// validation
+																const fieldPrefixStr = 'Content-Disposition:form-data;name=';
+																fieldArr.forEach((str) => {
+																	if (!str.includes(fieldPrefixStr)) {
+																		throw new Error('invalid data : Content-Disposition');
+																	}
+																});
+
+																paramObj = {};
+
+																fieldArr.forEach(field => {
+																	const [prefix, key, value] = field.split('"');
+																	paramObj[key] = value;
+																});
+
+																break;
 
 															case 'application/json':
 																paramObj = JSON.parse(bodyStr);
+																break;
+
+															case 'application/x-www-form-urlencoded':
+																paramObj = {};
+
+																fieldArr = bodyStr.split('&');
+
+																fieldArr.forEach(field => {
+																	const [key, value] = field.split('=');
+																	paramObj[key] = value;
+																});
 																break;
 														}
 													}
