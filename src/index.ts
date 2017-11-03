@@ -68,6 +68,7 @@ export class Badak {
 		const resultRuleObj = {};
 
 		keyArr.forEach(key => {
+			// TODO: root routing
 			const refinedKey = key.replace(/^\/|\/$/gi, '');
 
 			const uriArr = refinedKey.split('/');
@@ -221,15 +222,113 @@ export class Badak {
 								await middleware();
 							});
 
-							const resObj = await targetFnc();
+							// TODO: split with each 4-methods
+							Promise.resolve()
+								.then(async () => {
+									return (req.method === 'PUT' || req.method === 'POST') ?
+										new Promise((resolve, reject) => {
+											const bodyBuffer : Buffer[] = [];
+											let bodyStr : string = null;
 
-							if (!!resObj) {
-								// TODO: response type
-								res.end(JSON.stringify(resObj));
-							}
-							else {
-								res.end();
-							}
+											req.on('data', (stream : Buffer) => {
+												bodyBuffer.push(stream);
+											});
+
+											req.on('error', (err) => {
+												reject(err);
+											});
+
+											req.on('end', async () => {
+												let paramObj = undefined;
+
+												// for dev
+												try {
+													const contentTypeInHeader : string = req.headers['content-type'] as string;
+
+													// ex) 'multipart/form-data; boundary=--------------------------409163730478229095679468'
+													if (!!contentTypeInHeader) {
+														const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
+														const contentType = contentTypeStrArr[0].trim();
+
+														// const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
+														// console.log('boundaryStrArr :', boundaryStrArr);
+														//
+														// const boundaryStr : string = boundaryStrArr[1].trim();
+														// console.log('boundaryStr :', boundaryStr);
+														//
+														// if (!boundaryStr) {
+														// 	throw new Error('invalid content-type');
+														// }
+
+														bodyStr = Buffer.concat(bodyBuffer).toString().replace(/\s/g, '');
+
+														switch (contentType) {
+															// case 'multipart/form-data':
+															// 	console.log('multipart/form-data');
+															//
+															// 	console.log('\n\nbodyStr');
+															// 	console.log(bodyStr);
+															//
+															// 	console.log('\n\nsplit result');
+															// 	const splitArr = bodyStr.split(boundaryStr)
+															// 		.filter(one => {
+															// 			return one.includes('Content-Disposition:form-data') && one.includes('name=');
+															// 		});
+															// 	console.log(splitArr);
+															// 	break;
+
+															case 'application/json':
+																paramObj = JSON.parse(bodyStr);
+																break;
+														}
+													}
+
+													resolve(paramObj);
+												}
+												catch (err) {
+													console.error(err);
+													reject(err);
+												}
+											});
+										}) :
+										Promise.resolve();
+								})
+								.then(async (param : any) => {
+									const resObj = await targetFnc(param);
+
+									if (!!resObj) {
+										// TODO: response type
+										res.statusCode = 200; // default 200
+
+										// check result is json
+										if (typeof resObj === 'object') {
+											let isJson = false;
+
+											try {
+												JSON.stringify(resObj);
+												isJson = true;
+											}
+											catch (err) {
+												// no json
+											}
+
+											if (isJson) {
+												res.setHeader('Content-Type', 'application/json');
+											}
+										}
+
+										// res.writeHead(200, {
+										// 	'Content-Type': 'application/json'
+										// });
+										res.end(JSON.stringify(resObj));
+									}
+									else {
+										res.end();
+									}
+								}, async (err : Error) => {
+									res.statusCode = 500;
+									res.end();
+								});
 						})();
 					}
 				});
