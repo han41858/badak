@@ -113,8 +113,6 @@ export class Badak {
 					}
 
 					if (typeof value === 'object' && !!value) {
-
-
 						// check before-last depth
 						const beforeLastDepth : boolean = Object.keys(value).every(key => {
 							return value[key].constructor.name !== 'Object';
@@ -197,13 +195,19 @@ export class Badak {
 					}
 
 					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
-					let targetFnc : Function = null;
+					let targetFnc : Function = undefined;
+
+					// TODO: static files
 
 					uriArr.forEach((uriFrag, i, arr) => {
 						targetRouteObj = targetRouteObj[uriFrag];
 
-						if (i === arr.length - 1) {
-							targetFnc = targetRouteObj[req.method];
+						if (targetRouteObj !== undefined) {
+							if (i === arr.length - 1) {
+								if (!!req.method && !!targetRouteObj[req.method]) {
+									targetFnc = targetRouteObj[req.method];
+								}
+							}
 						}
 					});
 
@@ -219,7 +223,13 @@ export class Badak {
 
 							const resObj = await targetFnc();
 
-							res.end(resObj);
+							if (!!resObj) {
+								// TODO: response type
+								res.end(JSON.stringify(resObj));
+							}
+							else {
+								res.end();
+							}
 						})();
 					}
 				});
