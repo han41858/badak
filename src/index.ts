@@ -36,6 +36,11 @@ export class Badak {
 	private _middleware : Function[] = [];
 	private _routeRule : RouteRule = null;
 
+	// TODO: route abbreviation, get, post, put, delete
+	// async get (rule : RouteRule) : Promise<void> {
+	//
+	// }
+
 	async route (rule : RouteRule) : Promise<void> {
 		if (rule === undefined) {
 			throw new Error('route rule should be passed');
@@ -224,7 +229,7 @@ export class Badak {
 
 						// TODO: split with each 4-methods
 
-						let param : object = undefined;
+						let param : any = undefined;
 
 						if (req.method === 'PUT' || req.method === 'POST') {
 							param = await new Promise((_resolve, _reject) => {
