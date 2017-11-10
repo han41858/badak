@@ -36,26 +36,6 @@ export class Badak {
 	private _middleware : Function[] = [];
 	private _routeRule : RouteRule = null;
 
-	// TODO: route abbreviation, get, post, put, delete
-	// async get (rule : RouteRule) : Promise<void> {
-	//
-	// }
-
-	async route (rule : RouteRule) : Promise<void> {
-		if (rule === undefined) {
-			throw new Error('route rule should be passed');
-		}
-
-		if (typeof rule !== 'object') {
-			throw new Error('route rule should be object');
-		}
-
-		return this._checkRouteRule(rule)
-			.then((routeRule : RouteRule) => {
-				this._routeRule = routeRule;
-			});
-	}
-
 	// check & refine route rule
 	private async _checkRouteRule (rule : RouteRule | RouteRuleSeed) : Promise<RouteRule | RouteRuleSeed> {
 		if (rule === undefined) {
@@ -165,6 +145,68 @@ export class Badak {
 		return rules[0]; // rule object is in 0 index
 	}
 
+	private async _assignRule (ruleObj : RouteRule | RouteRuleSeed) {
+		console.log('_assignRule()', ruleObj);
+
+		if (this._routeRule === null) {
+			this._routeRule = {};
+		}
+
+		Object.keys(ruleObj).forEach(key => {
+			if (typeof key === 'object') {
+				console.log('RouteRule type');
+			}
+			else {
+				console.log('RouteRuleSeed type. key :', key);
+
+				this._routeRule[key] = ruleObj[key];
+			}
+		});
+	}
+
+	// TODO: route abbreviation, get, post, put, delete
+	async get (address : string, fnc : Function) : Promise<void> {
+		// check rule validation
+		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
+			[address] : {
+				'GET' : fnc
+			}
+		});
+
+		// assign to route rule
+		await this._assignRule(routeRule);
+	}
+
+	// TODO: listen() should use each of these
+	// private async _getRunner (address : string) : Promise<void> {
+	//
+	// }
+	//
+	// // GET, DELETE
+	// private async noParamRunner (address : string) : Promise<void> {
+	//
+	// }
+	//
+	// // POST, PUT
+	// private async paramRunner (address : string) : Promise<void> {
+	//
+	// }
+
+	async route (rule : RouteRule) : Promise<void> {
+		if (rule === undefined) {
+			throw new Error('route rule should be passed');
+		}
+
+		if (typeof rule !== 'object') {
+			throw new Error('route rule should be object');
+		}
+
+		return this._checkRouteRule(rule)
+			.then((routeRule : RouteRule) => {
+				this._routeRule = routeRule;
+			});
+	}
+
 	async use (middleware : Function) : Promise<void> {
 		if (middleware === undefined) {
 			throw new Error('middleware function should be passed');
@@ -203,7 +245,7 @@ export class Badak {
 
 					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
 
-					if(targetRouteObj !== null){
+					if (targetRouteObj !== null) {
 						let targetFnc : Function = undefined;
 
 						// TODO: static files
