@@ -202,155 +202,162 @@ export class Badak {
 					}
 
 					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
-					let targetFnc : Function = undefined;
 
-					// TODO: static files
+					if(targetRouteObj !== null){
+						let targetFnc : Function = undefined;
 
-					uriArr.forEach((uriFrag, i, arr) => {
-						targetRouteObj = targetRouteObj[uriFrag];
+						// TODO: static files
 
-						if (targetRouteObj !== undefined) {
-							if (i === arr.length - 1) {
-								if (!!req.method && !!targetRouteObj[req.method]) {
-									targetFnc = targetRouteObj[req.method];
+						uriArr.forEach((uriFrag, i, arr) => {
+							targetRouteObj = targetRouteObj[uriFrag];
+
+							if (targetRouteObj !== undefined) {
+								if (i === arr.length - 1) {
+									if (!!req.method && !!targetRouteObj[req.method]) {
+										targetFnc = targetRouteObj[req.method];
+									}
 								}
 							}
-						}
-					});
-
-					if (targetFnc === undefined) {
-						res.statusCode = 404;
-						res.end();
-					}
-					else {
-						this._middleware.forEach(async (middleware : Function) => {
-							await middleware();
 						});
 
-						// TODO: split with each 4-methods
-
-						let param : any = undefined;
-
-						if (req.method === 'PUT' || req.method === 'POST') {
-							param = await new Promise((_resolve, _reject) => {
-								const bodyBuffer : Buffer[] = [];
-								let bodyStr : string = null;
-
-								req.on('data', (stream : Buffer) => {
-									bodyBuffer.push(stream);
-								});
-
-								req.on('error', (err) => {
-									_reject(err);
-								});
-
-								req.on('end', async () => {
-									let paramObj = undefined;
-
-									const contentTypeInHeader : string = req.headers['content-type'] as string;
-
-									if (!!contentTypeInHeader) {
-										const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
-										const contentType = contentTypeStrArr[0].trim();
-
-										bodyStr = Buffer.concat(bodyBuffer).toString().replace(/\s/g, '');
-
-										let fieldArr : string[] = null;
-
-										switch (contentType) {
-											case 'multipart/form-data':
-												const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
-												const boundaryStr : string = boundaryStrArr[1].trim();
-
-												if (!boundaryStr) {
-													throw new Error('invalid content-type');
-												}
-
-												fieldArr = bodyStr.split(boundaryStr)
-													.filter(one => {
-														return one.includes('Content-Disposition:form-data') && one.includes('name=');
-													})
-													.map(one => {
-														// multipart/form-data has redundant '--', remove it
-														return one.substr(0, one.length - 2);
-													});
-
-												// validation
-												const fieldPrefixStr = 'Content-Disposition:form-data;name=';
-												fieldArr.forEach((str) => {
-													if (!str.includes(fieldPrefixStr)) {
-														throw new Error('invalid data : Content-Disposition');
-													}
-												});
-
-												paramObj = {};
-
-												fieldArr.forEach(field => {
-													const [prefix, key, value] = field.split('"');
-													paramObj[key] = value;
-												});
-
-												break;
-
-											case 'application/json':
-												paramObj = JSON.parse(bodyStr);
-												break;
-
-											case 'application/x-www-form-urlencoded':
-												paramObj = {};
-
-												fieldArr = bodyStr.split('&');
-
-												fieldArr.forEach(field => {
-													const [key, value] = field.split('=');
-													paramObj[key] = value;
-												});
-												break;
-										}
-									}
-
-									_resolve(paramObj);
-								});
-							})
-								.catch(async (err : Error) => {
-									console.error(err);
-
-									res.statusCode = 500;
-									res.end();
-								});
-						}
-
-						const resObj = await targetFnc(param);
-
-						if (!!resObj) {
-							// TODO: response type
-							res.statusCode = 200; // default 200
-
-							// check result is json
-							if (typeof resObj === 'object') {
-								let isJson = false;
-
-								try {
-									JSON.stringify(resObj);
-									isJson = true;
-								}
-								catch (err) {
-									// no json
-								}
-
-								if (isJson) {
-									res.setHeader('Content-Type', 'application/json');
-								}
-							}
-
-							// res.writeHead(200, {
-							// 	'Content-Type': 'application/json'
-							// });
-							res.end(JSON.stringify(resObj));
-						}
-						else {
+						if (targetFnc === undefined) {
+							res.statusCode = 404;
 							res.end();
 						}
+						else {
+							this._middleware.forEach(async (middleware : Function) => {
+								await middleware();
+							});
+
+							// TODO: split with each 4-methods
+
+							let param : any = undefined;
+
+							if (req.method === 'PUT' || req.method === 'POST') {
+								param = await new Promise((_resolve, _reject) => {
+									const bodyBuffer : Buffer[] = [];
+									let bodyStr : string = null;
+
+									req.on('data', (stream : Buffer) => {
+										bodyBuffer.push(stream);
+									});
+
+									req.on('error', (err) => {
+										_reject(err);
+									});
+
+									req.on('end', async () => {
+										let paramObj = undefined;
+
+										const contentTypeInHeader : string = req.headers['content-type'] as string;
+
+										if (!!contentTypeInHeader) {
+											const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
+											const contentType = contentTypeStrArr[0].trim();
+
+											bodyStr = Buffer.concat(bodyBuffer).toString().replace(/\s/g, '');
+
+											let fieldArr : string[] = null;
+
+											switch (contentType) {
+												case 'multipart/form-data':
+													const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
+													const boundaryStr : string = boundaryStrArr[1].trim();
+
+													if (!boundaryStr) {
+														throw new Error('invalid content-type');
+													}
+
+													fieldArr = bodyStr.split(boundaryStr)
+														.filter(one => {
+															return one.includes('Content-Disposition:form-data') && one.includes('name=');
+														})
+														.map(one => {
+															// multipart/form-data has redundant '--', remove it
+															return one.substr(0, one.length - 2);
+														});
+
+													// validation
+													const fieldPrefixStr = 'Content-Disposition:form-data;name=';
+													fieldArr.forEach((str) => {
+														if (!str.includes(fieldPrefixStr)) {
+															throw new Error('invalid data : Content-Disposition');
+														}
+													});
+
+													paramObj = {};
+
+													fieldArr.forEach(field => {
+														const [prefix, key, value] = field.split('"');
+														paramObj[key] = value;
+													});
+
+													break;
+
+												case 'application/json':
+													paramObj = JSON.parse(bodyStr);
+													break;
+
+												case 'application/x-www-form-urlencoded':
+													paramObj = {};
+
+													fieldArr = bodyStr.split('&');
+
+													fieldArr.forEach(field => {
+														const [key, value] = field.split('=');
+														paramObj[key] = value;
+													});
+													break;
+											}
+										}
+
+										_resolve(paramObj);
+									});
+								})
+									.catch(async (err : Error) => {
+										console.error(err);
+
+										res.statusCode = 500;
+										res.end();
+									});
+							}
+
+							const resObj = await targetFnc(param);
+
+							if (!!resObj) {
+								// TODO: response type
+								res.statusCode = 200; // default 200
+
+								// check result is json
+								if (typeof resObj === 'object') {
+									let isJson = false;
+
+									try {
+										JSON.stringify(resObj);
+										isJson = true;
+									}
+									catch (err) {
+										// no json
+									}
+
+									if (isJson) {
+										res.setHeader('Content-Type', 'application/json');
+									}
+								}
+
+								// res.writeHead(200, {
+								// 	'Content-Type': 'application/json'
+								// });
+								res.end(JSON.stringify(resObj));
+							}
+							else {
+								res.end();
+							}
+						}
+					}
+					else {
+						res.statusCode = 404;
+						res.end();
 					}
 				});
 
