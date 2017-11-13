@@ -145,21 +145,48 @@ export class Badak {
 		return rules[0]; // rule object is in 0 index
 	}
 
-	private async _assignRule (ruleObj : RouteRule | RouteRuleSeed) {
-		console.log('_assignRule()', ruleObj);
-
+	private async _assignRule (ruleObj : RouteRule | RouteRuleSeed, parentObj? : RouteRule | RouteRuleSeed) : Promise<void> {
 		if (this._routeRule === null) {
 			this._routeRule = {};
 		}
 
-		Object.keys(ruleObj).forEach(key => {
-			if (typeof key === 'object') {
-				console.log('RouteRule type');
+		const targetObj : RouteRule | RouteRuleSeed = parentObj === undefined ? this._routeRule : parentObj;
+
+		Object.keys(ruleObj).forEach(async key => {
+			if (typeof ruleObj[key] === 'object') {
+				// RouteRule
+				switch (key) {
+					case 'GET':
+					case 'POST':
+					case 'PUT':
+					case 'DELETE':
+						targetObj[key] = ruleObj[key];
+						break;
+
+					default:
+						// call recursively
+						if (targetObj[key] === undefined) {
+							targetObj[key] = {};
+						}
+
+						await this._assignRule(ruleObj[key], targetObj[key]);
+						break;
+				}
+
 			}
 			else {
-				console.log('RouteRuleSeed type. key :', key);
+				// RouteRuleSeed
+				switch (key) {
+					case 'GET':
+					case 'POST':
+					case 'PUT':
+					case 'DELETE':
+						targetObj[key] = ruleObj[key];
+						break;
 
-				this._routeRule[key] = ruleObj[key];
+					default:
+						throw new Error('invalid rule in RouteRuleSeed');
+				}
 			}
 		});
 	}
@@ -201,10 +228,9 @@ export class Badak {
 			throw new Error('route rule should be object');
 		}
 
-		return this._checkRouteRule(rule)
-			.then((routeRule : RouteRule) => {
-				this._routeRule = routeRule;
-			});
+		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule(rule);
+
+		this._assignRule(routeRule);
 	}
 
 	async use (middleware : Function) : Promise<void> {
