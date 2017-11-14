@@ -191,12 +191,48 @@ export class Badak {
 		});
 	}
 
-	// TODO: route abbreviation, get, post, put, delete
+	// route abbreviation
 	async get (address : string, fnc : Function) : Promise<void> {
 		// check rule validation
 		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
 			[address] : {
 				'GET' : fnc
+			}
+		});
+
+		// assign to route rule
+		await this._assignRule(routeRule);
+	}
+
+	async post (address : string, fnc : Function) : Promise<void> {
+		// check rule validation
+		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
+			[address] : {
+				'POST' : fnc
+			}
+		});
+
+		// assign to route rule
+		await this._assignRule(routeRule);
+	}
+
+	async put (address : string, fnc : Function) : Promise<void> {
+		// check rule validation
+		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
+			[address] : {
+				'PUT' : fnc
+			}
+		});
+
+		// assign to route rule
+		await this._assignRule(routeRule);
+	}
+
+	async delete (address : string, fnc : Function) : Promise<void> {
+		// check rule validation
+		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
+			[address] : {
+				'DELETE' : fnc
 			}
 		});
 
