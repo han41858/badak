@@ -457,10 +457,12 @@ export class Badak {
 								catch (err) {
 									// no json
 
+									res.setHeader('Content-Type', 'text/plain');
 									res.end(resObj);
 								}
 							}
 							else {
+								res.setHeader('Content-Type', 'text/plain');
 								res.end(resObj);
 							}
 						}
