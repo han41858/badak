@@ -240,20 +240,90 @@ export class Badak {
 		await this._assignRule(routeRule);
 	}
 
-	// TODO: listen() should use each of these
-	// private async _getRunner (address : string) : Promise<void> {
-	//
-	// }
-	//
-	// // GET, DELETE
-	// private async noParamRunner (address : string) : Promise<void> {
-	//
-	// }
-	//
-	// // POST, PUT
-	// private async paramRunner (address : string) : Promise<void> {
-	//
-	// }
+	// for POST, PUT
+	private async _paramParser (req : IncomingMessage) : Promise<any> {
+		return new Promise((_resolve, _reject) => {
+			const bodyBuffer : Buffer[] = [];
+			let bodyStr : string = null;
+
+			req.on('data', (stream : Buffer) => {
+				bodyBuffer.push(stream);
+			});
+
+			req.on('error', (err) => {
+				_reject(err);
+			});
+
+			req.on('end', async () => {
+				let paramObj = undefined;
+
+				const contentTypeInHeader : string = req.headers['content-type'] as string;
+
+				if (!!contentTypeInHeader) {
+					const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
+					const contentType = contentTypeStrArr[0].trim();
+
+					bodyStr = Buffer.concat(bodyBuffer).toString().replace(/\s/g, '');
+
+					let fieldArr : string[] = null;
+
+					switch (contentType) {
+						case 'multipart/form-data':
+							const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
+							const boundaryStr : string = boundaryStrArr[1].trim();
+
+							if (!boundaryStr) {
+								throw new Error('invalid content-type');
+							}
+
+							fieldArr = bodyStr.split(boundaryStr)
+								.filter(one => {
+									return one.includes('Content-Disposition:form-data') && one.includes('name=');
+								})
+								.map(one => {
+									// multipart/form-data has redundant '--', remove it
+									return one.substr(0, one.length - 2);
+								});
+
+							// validation
+							const fieldPrefixStr = 'Content-Disposition:form-data;name=';
+							fieldArr.forEach((str) => {
+								if (!str.includes(fieldPrefixStr)) {
+									throw new Error('invalid data : Content-Disposition');
+								}
+							});
+
+							paramObj = {};
+
+							fieldArr.forEach(field => {
+								const [prefix, key, value] = field.split('"');
+								paramObj[key] = value;
+							});
+
+							break;
+
+						case 'application/json':
+							paramObj = JSON.parse(bodyStr);
+							break;
+
+						case 'application/x-www-form-urlencoded':
+							paramObj = {};
+
+							fieldArr = bodyStr.split('&');
+
+							fieldArr.forEach(field => {
+								const [key, value] = field.split('=');
+								paramObj[key] = value;
+							});
+							break;
+					}
+				}
+
+				_resolve(paramObj);
+			});
+		});
+
+	}
 
 	async route (rule : RouteRule) : Promise<void> {
 		if (rule === undefined) {
@@ -329,102 +399,23 @@ export class Badak {
 							res.end();
 						}
 						else {
-							this._middleware.forEach(async (middleware : Function) => {
-								await middleware();
-							});
-
-							// TODO: split with each 4-methods
-
 							let param : any = undefined;
 
 							if (req.method === 'PUT' || req.method === 'POST') {
-								param = await new Promise((_resolve, _reject) => {
-									const bodyBuffer : Buffer[] = [];
-									let bodyStr : string = null;
-
-									req.on('data', (stream : Buffer) => {
-										bodyBuffer.push(stream);
-									});
-
-									req.on('error', (err) => {
-										_reject(err);
-									});
-
-									req.on('end', async () => {
-										let paramObj = undefined;
-
-										const contentTypeInHeader : string = req.headers['content-type'] as string;
-
-										if (!!contentTypeInHeader) {
-											const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
-											const contentType = contentTypeStrArr[0].trim();
-
-											bodyStr = Buffer.concat(bodyBuffer).toString().replace(/\s/g, '');
-
-											let fieldArr : string[] = null;
-
-											switch (contentType) {
-												case 'multipart/form-data':
-													const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
-													const boundaryStr : string = boundaryStrArr[1].trim();
-
-													if (!boundaryStr) {
-														throw new Error('invalid content-type');
-													}
-
-													fieldArr = bodyStr.split(boundaryStr)
-														.filter(one => {
-															return one.includes('Content-Disposition:form-data') && one.includes('name=');
-														})
-														.map(one => {
-															// multipart/form-data has redundant '--', remove it
-															return one.substr(0, one.length - 2);
-														});
-
-													// validation
-													const fieldPrefixStr = 'Content-Disposition:form-data;name=';
-													fieldArr.forEach((str) => {
-														if (!str.includes(fieldPrefixStr)) {
-															throw new Error('invalid data : Content-Disposition');
-														}
-													});
-
-													paramObj = {};
-
-													fieldArr.forEach(field => {
-														const [prefix, key, value] = field.split('"');
-														paramObj[key] = value;
-													});
-
-													break;
-
-												case 'application/json':
-													paramObj = JSON.parse(bodyStr);
-													break;
-
-												case 'application/x-www-form-urlencoded':
-													paramObj = {};
-
-													fieldArr = bodyStr.split('&');
-
-													fieldArr.forEach(field => {
-														const [key, value] = field.split('=');
-														paramObj[key] = value;
-													});
-													break;
-											}
-										}
-
-										_resolve(paramObj);
-									});
-								})
+								param = await this._paramParser(req)
 									.catch(async (err : Error) => {
 										console.error(err);
 
 										res.statusCode = 500;
 										res.end();
+
+										throw err;
 									});
 							}
+
+							this._middleware.forEach(async (middleware : Function) => {
+								await middleware();
+							});
 
 							const resObj = await targetFnc(param);
 
