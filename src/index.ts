@@ -366,22 +366,25 @@ export class Badak {
 		else {
 			// use new Promise for http.listen() callback
 			return new Promise(resolve => {
-				this._http = http.createServer(async (req : IncomingMessage, res : ServerResponse) => {
-					// find route rule
-					const uri = req.url;
-					const uriArr = uri.split('/').filter(frag => frag !== '');
+				this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
+					// new Promise loop to catch error
+					(async () => {
+						// find route rule
+						const uri : string = req.url;
+						const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
 
-					if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
-						throw new Error('invalid uri');
-					}
+						let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
 
-					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
+						if (targetRouteObj === null) {
+							// no rule assigned
+							throw new Error('no rule');
+						}
 
-					if (targetRouteObj !== null) {
 						let targetFnc : Function = undefined;
 
 						// TODO: static files
 
+						// find target function
 						uriArr.forEach((uriFrag, i, arr) => {
 							targetRouteObj = targetRouteObj[uriFrag];
 
@@ -395,65 +398,66 @@ export class Badak {
 						});
 
 						if (targetFnc === undefined) {
-							res.statusCode = 404;
-							res.end();
+							throw new Error('no rule');
 						}
-						else {
-							let param : any = undefined;
 
-							if (req.method === 'PUT' || req.method === 'POST') {
+						let param : any = undefined;
+
+						switch (req.method) {
+							case 'PUT':
+							case 'POST':
 								param = await this._paramParser(req)
 									.catch(async (err : Error) => {
 										console.error(err);
 
-										res.statusCode = 500;
-										res.end();
-
-										throw err;
+										throw new Error('parsing parameter error');
 									});
-							}
+								break;
+						}
 
-							this._middleware.forEach(async (middleware : Function) => {
-								await middleware();
-							});
+						this._middleware.forEach(async (middleware : Function) => {
+							await middleware();
+						});
 
-							const resObj = await targetFnc(param);
+						const resObj : any = await targetFnc(param);
 
-							if (!!resObj) {
-								// TODO: response type
-								res.statusCode = 200; // default 200
+						if (!!resObj) {
+							// check result is json
+							if (typeof resObj === 'object') {
+								let isJson = false;
 
-								// check result is json
-								if (typeof resObj === 'object') {
-									let isJson = false;
-
-									try {
-										JSON.stringify(resObj);
-										isJson = true;
-									}
-									catch (err) {
-										// no json
-									}
-
-									if (isJson) {
-										res.setHeader('Content-Type', 'application/json');
-									}
+								try {
+									JSON.stringify(resObj);
+									isJson = true;
+								}
+								catch (err) {
+									// no json
 								}
 
-								// res.writeHead(200, {
-								// 	'Content-Type': 'application/json'
-								// });
-								res.end(JSON.stringify(resObj));
+								if (isJson) {
+									res.setHeader('Content-Type', 'application/json');
+								}
 							}
-							else {
-								res.end();
-							}
+
+							res.end(JSON.stringify(resObj));
 						}
-					}
-					else {
-						res.statusCode = 404;
-						res.end();
-					}
+						else {
+							res.end();
+						}
+					})()
+						.catch((err : Error) => {
+							switch (err.message) {
+								case 'no rule':
+									res.statusCode = 404;
+									res.end();
+									break;
+
+								case 'parsing parameter error':
+									res.statusCode = 500;
+									res.end();
+									break;
+							}
+						});
 				});
 
 				this._http.listen(port, () => {
