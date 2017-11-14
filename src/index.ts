@@ -424,22 +424,23 @@ export class Badak {
 						if (!!resObj) {
 							// check result is json
 							if (typeof resObj === 'object') {
-								let isJson = false;
 
 								try {
 									JSON.stringify(resObj);
-									isJson = true;
+
+									res.setHeader('Content-Type', 'application/json');
+
+									res.end(JSON.stringify(resObj));
 								}
 								catch (err) {
 									// no json
-								}
 
-								if (isJson) {
-									res.setHeader('Content-Type', 'application/json');
+									res.end(resObj);
 								}
 							}
-
-							res.end(JSON.stringify(resObj));
+							else {
+								res.end(resObj);
+							}
 						}
 						else {
 							res.end();
