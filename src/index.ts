@@ -191,8 +191,24 @@ export class Badak {
 		});
 	}
 
+	async _routeAbbrValidator(address : string, fnc : Function) : Promise<void>{
+		if (address === undefined) {
+			throw new Error('no address');
+		}
+
+		if (fnc === undefined) {
+			throw new Error('no function');
+		}
+
+		if (fnc.constructor.name !== 'AsyncFunction') {
+			throw new Error('function should be async');
+		}
+	}
+
 	// route abbreviation
 	async get (address : string, fnc : Function) : Promise<void> {
+		await this._routeAbbrValidator(address, fnc);
+
 		// check rule validation
 		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
 			[address] : {
@@ -205,6 +221,8 @@ export class Badak {
 	}
 
 	async post (address : string, fnc : Function) : Promise<void> {
+		await this._routeAbbrValidator(address, fnc);
+
 		// check rule validation
 		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
 			[address] : {
@@ -217,6 +235,8 @@ export class Badak {
 	}
 
 	async put (address : string, fnc : Function) : Promise<void> {
+		await this._routeAbbrValidator(address, fnc);
+
 		// check rule validation
 		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
 			[address] : {
@@ -229,6 +249,8 @@ export class Badak {
 	}
 
 	async delete (address : string, fnc : Function) : Promise<void> {
+		await this._routeAbbrValidator(address, fnc);
+
 		// check rule validation
 		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
 			[address] : {
