@@ -191,7 +191,7 @@ export class Badak {
 		});
 	}
 
-	async _routeAbbrValidator(address : string, fnc : Function) : Promise<void>{
+	async _routeAbbrValidator (address : string, fnc : Function) : Promise<void> {
 		if (address === undefined) {
 			throw new Error('no address');
 		}
@@ -403,17 +403,40 @@ export class Badak {
 						}
 
 						let targetFnc : Function = undefined;
+						let param : any = undefined;
 
 						// TODO: static files
 
 						// find target function
 						uriArr.forEach((uriFrag, i, arr) => {
-							targetRouteObj = targetRouteObj[uriFrag];
+							if (targetRouteObj[uriFrag] !== undefined) {
+								targetRouteObj = targetRouteObj[uriFrag];
 
-							if (targetRouteObj !== undefined) {
+								// check route param
 								if (i === arr.length - 1) {
 									if (!!req.method && !!targetRouteObj[req.method]) {
 										targetFnc = targetRouteObj[req.method];
+									}
+								}
+							}
+							else {
+								// find router param
+								const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+
+								if (colonParam !== undefined) {
+									targetRouteObj = targetRouteObj[colonParam];
+
+									if (i === arr.length - 1) {
+										if (!!req.method && !!targetRouteObj[req.method]) {
+											targetFnc = targetRouteObj[req.method];
+
+											if (param === undefined) {
+												param = {
+													matcher : colonParam,
+													id : uriFrag
+												};
+											}
+										}
 									}
 								}
 							}
@@ -423,12 +446,14 @@ export class Badak {
 							throw new Error('no rule');
 						}
 
-						let param : any = undefined;
-
 						switch (req.method) {
 							case 'PUT':
 							case 'POST':
-								param = await this._paramParser(req)
+								if (param === undefined) {
+									param = {};
+								}
+
+								param.data = await this._paramParser(req)
 									.catch(async (err : Error) => {
 										console.error(err);
 
