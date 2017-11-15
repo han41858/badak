@@ -421,6 +421,8 @@ export class Badak {
 							}
 							else {
 								// find router param
+
+								// colon routing
 								const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
 
 								if (colonParam !== undefined) {
@@ -434,6 +436,7 @@ export class Badak {
 												param = {
 													matcher : colonParam,
 													id : uriFrag
+													// [colonParam.replace(':', '')] : uriFrag
 												};
 											}
 										}
@@ -503,6 +506,11 @@ export class Badak {
 									break;
 
 								case 'parsing parameter error':
+									res.statusCode = 500;
+									res.end();
+									break;
+									
+								default:
 									res.statusCode = 500;
 									res.end();
 									break;
