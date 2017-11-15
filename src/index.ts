@@ -428,17 +428,20 @@ export class Badak {
 								if (colonParam !== undefined) {
 									targetRouteObj = targetRouteObj[colonParam];
 
+									if (param === undefined) {
+										param = {};
+									}
+
+									if (param.matcher === undefined) {
+										param.matcher = [];
+									}
+
+									param.matcher.push(colonParam);
+									param[colonParam.replace(':', '')] = uriFrag;
+
 									if (i === arr.length - 1) {
 										if (!!req.method && !!targetRouteObj[req.method]) {
 											targetFnc = targetRouteObj[req.method];
-
-											if (param === undefined) {
-												param = {
-													matcher : colonParam,
-													id : uriFrag
-													// [colonParam.replace(':', '')] : uriFrag
-												};
-											}
 										}
 									}
 								}
@@ -509,8 +512,9 @@ export class Badak {
 									res.statusCode = 500;
 									res.end();
 									break;
-									
+
 								default:
+									console.log(err.message);
 									res.statusCode = 500;
 									res.end();
 									break;
