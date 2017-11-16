@@ -60,17 +60,25 @@ export class Badak {
 
 		// refine : remove '/', unzip abbreviation route path
 		keyArr.forEach(key => {
-			// TODO: root routing
-			const refinedKey = key.replace(/^\/|\/$/gi, '');
+			let refinedKey : string = null;
+			let uriArr : string[] = null;
 
-			const uriArr = refinedKey.split('/');
-
-			if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
-				throw new Error('empty uri included');
+			// slash is permitted only '/', for others remove slash
+			if (key === '/') {
+				refinedKey = key;
+				uriArr = [key];
 			}
+			else {
+				refinedKey = key.replace(/^\/|\/$/gi, '');
+				uriArr = refinedKey.split('/');
 
-			if (!uriArr.every(uriFrag => uriFrag.includes(':') ? uriFrag.indexOf(':') === 0 : true)) {
-				throw new Error('invalid colon route');
+				if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
+					throw new Error('empty uri included');
+				}
+
+				if (!uriArr.every(uriFrag => uriFrag.includes(':') ? uriFrag.indexOf(':') === 0 : true)) {
+					throw new Error('invalid colon route');
+				}
 			}
 
 			if (uriArr.length == 1) {
@@ -434,9 +442,8 @@ export class Badak {
 				this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
 					// new Promise loop to catch error
 					(async () => {
-						// find route rule
-						const uri : string = req.url;
-						const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
+						let targetFnc : Function = undefined;
+						let param : any = undefined;
 
 						let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
 
@@ -445,51 +452,60 @@ export class Badak {
 							throw new Error('no rule');
 						}
 
-						let targetFnc : Function = undefined;
-						let param : any = undefined;
+						// find route rule
+						const uri : string = req.url;
 
-						// TODO: static files
-
-						// find target function
-						uriArr.forEach((uriFrag, i, arr) => {
-							if (targetRouteObj[uriFrag] !== undefined) {
-								targetRouteObj = targetRouteObj[uriFrag];
-
-								// check route param
-								if (i === arr.length - 1) {
-									if (!!req.method && !!targetRouteObj[req.method]) {
-										targetFnc = targetRouteObj[req.method];
-									}
-								}
+						if (uri === '/') {
+							if (!!req.method && !!targetRouteObj['/'][req.method]) {
+								targetFnc = targetRouteObj['/'][req.method];
 							}
-							else {
-								// find router param
+						}
+						else {
+							const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
 
-								// colon routing
-								const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+							// TODO: static files
 
-								if (colonParam !== undefined) {
-									targetRouteObj = targetRouteObj[colonParam];
+							// find target function
+							uriArr.forEach((uriFrag, i, arr) => {
+								if (targetRouteObj[uriFrag] !== undefined) {
+									targetRouteObj = targetRouteObj[uriFrag];
 
-									if (param === undefined) {
-										param = {};
-									}
-
-									if (param.matcher === undefined) {
-										param.matcher = [];
-									}
-
-									param.matcher.push(colonParam);
-									param[colonParam.replace(':', '')] = uriFrag;
-
+									// check route param
 									if (i === arr.length - 1) {
 										if (!!req.method && !!targetRouteObj[req.method]) {
 											targetFnc = targetRouteObj[req.method];
 										}
 									}
 								}
-							}
-						});
+								else {
+									// find router param
+
+									// colon routing
+									const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+
+									if (colonParam !== undefined) {
+										targetRouteObj = targetRouteObj[colonParam];
+
+										if (param === undefined) {
+											param = {};
+										}
+
+										if (param.matcher === undefined) {
+											param.matcher = [];
+										}
+
+										param.matcher.push(colonParam);
+										param[colonParam.replace(':', '')] = uriFrag;
+
+										if (i === arr.length - 1) {
+											if (!!req.method && !!targetRouteObj[req.method]) {
+												targetFnc = targetRouteObj[req.method];
+											}
+										}
+									}
+								}
+							});
+						}
 
 						if (targetFnc === undefined) {
 							throw new Error('no rule');
