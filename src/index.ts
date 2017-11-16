@@ -76,17 +76,26 @@ export class Badak {
 					if (i > 0) {
 						if (i === arr.length - 1) {
 							// last one
+
 							targetObj[uriFrag] = rule[key];
 						}
 						else {
-							targetObj[uriFrag] = {};
+							if (targetObj[uriFrag] === undefined) {
+								targetObj[uriFrag] = {};
+							}
 
 							targetObj = targetObj[uriFrag]; // for recursive
 						}
 					}
 				});
 
-				refinedRuleObj[uriArr[0]] = abbrObj;
+				if (refinedRuleObj[uriArr[0]] === undefined) {
+					refinedRuleObj[uriArr[0]] = {};
+				}
+
+				Object.keys(abbrObj).forEach(key => {
+					refinedRuleObj[uriArr[0]][key] = abbrObj[key];
+				});
 			}
 		});
 
@@ -514,7 +523,7 @@ export class Badak {
 									break;
 
 								default:
-									console.log(err.message);
+									console.error(err.message);
 									res.statusCode = 500;
 									res.end();
 									break;
