@@ -52,6 +52,12 @@ export class Badak {
 		const refinedRuleObj = {}; // for abbreviation
 		const resultRuleObj = {};
 
+		// check colon routing count
+		const colonRouting : string[] = keyArr.filter(key => key.includes(':') && key.indexOf(':') === 0);
+		if (colonRouting.length > 1) {
+			throw new Error('duplicated colon routing');
+		}
+
 		// refine : remove '/', unzip abbreviation route path
 		keyArr.forEach(key => {
 			// TODO: root routing
@@ -59,14 +65,19 @@ export class Badak {
 
 			const uriArr = refinedKey.split('/');
 
+			if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
+				throw new Error('abbreviation valid failed');
+			}
+
+			if (!uriArr.every(uriFrag => uriFrag.includes(':') ? uriFrag.indexOf(':') === 0 : true)) {
+				throw new Error('invalid colon route');
+			}
+
 			if (uriArr.length == 1) {
 				refinedRuleObj[refinedKey] = rule[key];
 
 			}
 			else if (uriArr.length > 1) {
-				if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
-					throw new Error('abbreviation valid failed');
-				}
 
 				// convert abbreviation to recursive object
 				let abbrObj = {};
@@ -161,43 +172,66 @@ export class Badak {
 
 		const targetObj : RouteRule | RouteRuleSeed = parentObj === undefined ? this._routeRule : parentObj;
 
-		Object.keys(ruleObj).forEach(async key => {
-			if (typeof ruleObj[key] === 'object') {
-				// RouteRule
-				switch (key) {
-					case 'GET':
-					case 'POST':
-					case 'PUT':
-					case 'DELETE':
-						targetObj[key] = ruleObj[key];
-						break;
+		// use promise array to catch error in forEach loop
+		const promiseArr : Promise<void>[] = [];
 
-					default:
-						// call recursively
-						if (targetObj[key] === undefined) {
-							targetObj[key] = {};
-						}
+		Object.keys(ruleObj).forEach((key : string) => {
+			promiseArr.push((async () => {
+				if (typeof ruleObj[key] === 'object') {
+					// RouteRule
+					switch (key) {
+						case 'GET':
+						case 'POST':
+						case 'PUT':
+						case 'DELETE':
+							targetObj[key] = ruleObj[key];
+							break;
 
-						await this._assignRule(ruleObj[key], targetObj[key]);
-						break;
+						default:
+							// 	check duplicated param routing
+							const targetObjKeyArr : string[] = Object.keys(targetObj);
+							const ruleObjKeyArr : string[] = Object.keys(ruleObj);
+
+							const colonRouteArr : string[] = [...targetObjKeyArr, ...ruleObjKeyArr].filter(_key => _key.includes(':') && _key.indexOf(':') === 0);
+
+							if (colonRouteArr.length > 1) {
+								throw new Error('duplicated colon routing');
+							}
+
+							// call recursively
+							if (targetObj[key] === undefined) {
+								targetObj[key] = {};
+							}
+
+							await this._assignRule(ruleObj[key], targetObj[key]);
+							break;
+					}
+
 				}
+				else {
+					// RouteRuleSeed
+					switch (key) {
+						case 'GET':
+						case 'POST':
+						case 'PUT':
+						case 'DELETE':
+							targetObj[key] = ruleObj[key];
+							break;
 
-			}
-			else {
-				// RouteRuleSeed
-				switch (key) {
-					case 'GET':
-					case 'POST':
-					case 'PUT':
-					case 'DELETE':
-						targetObj[key] = ruleObj[key];
-						break;
-
-					default:
-						throw new Error('invalid rule in RouteRuleSeed');
+						default:
+							throw new Error('invalid rule in RouteRuleSeed');
+					}
 				}
-			}
+			})());
 		});
+
+		return Promise.all(promiseArr)
+			.then(() => {
+				// returns nothing
+			})
+			.catch((err : Error) => {
+				throw err;
+			});
 	}
 
 	async _routeAbbrValidator (address : string, fnc : Function) : Promise<void> {
@@ -367,7 +401,7 @@ export class Badak {
 
 		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule(rule);
 
-		this._assignRule(routeRule);
+		await this._assignRule(routeRule);
 	}
 
 	async use (middleware : Function) : Promise<void> {
