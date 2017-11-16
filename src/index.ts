@@ -66,7 +66,7 @@ export class Badak {
 			const uriArr = refinedKey.split('/');
 
 			if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
-				throw new Error('abbreviation valid failed');
+				throw new Error('empty uri included');
 			}
 
 			if (!uriArr.every(uriFrag => uriFrag.includes(':') ? uriFrag.indexOf(':') === 0 : true)) {
