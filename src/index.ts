@@ -503,6 +503,37 @@ export class Badak {
 											}
 										}
 									}
+									else {
+										console.log(targetRouteObj);
+
+										// find question routing
+
+										console.log('uriFrag :', uriFrag);
+
+										const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
+										console.log('routeRuleKeyArr :', routeRuleKeyArr);
+
+										const isExistQuestionRouting : boolean = routeRuleKeyArr.some(routeRuleKey => routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0);
+										console.log(isExistQuestionRouting);
+
+										if (isExistQuestionRouting) {
+											const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0);
+
+											console.log('questionKeyArr :', questionKeyArr);
+
+											const targetKeyArr : string[] = [];
+
+											questionKeyArr.forEach(questionKey => {
+												const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+
+												console.log('optionalCharacter :', optionalCharacter);
+
+												const targetQuestionKey : string = questionKeyArr.find(questionKey => new RegExp(`(\w?)${optionalCharacter}`).test(questionKey));
+
+												console.log('targetQuestionKey :', targetQuestionKey);
+											});
+										}
+									}
 								}
 							});
 						}
