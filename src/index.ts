@@ -496,43 +496,43 @@ export class Badak {
 
 										param.matcher.push(colonParam);
 										param[colonParam.replace(':', '')] = uriFrag;
-
-										if (i === arr.length - 1) {
-											if (!!req.method && !!targetRouteObj[req.method]) {
-												targetFnc = targetRouteObj[req.method];
-											}
-										}
 									}
 									else {
-										console.log(targetRouteObj);
-
 										// find question routing
 
-										console.log('uriFrag :', uriFrag);
-
 										const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
-										console.log('routeRuleKeyArr :', routeRuleKeyArr);
-
 										const isExistQuestionRouting : boolean = routeRuleKeyArr.some(routeRuleKey => routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0);
-										console.log(isExistQuestionRouting);
 
 										if (isExistQuestionRouting) {
 											const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0);
 
-											console.log('questionKeyArr :', questionKeyArr);
-
-											const targetKeyArr : string[] = [];
-
 											questionKeyArr.forEach(questionKey => {
 												const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
 
-												console.log('optionalCharacter :', optionalCharacter);
-
 												const targetQuestionKey : string = questionKeyArr.find(questionKey => new RegExp(`(\w?)${optionalCharacter}`).test(questionKey));
 
-												console.log('targetQuestionKey :', targetQuestionKey);
+												if(targetQuestionKey !== undefined){
+													targetRouteObj = targetRouteObj[targetQuestionKey];
+
+													if(param === undefined){
+														param = {};
+													}
+
+													if(param.matcher === undefined){
+														param.matcher = [];
+													}
+
+													param.matcher.push(targetQuestionKey);
+													param[targetQuestionKey] = uriFrag;
+												}
 											});
 										}
+									}
+								}
+
+								if (i === arr.length - 1) {
+									if (!!req.method && !!targetRouteObj[req.method]) {
+										targetFnc = targetRouteObj[req.method];
 									}
 								}
 							});
