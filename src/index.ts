@@ -155,9 +155,8 @@ export class Badak {
 					}
 					else {
 						// last depth seed function
-						// check function is async
-						if (value.constructor.name !== 'AsyncFunction') {
-							throw new Error('route function should be async');
+						if (!(value instanceof Function)) {
+							throw new Error('route function is not Function');
 						}
 
 						resultRuleObj[key] = value;
@@ -251,8 +250,8 @@ export class Badak {
 			throw new Error('no function');
 		}
 
-		if (fnc.constructor.name !== 'AsyncFunction') {
-			throw new Error('function should be async');
+		if (!(fnc instanceof Function)) {
+			throw new Error('middleware should be Function');
 		}
 	}
 
@@ -417,8 +416,8 @@ export class Badak {
 			throw new Error('middleware function should be passed');
 		}
 
-		if (middleware.constructor.name !== 'AsyncFunction') {
-			throw new Error('middleware function should be async');
+		if (!(middleware instanceof Function)) {
+			throw new Error('middleware should be function');
 		}
 
 		this._middleware.push(middleware);
@@ -511,14 +510,14 @@ export class Badak {
 
 												const targetQuestionKey : string = questionKeyArr.find(questionKey => new RegExp(`(\w?)${optionalCharacter}`).test(questionKey));
 
-												if(targetQuestionKey !== undefined){
+												if (targetQuestionKey !== undefined) {
 													targetRouteObj = targetRouteObj[targetQuestionKey];
 
-													if(param === undefined){
+													if (param === undefined) {
 														param = {};
 													}
 
-													if(param.matcher === undefined){
+													if (param.matcher === undefined) {
 														param.matcher = [];
 													}
 
