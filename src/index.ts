@@ -124,6 +124,17 @@ export class Badak {
 				(async () => {
 					const value = refinedRuleObj[key];
 
+					if (key.includes('?')) {
+						if (key.indexOf('?') === 0) {
+							throw new Error('uri can\'t start \'?\'');
+						}
+
+						// count ? character
+						if ((key.match(/\?/g) || []).length >= 2) {
+							throw new Error('multiple \'?\' in route uri');
+						}
+					}
+
 					if (value === undefined) {
 						throw new Error('route function should be passed');
 					}
@@ -199,7 +210,8 @@ export class Badak {
 							const targetObjKeyArr : string[] = Object.keys(targetObj);
 							const ruleObjKeyArr : string[] = Object.keys(ruleObj);
 
-							const colonRouteArr : string[] = [...targetObjKeyArr, ...ruleObjKeyArr].filter(_key => _key.includes(':') && _key.indexOf(':') === 0);
+							const colonRouteArr : string[] = [...targetObjKeyArr, ...ruleObjKeyArr]
+								.filter(_key => _key.includes(':') && _key.indexOf(':') === 0);
 
 							if (colonRouteArr.length > 1) {
 								throw new Error('duplicated colon routing');
@@ -503,7 +515,9 @@ export class Badak {
 										const isExistQuestionRouting : boolean = routeRuleKeyArr.some(routeRuleKey => routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0);
 
 										if (isExistQuestionRouting) {
-											const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0);
+											const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+												return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0
+											});
 
 											questionKeyArr.forEach(questionKey => {
 												const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
