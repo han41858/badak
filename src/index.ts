@@ -480,13 +480,6 @@ export class Badak {
 							uriArr.forEach((uriFrag, i, arr) => {
 								if (targetRouteObj[uriFrag] !== undefined) {
 									targetRouteObj = targetRouteObj[uriFrag];
-
-									// check route param
-									if (i === arr.length - 1) {
-										if (!!req.method && !!targetRouteObj[req.method]) {
-											targetFnc = targetRouteObj[req.method];
-										}
-									}
 								}
 								else {
 									// find router param
@@ -510,35 +503,33 @@ export class Badak {
 									}
 									else {
 										// find question routing
-
 										const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
-										const isExistQuestionRouting : boolean = routeRuleKeyArr.some(routeRuleKey => routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0);
 
-										if (isExistQuestionRouting) {
-											const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-												return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0
-											});
+										const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+											return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+										});
 
-											questionKeyArr.forEach(questionKey => {
-												const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+										const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+											const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+											const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+											const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
 
-												const targetQuestionKey : string = questionKeyArr.find(questionKey => new RegExp(`(\w?)${optionalCharacter}`).test(questionKey));
+											return new RegExp(`^${mandatoryKey}${optionalCharacter}?${restKey}$`).test(uriFrag);
+										});
 
-												if (targetQuestionKey !== undefined) {
-													targetRouteObj = targetRouteObj[targetQuestionKey];
+										if (targetQuestionKey !== undefined) {
+											targetRouteObj = targetRouteObj[targetQuestionKey];
 
-													if (param === undefined) {
-														param = {};
-													}
+											if (param === undefined) {
+												param = {};
+											}
 
-													if (param.matcher === undefined) {
-														param.matcher = [];
-													}
+											if (param.matcher === undefined) {
+												param.matcher = [];
+											}
 
-													param.matcher.push(targetQuestionKey);
-													param[targetQuestionKey] = uriFrag;
-												}
-											});
+											param.matcher.push(targetQuestionKey);
+											param[targetQuestionKey] = uriFrag;
 										}
 									}
 								}
