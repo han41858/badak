@@ -134,11 +134,6 @@ export class Badak {
 						if (key.indexOf('?') === 0) {
 							throw new Error('uri can\'t start \'?\'');
 						}
-
-						// count ? character
-						if ((key.match(/\?/g) || []).length >= 2) {
-							throw new Error('multiple \'?\' in route uri');
-						}
 					}
 
 					if (value === undefined) {
