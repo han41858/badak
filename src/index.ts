@@ -76,8 +76,14 @@ export class Badak {
 					throw new Error('empty uri included');
 				}
 
+				// ':' should be first index
 				if (!uriArr.every(uriFrag => uriFrag.includes(':') ? uriFrag.indexOf(':') === 0 : true)) {
 					throw new Error('invalid colon route');
+				}
+
+				// '+' should not be first index
+				if (!uriArr.every(uriFrag => uriFrag.includes('+') ? uriFrag.indexOf('+') !== 0 : true)) {
+					throw new Error('invalid plus route');
 				}
 			}
 
@@ -225,7 +231,6 @@ export class Badak {
 
 							// check current routed rule is duplicated
 							if (existingQuestionRouteArr.length > 0) {
-
 								const matchingQuestionUri : string = existingQuestionRouteArr.find(questionKey => {
 									return ruleObjKeyArr.some(ruleKey => {
 										return new RegExp(questionKey).test(ruleKey);
