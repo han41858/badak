@@ -254,7 +254,20 @@ export class Badak {
 							}
 
 							// check current plus route rule is duplicated
-							// const existingPlusRouteArr : string[] = []
+							const existingPlusRouteArr : string[] = [...targetObjKeyArr]
+								.filter(_key => _key.includes('+'));
+
+							if (existingPlusRouteArr.length > 0) {
+								const matchingPlusUri : string = existingPlusRouteArr.find(plusKey => {
+									return ruleObjKeyArr.some(ruleKey => {
+										return new RegExp(plusKey).test(ruleKey);
+									});
+								});
+
+								if (matchingPlusUri !== undefined) {
+									throw new Error('duplicated plus routing');
+								}
+							}
 
 							// check new plus route rule is duplicated
 							const newPlusRouteArr : string[] = [...ruleObjKeyArr]
