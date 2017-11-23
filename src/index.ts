@@ -190,6 +190,9 @@ export class Badak {
 
 		const targetObj : RouteRule | RouteRuleSeed = parentObj === undefined ? this._routeRule : parentObj;
 
+		const targetObjKeyArr : string[] = Object.keys(targetObj);
+		const ruleObjKeyArr : string[] = Object.keys(ruleObj);
+
 		// use promise array to catch error in forEach loop
 		const promiseArr : Promise<void>[] = [];
 
@@ -207,14 +210,47 @@ export class Badak {
 
 						default:
 							// 	check duplicated param routing
-							const targetObjKeyArr : string[] = Object.keys(targetObj);
-							const ruleObjKeyArr : string[] = Object.keys(ruleObj);
 
+							// find colon routing
 							const colonRouteArr : string[] = [...targetObjKeyArr, ...ruleObjKeyArr]
 								.filter(_key => _key.includes(':') && _key.indexOf(':') === 0);
 
 							if (colonRouteArr.length > 1) {
 								throw new Error('duplicated colon routing');
+							}
+
+							// find question routing
+							const existingQuestionRouteArr : string[] = [...targetObjKeyArr]
+								.filter(_key => _key.includes('?'));
+
+							// check current routed rule is duplicated
+							if (existingQuestionRouteArr.length > 0) {
+
+								const matchingQuestionUri : string = existingQuestionRouteArr.find(questionKey => {
+									return ruleObjKeyArr.some(ruleKey => {
+										return new RegExp(questionKey).test(ruleKey);
+									});
+								});
+
+								if (matchingQuestionUri !== undefined) {
+									throw new Error('duplicated question routing');
+								}
+							}
+
+							// check new route rule is duplicated
+							const newQuestionRouteArr : string[] = [...ruleObjKeyArr]
+								.filter(_key => _key.includes('?'));
+
+							if (newQuestionRouteArr.length > 0) {
+								const matchingQuestionUri : string = newQuestionRouteArr.find(questionKey => {
+									return targetObjKeyArr.some(ruleKey => {
+										return new RegExp(questionKey).test(ruleKey);
+									});
+								});
+
+								if (matchingQuestionUri !== undefined) {
+									throw new Error('duplicated question routing');
+								}
 							}
 
 							// call recursively
