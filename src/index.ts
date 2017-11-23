@@ -224,7 +224,7 @@ export class Badak {
 							const existingQuestionRouteArr : string[] = [...targetObjKeyArr]
 								.filter(_key => _key.includes('?'));
 
-							// check current routed rule is duplicated
+							// check current question routed rule is duplicated
 							if (existingQuestionRouteArr.length > 0) {
 								const matchingQuestionUri : string = existingQuestionRouteArr.find(questionKey => {
 									return ruleObjKeyArr.some(ruleKey => {
@@ -237,7 +237,7 @@ export class Badak {
 								}
 							}
 
-							// check new route rule is duplicated
+							// check new question route rule is duplicated
 							const newQuestionRouteArr : string[] = [...ruleObjKeyArr]
 								.filter(_key => _key.includes('?'));
 
@@ -250,6 +250,25 @@ export class Badak {
 
 								if (matchingQuestionUri !== undefined) {
 									throw new Error('duplicated question routing');
+								}
+							}
+
+							// check current plus route rule is duplicated
+							// const existingPlusRouteArr : string[] = []
+
+							// check new plus route rule is duplicated
+							const newPlusRouteArr : string[] = [...ruleObjKeyArr]
+								.filter(_key => _key.includes('+'));
+
+							if (newPlusRouteArr.length > 0) {
+								const matchingPlusUri : string = newPlusRouteArr.find(plusKey => {
+									return targetObjKeyArr.some(ruleKey => {
+										return new RegExp(plusKey).test(ruleKey);
+									});
+								});
+
+								if (matchingPlusUri !== undefined) {
+									throw new Error('duplicated plus routing');
 								}
 							}
 
