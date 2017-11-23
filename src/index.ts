@@ -567,6 +567,33 @@ export class Badak {
 											param.matcher.push(targetQuestionKey);
 											param[targetQuestionKey] = uriFrag;
 										}
+										else {
+											// find plus routing
+											const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
+
+											const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+												return routeRuleKey.includes('+');
+											});
+
+											const targetPlusKey : string = plusKeyArr.find(plusKey => {
+												return new RegExp(plusKey).test(uriFrag);
+											});
+
+											if (targetPlusKey !== undefined) {
+												targetRouteObj = targetRouteObj[targetPlusKey];
+
+												if (param === undefined) {
+													param = {};
+												}
+
+												if (param.matcher === undefined) {
+													param.matcher = [];
+												}
+
+												param.matcher.push(targetPlusKey);
+												param[targetPlusKey] = uriFrag;
+											}
+										}
 									}
 								}
 
