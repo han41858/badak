@@ -1,6 +1,10 @@
 .idea/
 node_modules/
-bundles/
 
 package-lock.json
 yarn.lock
+
+# belows are bundle
+index.js
+index.js.map
+index.d.ts
