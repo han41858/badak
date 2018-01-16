@@ -535,7 +535,7 @@ export class Badak {
 						const uri : string = req.url;
 
 						if (uri === '/') {
-							if (!!req.method && !!targetRouteObj['/'][req.method]) {
+							if (!!req.method && !!targetRouteObj['/'] && !!targetRouteObj['/'][req.method]) {
 								targetFnc = targetRouteObj['/'][req.method];
 							}
 						}
