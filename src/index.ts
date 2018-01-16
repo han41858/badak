@@ -21,7 +21,7 @@ import { Server } from 'net';
 // rule format, reserved keyword is 4-methods
 
 export interface RouteRule {
-	[uri : string] : RouteRule | RouteRuleSeed
+	[uri : string] : RouteRule | RouteRuleSeed;
 }
 
 export interface RouteRuleSeed {
@@ -87,14 +87,14 @@ export class Badak {
 				}
 			}
 
-			if (uriArr.length == 1) {
+			if (uriArr.length === 1) {
 				refinedRuleObj[refinedKey] = rule[key];
 
 			}
 			else if (uriArr.length > 1) {
 
 				// convert abbreviation to recursive object
-				let abbrObj = {};
+				const abbrObj = {};
 				let targetObj = abbrObj;
 				uriArr.forEach((uriFrag, i, arr) => {
 					// skip first fragment, it used first key
@@ -118,8 +118,8 @@ export class Badak {
 					refinedRuleObj[uriArr[0]] = {};
 				}
 
-				Object.keys(abbrObj).forEach(key => {
-					refinedRuleObj[uriArr[0]][key] = abbrObj[key];
+				Object.keys(abbrObj).forEach(oneKey => {
+					refinedRuleObj[uriArr[0]][oneKey] = abbrObj[oneKey];
 				});
 			}
 		});
@@ -142,8 +142,8 @@ export class Badak {
 
 					if (typeof value === 'object' && !!value) {
 						// check before-last depth
-						const beforeLastDepth : boolean = Object.keys(value).every(key => {
-							return value[key].constructor.name !== 'Object';
+						const beforeLastDepth : boolean = Object.keys(value).every(oneKey => {
+							return value[oneKey].constructor.name !== 'Object';
 						});
 
 						if (beforeLastDepth) {
@@ -407,7 +407,7 @@ export class Badak {
 			});
 
 			req.on('end', async () => {
-				let paramObj = undefined;
+				let paramObj;
 
 				const contentTypeInHeader : string = req.headers['content-type'] as string;
 
@@ -517,12 +517,12 @@ export class Badak {
 		}
 		else {
 			// use new Promise for http.listen() callback
-			return new Promise(resolve => {
+			return new Promise((resolve, reject) => {
 				this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
 					// new Promise loop to catch error
 					(async () => {
-						let targetFnc : Function = undefined;
-						let param : any = undefined;
+						let targetFnc : Function;
+						let param : any;
 
 						let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
 
@@ -601,8 +601,6 @@ export class Badak {
 										}
 										else {
 											// find plus routing
-											const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
-
 											const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
 												return routeRuleKey.includes('+');
 											});
@@ -673,8 +671,7 @@ export class Badak {
 									res.setHeader('Content-Type', 'application/json');
 
 									res.end(JSON.stringify(resObj));
-								}
-								catch (err) {
+								} catch (err) {
 									// no json
 
 									res.setHeader('Content-Type', 'text/plain');
@@ -711,8 +708,17 @@ export class Badak {
 						});
 				});
 
-				this._http.listen(port, () => {
-					resolve();
+				this._http.on('error', (err : Error) => {
+					reject(err);
+				});
+
+				this._http.listen(port, (err : Error) => {
+					if (!err) {
+						resolve();
+					}
+					else {
+						reject(err);
+					}
 				});
 			});
 		}
@@ -737,6 +743,6 @@ export class Badak {
 
 				resolve();
 			});
-		})
+		});
 	}
 }

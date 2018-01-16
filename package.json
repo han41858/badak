@@ -28,5 +28,8 @@
   "dependencies": {
     "@types/node": "^8.0.47",
     "typescript": "^2.5.3"
+  },
+  "devDependencies": {
+    "tslint": "^5.9.1"
   }
 }
