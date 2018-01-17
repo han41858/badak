@@ -550,14 +550,15 @@ export class Badak {
 							uriArr.forEach((uriFrag, i, arr) => {
 								ruleFound = false;
 
+								const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
+
 								if (targetRouteObj[uriFrag] !== undefined) {
 									targetRouteObj = targetRouteObj[uriFrag];
 
 									ruleFound = true;
 								}
-								else {
-									// find router param
 
+								if (!ruleFound) {
 									// colon routing
 									const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
 
@@ -577,66 +578,71 @@ export class Badak {
 
 										ruleFound = true;
 									}
-									else {
-										// find question routing
-										const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
+								}
 
-										const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-											return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
-										});
+								if (!ruleFound) {
+									// find question routing
 
-										const targetQuestionKey : string = questionKeyArr.find(questionKey => {
-											const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-											const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-											const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
+									const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+										return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+									});
 
-											return new RegExp(`^${mandatoryKey}${optionalCharacter}?${restKey}$`).test(uriFrag);
-										});
+									const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+										const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+										const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+										const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
 
-										if (targetQuestionKey !== undefined) {
-											targetRouteObj = targetRouteObj[targetQuestionKey];
+										return new RegExp(`^${mandatoryKey}${optionalCharacter}?${restKey}$`).test(uriFrag);
+									});
 
-											if (param === undefined) {
-												param = {};
-											}
+									if (targetQuestionKey !== undefined) {
+										targetRouteObj = targetRouteObj[targetQuestionKey];
 
-											if (param.matcher === undefined) {
-												param.matcher = [];
-											}
-
-											param.matcher.push(targetQuestionKey);
-											param[targetQuestionKey] = uriFrag;
-
-											ruleFound = true;
+										if (param === undefined) {
+											param = {};
 										}
-										else {
-											// find plus routing
-											const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-												return routeRuleKey.includes('+');
-											});
 
-											const targetPlusKey : string = plusKeyArr.find(plusKey => {
-												return new RegExp(plusKey).test(uriFrag);
-											});
-
-											if (targetPlusKey !== undefined) {
-												targetRouteObj = targetRouteObj[targetPlusKey];
-
-												if (param === undefined) {
-													param = {};
-												}
-
-												if (param.matcher === undefined) {
-													param.matcher = [];
-												}
-
-												param.matcher.push(targetPlusKey);
-												param[targetPlusKey] = uriFrag;
-
-												ruleFound = true;
-											}
+										if (param.matcher === undefined) {
+											param.matcher = [];
 										}
+
+										param.matcher.push(targetQuestionKey);
+										param[targetQuestionKey] = uriFrag;
+
+										ruleFound = true;
 									}
+								}
+
+								if (!ruleFound) {
+									// find plus routing
+									const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+										return routeRuleKey.includes('+');
+									});
+
+									const targetPlusKey : string = plusKeyArr.find(plusKey => {
+										return new RegExp(plusKey).test(uriFrag);
+									});
+
+									if (targetPlusKey !== undefined) {
+										targetRouteObj = targetRouteObj[targetPlusKey];
+
+										if (param === undefined) {
+											param = {};
+										}
+
+										if (param.matcher === undefined) {
+											param.matcher = [];
+										}
+
+										param.matcher.push(targetPlusKey);
+										param[targetPlusKey] = uriFrag;
+
+										ruleFound = true;
+									}
+								}
+
+								if (!ruleFound) {
+									console.log('find asterisk routing');
 								}
 
 								if (i === arr.length - 1) {
