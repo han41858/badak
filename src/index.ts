@@ -544,10 +544,16 @@ export class Badak {
 
 							// TODO: static files
 
+							let ruleFound : boolean = false;
+
 							// find target function
 							uriArr.forEach((uriFrag, i, arr) => {
+								ruleFound = false;
+
 								if (targetRouteObj[uriFrag] !== undefined) {
 									targetRouteObj = targetRouteObj[uriFrag];
+
+									ruleFound = true;
 								}
 								else {
 									// find router param
@@ -568,6 +574,8 @@ export class Badak {
 
 										param.matcher.push(colonParam);
 										param[colonParam.replace(':', '')] = uriFrag;
+
+										ruleFound = true;
 									}
 									else {
 										// find question routing
@@ -598,6 +606,8 @@ export class Badak {
 
 											param.matcher.push(targetQuestionKey);
 											param[targetQuestionKey] = uriFrag;
+
+											ruleFound = true;
 										}
 										else {
 											// find plus routing
@@ -622,13 +632,15 @@ export class Badak {
 
 												param.matcher.push(targetPlusKey);
 												param[targetPlusKey] = uriFrag;
+
+												ruleFound = true;
 											}
 										}
 									}
 								}
 
 								if (i === arr.length - 1) {
-									if (!!req.method && !!targetRouteObj[req.method]) {
+									if (ruleFound && !!req.method && !!targetRouteObj && !!targetRouteObj[req.method]) {
 										targetFnc = targetRouteObj[req.method];
 									}
 								}
