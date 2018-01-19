@@ -515,256 +515,254 @@ export class Badak {
 		if (this._http !== null) {
 			throw new Error('server is running already');
 		}
-		else {
-			// use new Promise for http.listen() callback
-			return new Promise((resolve, reject) => {
-				this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
-					// new Promise loop to catch error
-					(async () => {
-						let targetFnc : Function;
-						let param : any;
 
-						let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
+		// use new Promise for http.listen() callback
+		return new Promise((resolve, reject) => {
+			this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
+				// new Promise loop to catch error
+				(async () => {
+					let targetFnc : Function;
+					let param : any;
 
-						if (targetRouteObj === null) {
-							// no rule assigned
-							throw new Error('no rule');
+					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
+
+					if (targetRouteObj === null) {
+						// no rule assigned
+						throw new Error('no rule');
+					}
+
+					// find route rule
+					const uri : string = req.url;
+
+					if (uri === '/') {
+						if (!!req.method && !!targetRouteObj['/'] && !!targetRouteObj['/'][req.method]) {
+							targetFnc = targetRouteObj['/'][req.method];
 						}
+					}
+					else {
+						const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
 
-						// find route rule
-						const uri : string = req.url;
+						// TODO: static files
 
-						if (uri === '/') {
-							if (!!req.method && !!targetRouteObj['/'] && !!targetRouteObj['/'][req.method]) {
-								targetFnc = targetRouteObj['/'][req.method];
+						let ruleFound : boolean = false;
+
+						// find target function
+						uriArr.forEach((uriFrag, i, arr) => {
+							ruleFound = false;
+
+							const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
+
+							if (targetRouteObj[uriFrag] !== undefined) {
+								targetRouteObj = targetRouteObj[uriFrag];
+
+								ruleFound = true;
 							}
-						}
-						else {
-							const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
 
-							// TODO: static files
+							if (!ruleFound) {
+								// colon routing
+								const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
 
-							let ruleFound : boolean = false;
+								if (colonParam !== undefined) {
+									targetRouteObj = targetRouteObj[colonParam];
 
-							// find target function
-							uriArr.forEach((uriFrag, i, arr) => {
-								ruleFound = false;
+									if (param === undefined) {
+										param = {};
+									}
 
-								const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
+									if (param.matcher === undefined) {
+										param.matcher = [];
+									}
 
-								if (targetRouteObj[uriFrag] !== undefined) {
-									targetRouteObj = targetRouteObj[uriFrag];
+									param.matcher.push(colonParam);
+									param[colonParam.replace(':', '')] = uriFrag;
 
 									ruleFound = true;
 								}
+							}
 
-								if (!ruleFound) {
-									// colon routing
-									const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+							if (!ruleFound) {
+								// find question routing
 
-									if (colonParam !== undefined) {
-										targetRouteObj = targetRouteObj[colonParam];
+								const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+									return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+								});
 
-										if (param === undefined) {
-											param = {};
-										}
+								const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+									const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+									const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+									const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
 
-										if (param.matcher === undefined) {
-											param.matcher = [];
-										}
+									return new RegExp(`^${mandatoryKey}${optionalCharacter}?${restKey}$`).test(uriFrag);
+								});
 
-										param.matcher.push(colonParam);
-										param[colonParam.replace(':', '')] = uriFrag;
+								if (targetQuestionKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetQuestionKey];
 
-										ruleFound = true;
+									if (param === undefined) {
+										param = {};
 									}
-								}
 
-								if (!ruleFound) {
-									// find question routing
-
-									const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-										return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
-									});
-
-									const targetQuestionKey : string = questionKeyArr.find(questionKey => {
-										const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-										const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-										const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
-
-										return new RegExp(`^${mandatoryKey}${optionalCharacter}?${restKey}$`).test(uriFrag);
-									});
-
-									if (targetQuestionKey !== undefined) {
-										targetRouteObj = targetRouteObj[targetQuestionKey];
-
-										if (param === undefined) {
-											param = {};
-										}
-
-										if (param.matcher === undefined) {
-											param.matcher = [];
-										}
-
-										param.matcher.push(targetQuestionKey);
-										param[targetQuestionKey] = uriFrag;
-
-										ruleFound = true;
+									if (param.matcher === undefined) {
+										param.matcher = [];
 									}
-								}
 
-								if (!ruleFound) {
-									// find plus routing
-									const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-										return routeRuleKey.includes('+');
-									});
+									param.matcher.push(targetQuestionKey);
+									param[targetQuestionKey] = uriFrag;
 
-									const targetPlusKey : string = plusKeyArr.find(plusKey => {
-										return new RegExp(plusKey).test(uriFrag);
-									});
-
-									if (targetPlusKey !== undefined) {
-										targetRouteObj = targetRouteObj[targetPlusKey];
-
-										if (param === undefined) {
-											param = {};
-										}
-
-										if (param.matcher === undefined) {
-											param.matcher = [];
-										}
-
-										param.matcher.push(targetPlusKey);
-										param[targetPlusKey] = uriFrag;
-
-										ruleFound = true;
-									}
-								}
-
-								if (!ruleFound) {
-									// find asterisk routing
-									const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-										return routeRuleKey.includes('*');
-									});
-
-									const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
-										// replace '*' to '\\w*'
-										return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
-									});
-
-									if (targetAsteriskKey !== undefined) {
-										targetRouteObj = targetRouteObj[targetAsteriskKey];
-
-										if (param === undefined) {
-											param = {};
-										}
-
-										if (param.matcher === undefined) {
-											param.matcher = [];
-										}
-
-										param.matcher.push(targetAsteriskKey);
-										param[targetAsteriskKey] = uriFrag;
-
-										ruleFound = true;
-									}
-								}
-
-								if (i === arr.length - 1) {
-									if (ruleFound && !!req.method && !!targetRouteObj && !!targetRouteObj[req.method]) {
-										targetFnc = targetRouteObj[req.method];
-									}
-								}
-							});
-						}
-
-						if (targetFnc === undefined) {
-							throw new Error('no rule');
-						}
-
-						switch (req.method) {
-							case 'PUT':
-							case 'POST':
-								if (param === undefined) {
-									param = {};
-								}
-
-								param.data = await this._paramParser(req)
-									.catch(async (err : Error) => {
-										console.error(err);
-
-										throw new Error('parsing parameter error');
-									});
-								break;
-						}
-
-						this._middleware.forEach(async (middleware : Function) => {
-							await middleware();
-						});
-
-						const resObj : any = await targetFnc(param);
-
-						if (!!resObj) {
-							// check result is json
-							if (typeof resObj === 'object') {
-
-								try {
-									JSON.stringify(resObj);
-
-									res.setHeader('Content-Type', 'application/json');
-
-									res.end(JSON.stringify(resObj));
-								} catch (err) {
-									// no json
-
-									res.setHeader('Content-Type', 'text/plain');
-									res.end(resObj);
+									ruleFound = true;
 								}
 							}
-							else {
+
+							if (!ruleFound) {
+								// find plus routing
+								const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+									return routeRuleKey.includes('+');
+								});
+
+								const targetPlusKey : string = plusKeyArr.find(plusKey => {
+									return new RegExp(plusKey).test(uriFrag);
+								});
+
+								if (targetPlusKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetPlusKey];
+
+									if (param === undefined) {
+										param = {};
+									}
+
+									if (param.matcher === undefined) {
+										param.matcher = [];
+									}
+
+									param.matcher.push(targetPlusKey);
+									param[targetPlusKey] = uriFrag;
+
+									ruleFound = true;
+								}
+							}
+
+							if (!ruleFound) {
+								// find asterisk routing
+								const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+									return routeRuleKey.includes('*');
+								});
+
+								const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
+									// replace '*' to '\\w*'
+									return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
+								});
+
+								if (targetAsteriskKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetAsteriskKey];
+
+									if (param === undefined) {
+										param = {};
+									}
+
+									if (param.matcher === undefined) {
+										param.matcher = [];
+									}
+
+									param.matcher.push(targetAsteriskKey);
+									param[targetAsteriskKey] = uriFrag;
+
+									ruleFound = true;
+								}
+							}
+
+							if (i === arr.length - 1) {
+								if (ruleFound && !!req.method && !!targetRouteObj && !!targetRouteObj[req.method]) {
+									targetFnc = targetRouteObj[req.method];
+								}
+							}
+						});
+					}
+
+					if (targetFnc === undefined) {
+						throw new Error('no rule');
+					}
+
+					switch (req.method) {
+						case 'PUT':
+						case 'POST':
+							if (param === undefined) {
+								param = {};
+							}
+
+							param.data = await this._paramParser(req)
+								.catch(async (err : Error) => {
+									console.error(err);
+
+									throw new Error('parsing parameter error');
+								});
+							break;
+					}
+
+					this._middleware.forEach(async (middleware : Function) => {
+						await middleware();
+					});
+
+					const resObj : any = await targetFnc(param);
+
+					if (!!resObj) {
+						// check result is json
+						if (typeof resObj === 'object') {
+							try {
+								// try to stringify()
+								JSON.stringify(resObj);
+
+								res.setHeader('Content-Type', 'application/json');
+
+								res.end(JSON.stringify(resObj));
+							} catch (err) {
+								// no json
+
 								res.setHeader('Content-Type', 'text/plain');
 								res.end(resObj);
 							}
 						}
 						else {
-							res.end();
+							res.setHeader('Content-Type', 'text/plain');
+							res.end(resObj);
 						}
-					})()
-						.catch((err : Error) => {
-							switch (err.message) {
-								case 'no rule':
-									res.statusCode = 404;
-									res.end();
-									break;
-
-								case 'parsing parameter error':
-									res.statusCode = 500;
-									res.end();
-									break;
-
-								default:
-									console.error(err.message);
-									res.statusCode = 500;
-									res.end();
-									break;
-							}
-						});
-				});
-
-				this._http.on('error', (err : Error) => {
-					reject(err);
-				});
-
-				this._http.listen(port, (err : Error) => {
-					if (!err) {
-						resolve();
 					}
 					else {
-						reject(err);
+						res.end();
 					}
-				});
+				})()
+					.catch((err : Error) => {
+						switch (err.message) {
+							case 'no rule':
+								res.statusCode = 404;
+								break;
+
+							case 'parsing parameter error':
+								res.statusCode = 500;
+								break;
+
+							default:
+								console.error(err.message);
+								res.statusCode = 500;
+								break;
+						}
+
+						res.end();
+					});
 			});
-		}
+
+			this._http.on('error', (err : Error) => {
+				reject(err);
+			});
+
+			this._http.listen(port, (err : Error) => {
+				if (!err) {
+					resolve();
+				}
+				else {
+					reject(err);
+				}
+			});
+		});
 	}
 
 	isRunning () : boolean {
