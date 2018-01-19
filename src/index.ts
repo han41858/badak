@@ -642,7 +642,32 @@ export class Badak {
 								}
 
 								if (!ruleFound) {
-									console.log('find asterisk routing');
+									// find asterisk routing
+									const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+										return routeRuleKey.includes('*');
+									});
+
+									const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
+										// replace '*' to '\\w*'
+										return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
+									});
+
+									if (targetAsteriskKey !== undefined) {
+										targetRouteObj = targetRouteObj[targetAsteriskKey];
+
+										if (param === undefined) {
+											param = {};
+										}
+
+										if (param.matcher === undefined) {
+											param.matcher = [];
+										}
+
+										param.matcher.push(targetAsteriskKey);
+										param[targetAsteriskKey] = uriFrag;
+
+										ruleFound = true;
+									}
 								}
 
 								if (i === arr.length - 1) {
