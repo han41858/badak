@@ -455,23 +455,39 @@ export class Badak {
 							break;
 
 						case 'application/json':
-							paramObj = JSON.parse(bodyStr);
+							if (!!bodyStr) {
+								try {
+									paramObj = JSON.parse(bodyStr);
+								}
+								catch (e) {
+									throw new Error('parsing parameter failed');
+								}
+							}
+							// no payload, but ok
 							break;
 
 						case 'application/x-www-form-urlencoded':
-							paramObj = {};
+							if (!!bodyStr) {
+								paramObj = {};
 
-							fieldArr = bodyStr.split('&');
+								fieldArr = bodyStr.split('&');
 
-							fieldArr.forEach(field => {
-								const [key, value] = field.split('=');
-								paramObj[key] = value;
-							});
+								fieldArr.forEach(field => {
+									const [key, value] = field.split('=');
+									paramObj[key] = value;
+								});
+							}
+
+							// no payload, but ok
 							break;
 					}
-				}
 
-				_resolve(paramObj);
+					_resolve(paramObj);
+				}
+				else {
+					// no content-type, but ok
+					_resolve();
+				}
 			});
 		});
 
@@ -689,12 +705,7 @@ export class Badak {
 								param = {};
 							}
 
-							param.data = await this._paramParser(req)
-								.catch(async (err : Error) => {
-									console.error(err);
-
-									throw new Error('parsing parameter error');
-								});
+							param.data = await this._paramParser(req);
 							break;
 					}
 
@@ -736,7 +747,7 @@ export class Badak {
 								res.statusCode = 404;
 								break;
 
-							case 'parsing parameter error':
+							case 'parsing parameter failed':
 								res.statusCode = 500;
 								break;
 
@@ -747,6 +758,8 @@ export class Badak {
 						}
 
 						res.end();
+
+						reject(err);
 					});
 			});
 
@@ -762,7 +775,10 @@ export class Badak {
 					reject(err);
 				}
 			});
-		});
+		})
+			.catch((err : Error) => {
+				// final catch(), no throw
+			});
 	}
 
 	isRunning () : boolean {
