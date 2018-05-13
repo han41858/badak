@@ -585,11 +585,11 @@ export class Badak {
 										param = {};
 									}
 
-									if (param.matcher === undefined) {
-										param.matcher = [];
-									}
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
 
-									param.matcher.push(colonParam);
+									// param.matcher.push(colonParam);
 									param[colonParam.replace(':', '')] = uriFrag;
 
 									ruleFound = true;
@@ -618,11 +618,11 @@ export class Badak {
 										param = {};
 									}
 
-									if (param.matcher === undefined) {
-										param.matcher = [];
-									}
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
 
-									param.matcher.push(targetQuestionKey);
+									// param.matcher.push(targetQuestionKey);
 									param[targetQuestionKey] = uriFrag;
 
 									ruleFound = true;
@@ -646,11 +646,11 @@ export class Badak {
 										param = {};
 									}
 
-									if (param.matcher === undefined) {
-										param.matcher = [];
-									}
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
 
-									param.matcher.push(targetPlusKey);
+									// param.matcher.push(targetPlusKey);
 									param[targetPlusKey] = uriFrag;
 
 									ruleFound = true;
@@ -675,11 +675,11 @@ export class Badak {
 										param = {};
 									}
 
-									if (param.matcher === undefined) {
-										param.matcher = [];
-									}
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
 
-									param.matcher.push(targetAsteriskKey);
+									// param.matcher.push(targetAsteriskKey);
 									param[targetAsteriskKey] = uriFrag;
 
 									ruleFound = true;
@@ -702,10 +702,12 @@ export class Badak {
 						case 'PUT':
 						case 'POST':
 							if (param === undefined) {
-								param = {};
+								param = await this._paramParser(req);
 							}
-
-							param.data = await this._paramParser(req);
+							else {
+								// TODO: overwrite? uri param & param object
+								param = Object.assign(param, await this._paramParser(req));
+							}
 							break;
 					}
 
