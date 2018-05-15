@@ -743,7 +743,7 @@ export class Badak {
 						res.end();
 					}
 				})()
-					.catch((err : Error) => {
+					.catch((err : any) => {
 						switch (err.message) {
 							case 'no rule':
 								res.statusCode = 404;
@@ -754,7 +754,7 @@ export class Badak {
 								break;
 
 							default:
-								console.error(err.message);
+								console.error('not defined error : %o', err);
 								res.statusCode = 500;
 								break;
 						}
@@ -777,10 +777,7 @@ export class Badak {
 					reject(err);
 				}
 			});
-		})
-			.catch((err : Error) => {
-				// final catch(), no throw
-			});
+		});
 	}
 
 	isRunning () : boolean {
