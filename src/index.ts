@@ -747,19 +747,34 @@ export class Badak {
 						switch (err.message) {
 							case 'no rule':
 								res.statusCode = 404;
+
+								res.end();
 								break;
 
+							// internal errors
 							case 'parsing parameter failed':
 								res.statusCode = 500;
+
+								res.end();
 								break;
 
 							default:
-								console.error('not defined error : %o', err);
 								res.statusCode = 500;
+
+								if (!!err) {
+									if (err instanceof Object) {
+										res.setHeader('Content-Type', 'application/json');
+										res.end(JSON.stringify(err));
+									}
+									else {
+										res.end(err);
+									}
+								}
+								else {
+									res.end();
+								}
 								break;
 						}
-
-						res.end();
 
 						reject(err);
 					});
