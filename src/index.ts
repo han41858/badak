@@ -711,9 +711,9 @@ export class Badak {
 							break;
 					}
 
-					this._middleware.forEach(async (middleware : Function) => {
-						await middleware(param, req, res);
-					});
+					await Promise.all(this._middleware.map((middlewareFnc : Function) => {
+						return middlewareFnc(param, req, res);
+					}));
 
 					const resObj : any = await targetFnc(param, req, res);
 
