@@ -712,10 +712,10 @@ export class Badak {
 					}
 
 					this._middleware.forEach(async (middleware : Function) => {
-						await middleware();
+						await middleware(param, req, res);
 					});
 
-					const resObj : any = await targetFnc(param);
+					const resObj : any = await targetFnc(param, req, res);
 
 					if (!!resObj) {
 						// check result is json
