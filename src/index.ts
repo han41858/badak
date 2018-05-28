@@ -25,16 +25,19 @@ export interface RouteRule {
 }
 
 export interface RouteRuleSeed {
-	GET? : Function;
-	POST? : Function;
-	PUT? : Function;
-	DELETE? : Function;
+	GET? : RouteFunction;
+	POST? : RouteFunction;
+	PUT? : RouteFunction;
+	DELETE? : RouteFunction;
 }
+
+// function type definition for IDE
+export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
 
 export class Badak {
 	private _http : Server = null;
-	private _authFnc : Function = null;
-	private _middleware : Function[] = [];
+	private _authFnc : RouteFunction = null;
+	private _middleware : RouteFunction[] = [];
 	private _routeRule : RouteRule = null;
 
 	// check & refine route rule
@@ -322,7 +325,7 @@ export class Badak {
 			});
 	}
 
-	async _routeAbbrValidator (address : string, fnc : Function) : Promise<void> {
+	async _routeAbbrValidator (address : string, fnc : RouteFunction) : Promise<void> {
 		if (address === undefined) {
 			throw new Error('no address');
 		}
@@ -337,7 +340,7 @@ export class Badak {
 	}
 
 	// auth
-	async auth (fnc : Function) : Promise<void> {
+	async auth (fnc : RouteFunction) : Promise<void> {
 		if (fnc === undefined) {
 			throw  new Error('no auth function');
 		}
@@ -350,7 +353,7 @@ export class Badak {
 	}
 
 	// route abbreviation
-	async get (address : string, fnc : Function) : Promise<void> {
+	async get (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
 
 		// check rule validation
@@ -364,7 +367,7 @@ export class Badak {
 		await this._assignRule(routeRule);
 	}
 
-	async post (address : string, fnc : Function) : Promise<void> {
+	async post (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
 
 		// check rule validation
@@ -378,7 +381,7 @@ export class Badak {
 		await this._assignRule(routeRule);
 	}
 
-	async put (address : string, fnc : Function) : Promise<void> {
+	async put (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
 
 		// check rule validation
@@ -392,7 +395,7 @@ export class Badak {
 		await this._assignRule(routeRule);
 	}
 
-	async delete (address : string, fnc : Function) : Promise<void> {
+	async delete (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
 
 		// check rule validation
@@ -521,7 +524,7 @@ export class Badak {
 		await this._assignRule(routeRule);
 	}
 
-	async use (middleware : Function) : Promise<void> {
+	async use (middleware : RouteFunction) : Promise<void> {
 		if (middleware === undefined) {
 			throw new Error('middleware function should be passed');
 		}
@@ -551,7 +554,7 @@ export class Badak {
 			this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
 				// new Promise loop to catch error
 				(async () => {
-					let targetFnc : Function;
+					let targetFnc : RouteFunction;
 					let param : any;
 
 					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
@@ -736,7 +739,7 @@ export class Badak {
 						}
 					}
 
-					await Promise.all(this._middleware.map((middlewareFnc : Function) => {
+					await Promise.all(this._middleware.map((middlewareFnc : RouteFunction) => {
 						return middlewareFnc(param, req, res);
 					}));
 
