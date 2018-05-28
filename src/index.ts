@@ -33,6 +33,7 @@ export interface RouteRuleSeed {
 
 export class Badak {
 	private _http : Server = null;
+	private _authFnc : Function = null;
 	private _middleware : Function[] = [];
 	private _routeRule : RouteRule = null;
 
@@ -333,6 +334,19 @@ export class Badak {
 		if (!(fnc instanceof Function)) {
 			throw new Error('middleware should be Function');
 		}
+	}
+
+	// auth
+	async auth (fnc : Function) : Promise<void> {
+		if (fnc === undefined) {
+			throw  new Error('no auth function');
+		}
+
+		if (!(fnc instanceof Function)) {
+			throw new Error('auth param should be Function');
+		}
+
+		this._authFnc = fnc;
 	}
 
 	// route abbreviation
@@ -711,6 +725,17 @@ export class Badak {
 							break;
 					}
 
+					if (!!this._authFnc) {
+						// can be normal or async function
+						try {
+							await this._authFnc(param, req, res);
+						}
+						catch (e) {
+							// create new error instance
+							throw new Error('auth failed');
+						}
+					}
+
 					await Promise.all(this._middleware.map((middlewareFnc : Function) => {
 						return middlewareFnc(param, req, res);
 					}));
@@ -745,21 +770,27 @@ export class Badak {
 				})()
 					.catch((err : any) => {
 						switch (err.message) {
+							case 'auth failed':
+								res.statusCode = 401; // Unauthorized, Unauthenticated
+
+								res.end();
+								break;
+
 							case 'no rule':
-								res.statusCode = 404;
+								res.statusCode = 404; // not found
 
 								res.end();
 								break;
 
 							// internal errors
 							case 'parsing parameter failed':
-								res.statusCode = 500;
+								res.statusCode = 500; // Internal Server Error
 
 								res.end();
 								break;
 
 							default:
-								res.statusCode = 500;
+								res.statusCode = 500; // Internal Server Error
 
 								if (!!err) {
 									if (err instanceof Object) {
