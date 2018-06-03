@@ -432,7 +432,7 @@ export class Badak {
 					const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
 					const contentType = contentTypeStrArr[0].trim();
 
-					bodyStr = Buffer.concat(bodyBuffer).toString().replace(/\s/g, '');
+					bodyStr = Buffer.concat(bodyBuffer).toString();
 
 					let fieldArr : string[] = null;
 
