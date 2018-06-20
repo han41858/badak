@@ -34,6 +34,10 @@ export interface RouteRuleSeed {
 // function type definition for IDE
 export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
 
+export interface ListenOptions {
+	parseDateString : boolean; // default false, if true, convert date string to Date object
+}
+
 export class Badak {
 	private _http : Server = null;
 	private _authFnc : RouteFunction = null;
@@ -410,7 +414,7 @@ export class Badak {
 	}
 
 	// for POST, PUT
-	private async _paramParser (req : IncomingMessage) : Promise<any> {
+	private async _paramParser (req : IncomingMessage, options : ListenOptions) : Promise<any> {
 		return new Promise((_resolve, _reject) => {
 			const bodyBuffer : Buffer[] = [];
 			let bodyStr : string = null;
@@ -447,26 +451,29 @@ export class Badak {
 
 							fieldArr = bodyStr.split(boundaryStr)
 								.filter(one => {
-									return one.includes('Content-Disposition:form-data') && one.includes('name=');
+									return one.includes('Content-Disposition')
+										&& one.includes('form-data')
+										&& one.includes('name=');
 								})
 								.map(one => {
-									// multipart/form-data has redundant '--', remove it
-									return one.substr(0, one.length - 2);
+									return one
+										.replace(/\r\n--/, '') // multipart/form-data has redundant '--', remove it
+										.replace(/\r\n/g, ''); // trim '\r\n'
 								});
-
-							// validation
-							const fieldPrefixStr = 'Content-Disposition:form-data;name=';
-							fieldArr.forEach((str) => {
-								if (!str.includes(fieldPrefixStr)) {
-									throw new Error('invalid data : Content-Disposition');
-								}
-							});
 
 							paramObj = {};
 
 							fieldArr.forEach(field => {
 								const [prefix, key, value] = field.split('"');
-								paramObj[key] = value;
+
+								if (!!options && options.parseDateString === true
+									&& !isNaN(Date.parse(value))) {
+									// parse date string
+									paramObj[key] = new Date(value);
+								}
+								else {
+									paramObj[key] = value;
+								}
 							});
 
 							break;
@@ -475,6 +482,16 @@ export class Badak {
 							if (!!bodyStr) {
 								try {
 									paramObj = JSON.parse(bodyStr);
+
+									// parse date string to Date object
+									if (!!options && options.parseDateString === true) {
+										Object.keys(paramObj).forEach(key => {
+											if (!isNaN(Date.parse(paramObj[key]))) {
+												// parse date string
+												paramObj[key] = new Date(paramObj[key]);
+											}
+										});
+									}
 								}
 								catch (e) {
 									throw new Error('parsing parameter failed');
@@ -491,7 +508,15 @@ export class Badak {
 
 								fieldArr.forEach(field => {
 									const [key, value] = field.split('=');
-									paramObj[key] = value;
+
+
+									if (!!options && options.parseDateString === true
+										&& !isNaN(Date.parse(value))) {
+										paramObj[key] = new Date(value);
+									}
+									else {
+										paramObj[key] = value;
+									}
 								});
 							}
 
@@ -536,7 +561,7 @@ export class Badak {
 		this._middleware.push(middleware);
 	}
 
-	async listen (port : number) : Promise<any> {
+	async listen (port : number, options? : ListenOptions) : Promise<any> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
 		}
@@ -718,12 +743,13 @@ export class Badak {
 					switch (req.method) {
 						case 'PUT':
 						case 'POST':
+							// options
 							if (param === undefined) {
-								param = await this._paramParser(req);
+								param = await this._paramParser(req, options);
 							}
 							else {
 								// TODO: overwrite? uri param & param object
-								param = Object.assign(param, await this._paramParser(req));
+								param = Object.assign(param, await this._paramParser(req, options));
 							}
 							break;
 					}
