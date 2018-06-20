@@ -34,8 +34,9 @@ export interface RouteRuleSeed {
 // function type definition for IDE
 export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
 
-export interface ListenOptions {
-	parseDateString : boolean; // default false, if true, convert date string to Date object
+export interface ParamOptions {
+	// parseNumber : boolean; // default false, if true, convert number string to Number
+	parseDate : boolean; // default false, if true, convert date string to Date object
 }
 
 export class Badak {
@@ -413,8 +414,47 @@ export class Badak {
 		await this._assignRule(routeRule);
 	}
 
+	private _paramConverter (param : Object, options : ParamOptions) : Object {
+		// convert if date string, parameter can be string because request has string
+		// if not date string, return itself
+		function convertDateStr (param : any) : any {
+			let result : any = param;
+
+			// only work for ISO 8601 date format
+			const dateExps : RegExp[] = [
+				/^(\d){4}-(\d){2}-(\d){2}$/, // date : '2018-06-20'
+				/^(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}\+(\d){2}:(\d){2}$/, // combined date and time in UTC : '2018-06-20T21:22:09+00:00'
+				/^(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}(.(\d){3})?Z$/, // combined date and time in UTC : '2018-06-20T21:22:09Z', '2018-06-20T22:00:30.296Z'
+				/^(\d){8}T(\d){6}Z$/, // combined date and time in UTC : '20180620T212209Z'
+				/^(\d){4}-W(\d){2}$/, // week : '2018-W25'
+				/^(\d){4}-W(\d){2}-(\d){1}$/, // date with week number : '2018-W25-3'
+				/^--(\d){2}-(\d){2}$/, // date without year : '--06-20'
+				/^(\d){4}-(\d){3}$/ // ordinal dates : '2018-171'
+			];
+
+			if (dateExps.some(dateExp => {
+				return dateExp.test(param);
+			})) {
+				result = new Date(param);
+			}
+
+			return result;
+		}
+
+		Object.keys(param).forEach((key) => {
+			// only work for string param
+			if (typeof param[key] === 'string') {
+				if (options.parseDate) {
+					param[key] = convertDateStr(param[key]);
+				}
+			}
+		});
+
+		return param;
+	}
+
 	// for POST, PUT
-	private async _paramParser (req : IncomingMessage, options : ListenOptions) : Promise<any> {
+	private async _paramParser (req : IncomingMessage, options : ParamOptions) : Promise<any> {
 		return new Promise((_resolve, _reject) => {
 			const bodyBuffer : Buffer[] = [];
 			let bodyStr : string = null;
@@ -466,14 +506,7 @@ export class Badak {
 							fieldArr.forEach(field => {
 								const [prefix, key, value] = field.split('"');
 
-								if (!!options && options.parseDateString === true
-									&& !isNaN(Date.parse(value))) {
-									// parse date string
-									paramObj[key] = new Date(value);
-								}
-								else {
-									paramObj[key] = value;
-								}
+								paramObj[key] = value;
 							});
 
 							break;
@@ -482,16 +515,6 @@ export class Badak {
 							if (!!bodyStr) {
 								try {
 									paramObj = JSON.parse(bodyStr);
-
-									// parse date string to Date object
-									if (!!options && options.parseDateString === true) {
-										Object.keys(paramObj).forEach(key => {
-											if (!isNaN(Date.parse(paramObj[key]))) {
-												// parse date string
-												paramObj[key] = new Date(paramObj[key]);
-											}
-										});
-									}
 								}
 								catch (e) {
 									throw new Error('parsing parameter failed');
@@ -509,19 +532,16 @@ export class Badak {
 								fieldArr.forEach(field => {
 									const [key, value] = field.split('=');
 
-
-									if (!!options && options.parseDateString === true
-										&& !isNaN(Date.parse(value))) {
-										paramObj[key] = new Date(value);
-									}
-									else {
-										paramObj[key] = value;
-									}
+									paramObj[key] = value;
 								});
 							}
 
 							// no payload, but ok
 							break;
+					}
+
+					if (!!paramObj && !!options) {
+						paramObj = this._paramConverter(paramObj, options);
 					}
 
 					_resolve(paramObj);
@@ -561,7 +581,7 @@ export class Badak {
 		this._middleware.push(middleware);
 	}
 
-	async listen (port : number, options? : ListenOptions) : Promise<any> {
+	async listen (port : number, options? : ParamOptions) : Promise<any> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
 		}
