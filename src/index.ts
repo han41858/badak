@@ -35,7 +35,7 @@ export interface RouteRuleSeed {
 export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
 
 export interface ParamOptions {
-	// parseNumber : boolean; // default false, if true, convert number string to Number
+	parseNumber : boolean; // default false, if true, convert number string to Number
 	parseDate : boolean; // default false, if true, convert date string to Date object
 }
 
@@ -414,8 +414,22 @@ export class Badak {
 		await this._assignRule(routeRule);
 	}
 
+	// parameter can be Object of string because request has string
 	private _paramConverter (param : Object, options : ParamOptions) : Object {
-		// convert if date string, parameter can be string because request has string
+
+		// convert if number string
+		// if not number string, return itself
+		function convertNumberStr (param : any) : any {
+			let result : any = param;
+
+			if (!isNaN(+param)) {
+				result = +param;
+			}
+
+			return result;
+		}
+
+		// convert if date string
 		// if not date string, return itself
 		function convertDateStr (param : any) : any {
 			let result : any = param;
@@ -444,7 +458,10 @@ export class Badak {
 		Object.keys(param).forEach((key) => {
 			// only work for string param
 			if (typeof param[key] === 'string') {
-				if (options.parseDate) {
+				if (options.parseNumber) {
+					param[key] = convertNumberStr(param[key]);
+				}
+				else if (options.parseDate) {
 					param[key] = convertDateStr(param[key]);
 				}
 			}
