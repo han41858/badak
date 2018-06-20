@@ -35,8 +35,8 @@ export interface RouteRuleSeed {
 export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
 
 export interface ParamOptions {
-	parseNumber : boolean; // default false, if true, convert number string to Number
-	parseDate : boolean; // default false, if true, convert date string to Date object
+	parseNumber? : boolean; // default false, if true, convert number string to Number
+	parseDate? : boolean; // default false, if true, convert date string to Date object
 }
 
 export class Badak {
