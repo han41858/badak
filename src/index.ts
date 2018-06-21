@@ -34,16 +34,18 @@ export interface RouteRuleSeed {
 // function type definition for IDE
 export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
 
-export interface ParamOptions {
-	parseNumber? : boolean; // default false, if true, convert number string to Number
-	parseDate? : boolean; // default false, if true, convert date string to Date object
-}
-
 export class Badak {
 	private _http : Server = null;
 	private _authFnc : RouteFunction = null;
 	private _middleware : RouteFunction[] = [];
 	private _routeRule : RouteRule = null;
+
+	private _config : {
+		[key : string] : boolean
+	} = {
+		parseNumber : false, // default false, if true, convert number string to Number
+		parseDate : false // default false, if true, convert date string to Date object
+	};
 
 	// check & refine route rule
 	private async _checkRouteRule (rule : RouteRule | RouteRuleSeed) : Promise<RouteRule | RouteRuleSeed> {
@@ -357,6 +359,15 @@ export class Badak {
 		this._authFnc = fnc;
 	}
 
+	async config (key : string, value : boolean) : Promise<void> {
+		if (Object.keys(this._config).includes(key)) {
+			this._config[key] = value;
+		}
+		else {
+			throw new Error('not defined option');
+		}
+	}
+
 	// route abbreviation
 	async get (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
@@ -415,7 +426,7 @@ export class Badak {
 	}
 
 	// parameter can be Object of string because request has string
-	private _paramConverter (param : Object, options : ParamOptions) : Object {
+	private _paramConverter (param : Object) : Object {
 
 		// convert if number string
 		// if not number string, return itself
@@ -458,10 +469,10 @@ export class Badak {
 		Object.keys(param).forEach((key) => {
 			// only work for string param
 			if (typeof param[key] === 'string') {
-				if (options.parseNumber) {
+				if (this._config.parseNumber) {
 					param[key] = convertNumberStr(param[key]);
 				}
-				else if (options.parseDate) {
+				if (this._config.parseDate) {
 					param[key] = convertDateStr(param[key]);
 				}
 			}
@@ -471,7 +482,7 @@ export class Badak {
 	}
 
 	// for POST, PUT
-	private async _paramParser (req : IncomingMessage, options : ParamOptions) : Promise<any> {
+	private async _paramParser (req : IncomingMessage) : Promise<any> {
 		return new Promise((_resolve, _reject) => {
 			const bodyBuffer : Buffer[] = [];
 			let bodyStr : string = null;
@@ -557,8 +568,8 @@ export class Badak {
 							break;
 					}
 
-					if (!!paramObj && !!options) {
-						paramObj = this._paramConverter(paramObj, options);
+					if (!!paramObj) {
+						paramObj = this._paramConverter(paramObj);
 					}
 
 					_resolve(paramObj);
@@ -598,7 +609,7 @@ export class Badak {
 		this._middleware.push(middleware);
 	}
 
-	async listen (port : number, options? : ParamOptions) : Promise<any> {
+	async listen (port : number) : Promise<any> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
 		}
@@ -780,13 +791,12 @@ export class Badak {
 					switch (req.method) {
 						case 'PUT':
 						case 'POST':
-							// options
 							if (param === undefined) {
-								param = await this._paramParser(req, options);
+								param = await this._paramParser(req);
 							}
 							else {
 								// TODO: overwrite? uri param & param object
-								param = Object.assign(param, await this._paramParser(req, options));
+								param = Object.assign(param, await this._paramParser(req));
 							}
 							break;
 					}
