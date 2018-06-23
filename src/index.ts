@@ -18,10 +18,18 @@ import { Server } from 'net';
  *     }
  * }
  */
+
 // rule format, reserved keyword is 4-methods
 
+enum METHODS {
+	GET = 'GET',
+	POST = 'POST',
+	PUT = 'PUT',
+	DELETE = 'DELETE'
+}
+
 export interface RouteRule {
-	[uri : string] : RouteRule | RouteRuleSeed;
+	[uri : string] : RouteRule | RouteRuleSeed | Function; // function can be assigned after config('defaultMethod', [method_type])
 }
 
 export interface RouteRuleSeed {
@@ -41,295 +49,250 @@ export class Badak {
 	private _routeRule : RouteRule = null;
 
 	private _config : {
-		[key : string] : boolean
+		[key : string] : any
 	} = {
+		defaultMethod : null, // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
+		/**
+		 * before rule :
+		 * {
+		 *     '/users' : {
+		 *         GET : getUserList
+		 *     }
+		 * }
+		 *
+		 * after set app.config('defaultMethod', 'GET') :
+		 * {
+		 *     '/users' : getUserList
+		 * }
+		 */
+
 		parseNumber : false, // default false, if true, convert number string to Number
 		parseDate : false // default false, if true, convert date string to Date object
 	};
 
-	// check & refine route rule
-	private async _checkRouteRule (rule : RouteRule | RouteRuleSeed) : Promise<RouteRule | RouteRuleSeed> {
+	// refine route rule, this function can be called recursively
+	private _refineRouteRule (rule : RouteRule | RouteRuleSeed) {
 		if (rule === undefined) {
 			throw new Error('no rule');
 		}
 
 		const keyArr = Object.keys(rule);
+
 		if (keyArr.length === 0) {
 			throw new Error('no rule in rule object');
 		}
 
-		const promiseArr = [];
-
-		const refinedRuleObj = {}; // for abbreviation
-		const resultRuleObj = {};
-
-		// check colon routing count
-		const colonRouting : string[] = keyArr.filter(key => key.includes(':') && key.indexOf(':') === 0);
-		if (colonRouting.length > 1) {
-			throw new Error('duplicated colon routing');
-		}
-
-		// refine : remove '/', unzip abbreviation route path
 		keyArr.forEach(key => {
-			let refinedKey : string = null;
-			let uriArr : string[] = null;
+			if (!key) {
+				throw new Error('empty rule in rule object');
+			}
+		});
 
+		const refinedRuleObj = {};
+
+		// called recursively
+		keyArr.forEach(uri => {
 			// slash is permitted only '/', for others remove slash
-			if (key === '/') {
-				refinedKey = key;
-				uriArr = [key];
+			if (uri === '/') {
+				refinedRuleObj['/'] = this._refineRouteRule(rule[uri]);
 			}
 			else {
-				refinedKey = key.replace(/^\/|\/$/gi, '');
-				uriArr = refinedKey.split('/');
-
-				if (!uriArr.every(uriFrag => uriFrag.length > 0)) {
-					throw new Error('empty uri included');
+				if (uri.includes('//')) {
+					throw new Error('invalid double slash');
 				}
 
-				// ':' should be first index
-				if (!uriArr.every(uriFrag => uriFrag.includes(':') ? uriFrag.indexOf(':') === 0 : true)) {
-					throw new Error('invalid colon route');
-				}
+				// make array for uri abbreviation
+				const uriArr : string[] = uri.includes('/') ?
+					uri.split('/').filter(uriFrag => uriFrag !== '') :
+					[uri];
 
-				// '+' should not be first index
-				if (!uriArr.every(uriFrag => uriFrag.includes('+') ? uriFrag.indexOf('+') !== 0 : true)) {
-					throw new Error('invalid plus route');
-				}
-			}
-
-			if (uriArr.length === 1) {
-				refinedRuleObj[refinedKey] = rule[key];
-
-			}
-			else if (uriArr.length > 1) {
-
-				// convert abbreviation to recursive object
-				const abbrObj = {};
-				let targetObj = abbrObj;
+				let targetObj = refinedRuleObj;
 				uriArr.forEach((uriFrag, i, arr) => {
-					// skip first fragment, it used first key
-					if (i > 0) {
-						if (i === arr.length - 1) {
-							// last one
+					if (uriFrag.trim() !== uriFrag) {
+						throw new Error('uri include space');
+					}
 
-							targetObj[uriFrag] = rule[key];
-						}
-						else {
-							if (targetObj[uriFrag] === undefined) {
+					if (uriFrag.trim() === '') {
+						throw new Error('empty uri frag');
+					}
+
+					if (uriFrag.includes(':') && !uriFrag.startsWith(':')) {
+						throw new Error('invalid colon route');
+					}
+
+					if (uriFrag.includes('?') && uriFrag.startsWith('?')) {
+						throw new Error('invalid question route');
+					}
+
+					if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
+						throw new Error('invalid plus route');
+					}
+
+					if (Object.values(METHODS).includes(uriFrag)) {
+						const method : string = uriFrag; // re-assign for readability
+
+						targetObj[method] = rule[method];
+					}
+					else {
+						if (i < arr.length - 1) {
+							// unzip abbreviation path
+							if (!targetObj[uriFrag]) {
 								targetObj[uriFrag] = {};
 							}
 
-							targetObj = targetObj[uriFrag]; // for recursive
+							targetObj = targetObj[uriFrag];
+						}
+						else {
+							// last uri frag
+							if (typeof rule[uri] === 'object') {
+								targetObj[uriFrag] = this._refineRouteRule(rule[uri]);
+							}
+							else if (typeof rule[uri] === 'function') {
+								if (!!this._config.defaultMethod) {
+									targetObj[uriFrag] = {
+										[this._config.defaultMethod] : rule[uri]
+									};
+								}
+								else {
+									throw new Error('invalid rule or defaultMethod not set');
+								}
+							}
 						}
 					}
-				});
 
-				if (refinedRuleObj[uriArr[0]] === undefined) {
-					refinedRuleObj[uriArr[0]] = {};
-				}
-
-				Object.keys(abbrObj).forEach(oneKey => {
-					refinedRuleObj[uriArr[0]][oneKey] = abbrObj[oneKey];
+					this._checkUriDuplication(Object.keys(targetObj));
 				});
 			}
 		});
 
-		// check RoueRuleSeed format
-		Object.keys(refinedRuleObj).forEach((key) => {
-			promiseArr.push(
-				(async () => {
-					const value = refinedRuleObj[key];
-
-					if (key.includes('?')) {
-						if (key.indexOf('?') === 0) {
-							throw new Error('uri can\'t start \'?\'');
-						}
-					}
-
-					if (value === undefined) {
-						throw new Error('route function should be passed');
-					}
-
-					if (typeof value === 'object' && !!value) {
-						// check before-last depth
-						const beforeLastDepth : boolean = Object.keys(value).every(oneKey => {
-							return value[oneKey].constructor.name !== 'Object';
-						});
-
-						if (beforeLastDepth) {
-							const objKeyArr : string[] = Object.keys(rule);
-							const methodArr : string[] = ['GET', 'POST', 'PUT', 'DELETE'];
-
-							// RouteRuleSeed should have one more of 4-methods
-							const hasRouteRuleSeed = objKeyArr.some(objKey => {
-								return methodArr.some(method => {
-									return Object.keys(rule[objKey]).includes(method);
-								});
-							});
-
-							if (!hasRouteRuleSeed) {
-								throw new Error('route rule should have any of "GET", "POST", "PUT", "DELETE"');
-							}
-						}
-
-						// call recursively
-						resultRuleObj[key] = await this._checkRouteRule(value);
-					}
-					else {
-						// last depth seed function
-						if (!(value instanceof Function)) {
-							throw new Error('route function is not Function');
-						}
-
-						resultRuleObj[key] = value;
-					}
-
-					return resultRuleObj;
-				})()
-			);
-		});
-
-		const rules = await Promise.all(promiseArr);
-
-		return rules[0]; // rule object is in 0 index
+		return refinedRuleObj;
 	}
 
-	private async _assignRule (ruleObj : RouteRule | RouteRuleSeed, parentObj? : RouteRule | RouteRuleSeed) : Promise<void> {
-		if (this._routeRule === null) {
-			this._routeRule = {};
-		}
-
-		const targetObj : RouteRule | RouteRuleSeed = parentObj === undefined ? this._routeRule : parentObj;
-
-		const targetObjKeyArr : string[] = Object.keys(targetObj);
-		const ruleObjKeyArr : string[] = Object.keys(ruleObj);
-
-		// use promise array to catch error in forEach loop
-		const promiseArr : Promise<void>[] = [];
-
-		Object.keys(ruleObj).forEach((key : string) => {
-			promiseArr.push((async () => {
-				if (typeof ruleObj[key] === 'object') {
-					// RouteRule
-					switch (key) {
-						case 'GET':
-						case 'POST':
-						case 'PUT':
-						case 'DELETE':
-							targetObj[key] = ruleObj[key];
-							break;
-
-						default:
-							// 	check duplicated param routing
-
-							// find colon routing
-							const colonRouteArr : string[] = [...targetObjKeyArr, ...ruleObjKeyArr]
-								.filter(_key => _key.includes(':') && _key.indexOf(':') === 0);
-
-							if (colonRouteArr.length > 1) {
-								throw new Error('duplicated colon routing');
-							}
-
-							// find question routing
-							const existingQuestionRouteArr : string[] = [...targetObjKeyArr]
-								.filter(_key => _key.includes('?'));
-
-							// check current question routed rule is duplicated
-							if (existingQuestionRouteArr.length > 0) {
-								const matchingQuestionUri : string = existingQuestionRouteArr.find(questionKey => {
-									return ruleObjKeyArr.some(ruleKey => {
-										return new RegExp(questionKey).test(ruleKey);
-									});
-								});
-
-								if (matchingQuestionUri !== undefined) {
-									throw new Error('duplicated question routing');
-								}
-							}
-
-							// check new question route rule is duplicated
-							const newQuestionRouteArr : string[] = [...ruleObjKeyArr]
-								.filter(_key => _key.includes('?'));
-
-							if (newQuestionRouteArr.length > 0) {
-								const matchingQuestionUri : string = newQuestionRouteArr.find(questionKey => {
-									return targetObjKeyArr.some(ruleKey => {
-										return new RegExp(questionKey).test(ruleKey);
-									});
-								});
-
-								if (matchingQuestionUri !== undefined) {
-									throw new Error('duplicated question routing');
-								}
-							}
-
-							// check current plus route rule is duplicated
-							const existingPlusRouteArr : string[] = [...targetObjKeyArr]
-								.filter(_key => _key.includes('+'));
-
-							if (existingPlusRouteArr.length > 0) {
-								const matchingPlusUri : string = existingPlusRouteArr.find(plusKey => {
-									return ruleObjKeyArr.some(ruleKey => {
-										return new RegExp(plusKey).test(ruleKey);
-									});
-								});
-
-								if (matchingPlusUri !== undefined) {
-									throw new Error('duplicated plus routing');
-								}
-							}
-
-							// check new plus route rule is duplicated
-							const newPlusRouteArr : string[] = [...ruleObjKeyArr]
-								.filter(_key => _key.includes('+'));
-
-							if (newPlusRouteArr.length > 0) {
-								const matchingPlusUri : string = newPlusRouteArr.find(plusKey => {
-									return targetObjKeyArr.some(ruleKey => {
-										return new RegExp(plusKey).test(ruleKey);
-									});
-								});
-
-								if (matchingPlusUri !== undefined) {
-									throw new Error('duplicated plus routing');
-								}
-							}
-
-							// call recursively
-							if (targetObj[key] === undefined) {
-								targetObj[key] = {};
-							}
-
-							await this._assignRule(ruleObj[key], targetObj[key]);
-							break;
-					}
-
-				}
-				else {
-					// RouteRuleSeed
-					switch (key) {
-						case 'GET':
-						case 'POST':
-						case 'PUT':
-						case 'DELETE':
-							targetObj[key] = ruleObj[key];
-							break;
-
-						default:
-							throw new Error('invalid rule in RouteRuleSeed');
-					}
-				}
-			})());
+	private _checkUriDuplication (uriKeys : string[]) {
+		// sift keys, uriKeys can have duplicated item
+		const uris : string[] = uriKeys.filter((key, i, arr) => {
+			return i === arr.indexOf(key);
 		});
 
-		return Promise.all(promiseArr)
-			.then(() => {
-				// returns nothing
-			})
-			.catch((err : Error) => {
-				throw err;
-			});
+		if (uris.length > 1) {
+			// colon routing
+			const colonRouteArr : string[] = uris.filter(uri => uri.startsWith(':'));
+			if (colonRouteArr.length > 1) {
+				throw new Error('duplicated colon routing');
+			}
+
+			// question routing
+			const questionRouteArr : string[] = uris.filter(uri => uri.includes('?'));
+			if (questionRouteArr.length > 0) {
+				const targetUris : string[] = uris.filter(uri => !questionRouteArr.includes(uri));
+
+				const matchingResult : string = questionRouteArr.find(regSrc => {
+					return targetUris.some(uri => new RegExp(regSrc).test(uri));
+				});
+
+				if (matchingResult !== undefined) {
+					throw new Error('duplicated question routing');
+				}
+			}
+
+			// plus routing
+			const plusRouteArr : string[] = uris.filter(uri => uri.includes('+'));
+			if (plusRouteArr.length > 0) {
+				const plusUrisSanitized : string[] = [...uris]; // start with all keys
+				plusRouteArr.forEach(uri => {
+					const plusIncluded : string = uri.replace('+', '');
+					const plusExcluded : string = uri.replace(/.\+/, '');
+
+					if (plusUrisSanitized.includes(plusIncluded) || plusUrisSanitized.includes(plusExcluded)) {
+						throw new Error('duplicated plus routing');
+					}
+					else {
+						plusUrisSanitized.push(plusIncluded, plusExcluded);
+					}
+				});
+			}
+		}
+	}
+
+
+	// divided with _assignRule for nested object, can be called recursively
+	// Object.assign() overwrite existing tree, do this manually
+	// param type is any, not RouteRule, different methods can be merged
+	private _getMergedRule (currentRule : any, newRule : any) : RouteRule {
+		if (newRule === undefined) {
+			throw new Error('no newRule to merge');
+		}
+
+		const resultRule : RouteRule = Object.assign({}, currentRule);
+
+		this._checkUriDuplication([
+			...Object.keys(resultRule),
+			...Object.keys(newRule)]
+		);
+
+		Object.keys(newRule).forEach(newRuleKey => {
+			// assign
+			if (!!resultRule[newRuleKey] && !Object.keys(METHODS).includes(newRuleKey)) {
+				resultRule[newRuleKey] = this._getMergedRule(resultRule[newRuleKey], newRule[newRuleKey]);
+			}
+			else {
+				resultRule[newRuleKey] = newRule[newRuleKey];
+			}
+		});
+
+		return resultRule;
+	}
+
+	private _assignRule (rule : RouteRule) {
+		const refinedRule : RouteRule = this._refineRouteRule(rule);
+
+		this._routeRule = this._getMergedRule(this._routeRule, refinedRule);
+	}
+
+	// auth
+	async auth (fnc : RouteFunction) : Promise<void> {
+		if (fnc === undefined) {
+			throw  new Error('no auth function');
+		}
+
+		if (!(fnc instanceof Function)) {
+			throw new Error('auth param should be Function');
+		}
+
+		this._authFnc = fnc;
+	}
+
+	async config (key : string, value : any) : Promise<void> {
+		if (Object.keys(this._config).includes(key)) {
+			switch (key) {
+				// boolean keys
+				case 'parseNumber':
+				case 'parseDate':
+					if (typeof value !== 'boolean') {
+						throw new Error('invalid value');
+					}
+
+					this._config[key] = value;
+					break;
+
+				case 'defaultMethod':
+					if (typeof value !== 'string') {
+						throw new Error('invalid method parameter');
+					}
+
+					if (!Object.values(METHODS).some(method => {
+						return method === value;
+					})) {
+						throw new Error('not defined method');
+					}
+
+					this._config[key] = value;
+					break;
+			}
+		}
+		else {
+			throw new Error('not defined option');
+		}
 	}
 
 	async _routeAbbrValidator (address : string, fnc : RouteFunction) : Promise<void> {
@@ -346,83 +309,49 @@ export class Badak {
 		}
 	}
 
-	// auth
-	async auth (fnc : RouteFunction) : Promise<void> {
-		if (fnc === undefined) {
-			throw  new Error('no auth function');
-		}
-
-		if (!(fnc instanceof Function)) {
-			throw new Error('auth param should be Function');
-		}
-
-		this._authFnc = fnc;
-	}
-
-	async config (key : string, value : boolean) : Promise<void> {
-		if (Object.keys(this._config).includes(key)) {
-			this._config[key] = value;
-		}
-		else {
-			throw new Error('not defined option');
-		}
-	}
-
 	// route abbreviation
 	async get (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
 
-		// check rule validation
-		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
+		// assign to route rule
+		await this._assignRule({
 			[address] : {
-				'GET' : fnc
+				[METHODS.GET] : fnc
 			}
 		});
-
-		// assign to route rule
-		await this._assignRule(routeRule);
 	}
 
 	async post (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
 
-		// check rule validation
-		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
+		// assign to route rule
+		await this._assignRule({
 			[address] : {
-				'POST' : fnc
+				[METHODS.POST] : fnc
 			}
 		});
-
-		// assign to route rule
-		await this._assignRule(routeRule);
 	}
 
 	async put (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
 
-		// check rule validation
-		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
+		// assign to route rule
+		await this._assignRule({
 			[address] : {
-				'PUT' : fnc
+				[METHODS.PUT] : fnc
 			}
 		});
-
-		// assign to route rule
-		await this._assignRule(routeRule);
 	}
 
 	async delete (address : string, fnc : RouteFunction) : Promise<void> {
 		await this._routeAbbrValidator(address, fnc);
 
-		// check rule validation
-		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule({
+		// assign to route rule
+		await this._assignRule({
 			[address] : {
-				'DELETE' : fnc
+				[METHODS.DELETE] : fnc
 			}
 		});
-
-		// assign to route rule
-		await this._assignRule(routeRule);
 	}
 
 	// parameter can be Object of string because request has string
@@ -584,17 +513,7 @@ export class Badak {
 	}
 
 	async route (rule : RouteRule) : Promise<void> {
-		if (rule === undefined) {
-			throw new Error('route rule should be passed');
-		}
-
-		if (typeof rule !== 'object') {
-			throw new Error('route rule should be object');
-		}
-
-		const routeRule : RouteRule | RouteRuleSeed = await this._checkRouteRule(rule);
-
-		await this._assignRule(routeRule);
+		await this._assignRule(rule);
 	}
 
 	async use (middleware : RouteFunction) : Promise<void> {
@@ -642,7 +561,7 @@ export class Badak {
 
 					if (uri === '/') {
 						if (!!req.method && !!targetRouteObj['/'] && !!targetRouteObj['/'][req.method]) {
-							targetFnc = targetRouteObj['/'][req.method];
+							targetFnc = targetRouteObj['/'][req.method.toUpperCase()];
 						}
 					}
 					else {
@@ -778,7 +697,7 @@ export class Badak {
 
 							if (i === arr.length - 1) {
 								if (ruleFound && !!req.method && !!targetRouteObj && !!targetRouteObj[req.method]) {
-									targetFnc = targetRouteObj[req.method];
+									targetFnc = targetRouteObj[req.method.toUpperCase()];
 								}
 							}
 						});
@@ -788,9 +707,9 @@ export class Badak {
 						throw new Error('no rule');
 					}
 
-					switch (req.method) {
-						case 'PUT':
-						case 'POST':
+					switch (req.method.toUpperCase()) {
+						case METHODS.PUT:
+						case METHODS.POST:
 							if (param === undefined) {
 								param = await this._paramParser(req);
 							}
@@ -907,6 +826,10 @@ export class Badak {
 	}
 
 	getHttpServer () : Server {
+		if (!this.isRunning()) {
+			throw new Error('server is not started');
+		}
+
 		return this._http;
 	}
 
