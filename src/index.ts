@@ -168,7 +168,7 @@ export class Badak {
 		return refinedRuleObj;
 	}
 
-	private _checkUriDuplication (uriKeys : string[]) {
+	private _checkUriDuplication (uriKeys : string[]) : void {
 		// sift keys, uriKeys can have duplicated item
 		const uris : string[] = uriKeys.filter((key, i, arr) => {
 			return i === arr.indexOf(key);
@@ -243,7 +243,7 @@ export class Badak {
 		return resultRule;
 	}
 
-	private _assignRule (rule : RouteRule) {
+	private _assignRule (rule : RouteRule) : void {
 		const refinedRule : RouteRule = this._refineRouteRule(rule);
 
 		this._routeRule = this._getMergedRule(this._routeRule, refinedRule);
@@ -295,7 +295,7 @@ export class Badak {
 		}
 	}
 
-	async _routeAbbrValidator (address : string, fnc : RouteFunction) : Promise<void> {
+	private _routeAbbrValidator (address : string, fnc : RouteFunction) : void {
 		if (address === undefined) {
 			throw new Error('no address');
 		}
@@ -311,10 +311,10 @@ export class Badak {
 
 	// route abbreviation
 	async get (address : string, fnc : RouteFunction) : Promise<void> {
-		await this._routeAbbrValidator(address, fnc);
+		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
-		await this._assignRule({
+		this._assignRule({
 			[address] : {
 				[METHODS.GET] : fnc
 			}
@@ -322,10 +322,10 @@ export class Badak {
 	}
 
 	async post (address : string, fnc : RouteFunction) : Promise<void> {
-		await this._routeAbbrValidator(address, fnc);
+		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
-		await this._assignRule({
+		this._assignRule({
 			[address] : {
 				[METHODS.POST] : fnc
 			}
@@ -333,10 +333,10 @@ export class Badak {
 	}
 
 	async put (address : string, fnc : RouteFunction) : Promise<void> {
-		await this._routeAbbrValidator(address, fnc);
+		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
-		await this._assignRule({
+		this._assignRule({
 			[address] : {
 				[METHODS.PUT] : fnc
 			}
@@ -344,10 +344,10 @@ export class Badak {
 	}
 
 	async delete (address : string, fnc : RouteFunction) : Promise<void> {
-		await this._routeAbbrValidator(address, fnc);
+		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
-		await this._assignRule({
+		this._assignRule({
 			[address] : {
 				[METHODS.DELETE] : fnc
 			}
@@ -513,7 +513,7 @@ export class Badak {
 	}
 
 	async route (rule : RouteRule) : Promise<void> {
-		await this._assignRule(rule);
+		this._assignRule(rule);
 	}
 
 	async use (middleware : RouteFunction) : Promise<void> {
