@@ -47,7 +47,7 @@ export class Badak {
 	private _http : Server = null;
 
 	// auth hook
-	private _authFnc : RouteFunction = null;
+	private _authFnc : MiddlewareFunction = null;
 
 	// before & after hooks
 	private _middlewaresBefore : MiddlewareFunction[] = [];
@@ -257,7 +257,7 @@ export class Badak {
 	}
 
 	// auth
-	async auth (fnc : RouteFunction) : Promise<void> {
+	async auth (fnc : MiddlewareFunction) : Promise<void> {
 		if (fnc === undefined) {
 			throw  new Error('no auth function');
 		}
@@ -759,7 +759,7 @@ export class Badak {
 					if (!!this._authFnc) {
 						// can be normal or async function
 						try {
-							await this._authFnc(param, req, res);
+							await this._authFnc(req, res);
 						}
 						catch (e) {
 							// create new error instance
