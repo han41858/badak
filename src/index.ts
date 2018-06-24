@@ -41,11 +41,18 @@ export interface RouteRuleSeed {
 
 // function type definition for IDE
 export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
+export type MiddlewareFunction = (req : IncomingMessage, res : ServerResponse) => void;
 
 export class Badak {
 	private _http : Server = null;
+
+	// auth hook
 	private _authFnc : RouteFunction = null;
-	private _middleware : RouteFunction[] = [];
+
+	// before & after hooks
+	private _middlewaresBefore : MiddlewareFunction[] = [];
+	private _middlewaresAfter : MiddlewareFunction[] = [];
+
 	private _routeRule : RouteRule = null;
 
 	private _config : {
@@ -260,6 +267,38 @@ export class Badak {
 		}
 
 		this._authFnc = fnc;
+	}
+
+	async before (middleware : MiddlewareFunction) : Promise<void> {
+		if (this.isRunning()) {
+			throw new Error('server is started already, this function should be called before listen()');
+		}
+
+		if (middleware === undefined) {
+			throw new Error('middleware function should be passed');
+		}
+
+		if (!(middleware instanceof Function)) {
+			throw new Error('middleware should be function');
+		}
+
+		this._middlewaresBefore.push(middleware);
+	}
+
+	async after (middleware : MiddlewareFunction) : Promise<void> {
+		if (this.isRunning()) {
+			throw new Error('server is started already, this function should be called before listen()');
+		}
+
+		if (middleware === undefined) {
+			throw new Error('middleware function should be passed');
+		}
+
+		if (!(middleware instanceof Function)) {
+			throw new Error('middleware should be function');
+		}
+
+		this._middlewaresAfter.push(middleware);
 	}
 
 	async config (key : string, value : any) : Promise<void> {
@@ -516,18 +555,6 @@ export class Badak {
 		this._assignRule(rule);
 	}
 
-	async use (middleware : RouteFunction) : Promise<void> {
-		if (middleware === undefined) {
-			throw new Error('middleware function should be passed');
-		}
-
-		if (!(middleware instanceof Function)) {
-			throw new Error('middleware should be function');
-		}
-
-		this._middleware.push(middleware);
-	}
-
 	async listen (port : number) : Promise<any> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
@@ -546,6 +573,15 @@ export class Badak {
 			this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
 				// new Promise loop to catch error
 				(async () => {
+					// run before middleware functions in parallel
+					// before functions can't modify parameters
+					await Promise.all(this._middlewaresBefore.map((middlewareFnc : MiddlewareFunction) => {
+						return middlewareFnc(req, res);
+					}))
+						.catch(err => {
+							// catch middleware exception
+						});
+
 					let targetFnc : RouteFunction;
 					let param : any;
 
@@ -731,10 +767,6 @@ export class Badak {
 						}
 					}
 
-					await Promise.all(this._middleware.map((middlewareFnc : RouteFunction) => {
-						return middlewareFnc(param, req, res);
-					}));
-
 					const resObj : any = await targetFnc(param, req, res);
 
 					if (!!resObj) {
@@ -763,7 +795,7 @@ export class Badak {
 						res.end();
 					}
 				})()
-					.catch((err : any) => {
+					.catch(async (err : any) => {
 						switch (err.message) {
 							case 'auth failed':
 								res.statusCode = 401; // Unauthorized, Unauthenticated
@@ -801,14 +833,21 @@ export class Badak {
 								}
 								break;
 						}
-
-						reject(err);
+					})
+					.then(async () => {
+						// run after middleware functions
+						await Promise.all(this._middlewaresAfter.map((middlewareFnc : MiddlewareFunction) => {
+							return middlewareFnc(req, res);
+						}))
+							.catch(() => {
+								// catch middleware exception
+							});
 					});
 			});
 
-			this._http.on('error', (err : Error) => {
-				reject(err);
-			});
+			// this._http.on('error', (err : Error) => {
+			// 	reject(err);
+			// });
 
 			this._http.listen(port, (err : Error) => {
 				if (!err) {
