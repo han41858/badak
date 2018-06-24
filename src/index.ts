@@ -555,7 +555,7 @@ export class Badak {
 		this._assignRule(rule);
 	}
 
-	async listen (port : number) : Promise<any> {
+	async listen (port : number) : Promise<void> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
 		}
@@ -564,23 +564,26 @@ export class Badak {
 			throw new Error('port should be number type');
 		}
 
-		if (this._http !== null) {
+		if (this.isRunning()) {
 			throw new Error('server is running already');
 		}
 
 		// use new Promise for http.listen() callback
-		return new Promise((resolve, reject) => {
+		await new Promise<void>((resolve, reject) => {
 			this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
 				// new Promise loop to catch error
 				(async () => {
 					// run before middleware functions in parallel
 					// before functions can't modify parameters
-					await Promise.all(this._middlewaresBefore.map((middlewareFnc : MiddlewareFunction) => {
-						return middlewareFnc(req, res);
-					}))
-						.catch(err => {
-							// catch middleware exception
-						});
+					// use try {} to run route function
+					try {
+						await Promise.all(this._middlewaresBefore.map((middlewareFnc : MiddlewareFunction) => {
+							return middlewareFnc(req, res);
+						}));
+					}
+					catch (err) {
+						// catch middleware exception
+					}
 
 					let targetFnc : RouteFunction;
 					let param : any;
@@ -836,12 +839,14 @@ export class Badak {
 					})
 					.then(async () => {
 						// run after middleware functions
-						await Promise.all(this._middlewaresAfter.map((middlewareFnc : MiddlewareFunction) => {
-							return middlewareFnc(req, res);
-						}))
-							.catch(() => {
-								// catch middleware exception
-							});
+						try {
+							await Promise.all(this._middlewaresAfter.map((middlewareFnc : MiddlewareFunction) => {
+								return middlewareFnc(req, res);
+							}));
+						}
+						catch (err) {
+							// catch middleware exception
+						}
 					});
 			});
 
