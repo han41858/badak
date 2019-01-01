@@ -1,8 +1,9 @@
 {
   "name": "badak",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "node.js Server framework based on Promise and TypeScript",
   "main": "build/public_api.js",
+  "types": "build/public_api.d.ts",
   "scripts": {
     "clean": "rimraf ./build",
     "prebuild": "yarn clean",
