@@ -130,7 +130,7 @@ var Badak = /** @class */ (function () {
                     if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
                         throw new Error('invalid plus route');
                     }
-                    if (Object.values(constants_1.METHODS).includes(uriFrag)) {
+                    if (Object.values(constants_1.Method).includes(uriFrag)) {
                         var method = uriFrag; // re-assign for readability
                         targetObj_1[method] = rule[method];
                     }
@@ -216,7 +216,7 @@ var Badak = /** @class */ (function () {
         this._checkUriDuplication(Object.keys(resultRule).concat(Object.keys(newRule)));
         Object.keys(newRule).forEach(function (newRuleKey) {
             // assign
-            if (!!resultRule[newRuleKey] && !Object.keys(constants_1.METHODS).includes(newRuleKey)) {
+            if (!!resultRule[newRuleKey] && !Object.keys(constants_1.Method).includes(newRuleKey)) {
                 resultRule[newRuleKey] = _this._getMergedRule(resultRule[newRuleKey], newRule[newRuleKey]);
             }
             else {
@@ -295,7 +295,7 @@ var Badak = /** @class */ (function () {
                             if (typeof value !== 'string') {
                                 throw new Error('invalid method parameter');
                             }
-                            if (!Object.values(constants_1.METHODS).some(function (method) {
+                            if (!Object.values(constants_1.Method).some(function (method) {
                                 return method === value;
                             })) {
                                 throw new Error('not defined method');
@@ -331,7 +331,7 @@ var Badak = /** @class */ (function () {
                 // assign to route rule
                 this._assignRule((_a = {},
                     _a[address] = (_b = {},
-                        _b[constants_1.METHODS.GET] = fnc,
+                        _b[constants_1.Method.GET] = fnc,
                         _b),
                     _a));
                 return [2 /*return*/];
@@ -346,7 +346,7 @@ var Badak = /** @class */ (function () {
                 // assign to route rule
                 this._assignRule((_a = {},
                     _a[address] = (_b = {},
-                        _b[constants_1.METHODS.POST] = fnc,
+                        _b[constants_1.Method.POST] = fnc,
                         _b),
                     _a));
                 return [2 /*return*/];
@@ -361,7 +361,7 @@ var Badak = /** @class */ (function () {
                 // assign to route rule
                 this._assignRule((_a = {},
                     _a[address] = (_b = {},
-                        _b[constants_1.METHODS.PUT] = fnc,
+                        _b[constants_1.Method.PUT] = fnc,
                         _b),
                     _a));
                 return [2 /*return*/];
@@ -376,7 +376,7 @@ var Badak = /** @class */ (function () {
                 // assign to route rule
                 this._assignRule((_a = {},
                     _a[address] = (_b = {},
-                        _b[constants_1.METHODS.DELETE] = fnc,
+                        _b[constants_1.Method.DELETE] = fnc,
                         _b),
                     _a));
                 return [2 /*return*/];
@@ -676,8 +676,8 @@ var Badak = /** @class */ (function () {
                                                     }
                                                     _a = req.method.toUpperCase();
                                                     switch (_a) {
-                                                        case constants_1.METHODS.PUT: return [3 /*break*/, 4];
-                                                        case constants_1.METHODS.POST: return [3 /*break*/, 4];
+                                                        case constants_1.Method.PUT: return [3 /*break*/, 4];
+                                                        case constants_1.Method.POST: return [3 /*break*/, 4];
                                                     }
                                                     return [3 /*break*/, 9];
                                                 case 4:
