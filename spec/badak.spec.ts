@@ -3,7 +3,7 @@ import 'mocha';
 import { expect } from 'chai';
 import * as request from 'supertest';
 
-import { Badak } from '../src';
+import { Badak } from '../src/badak';
 
 const fail = async () => {
 	throw new Error('this should be not execute');

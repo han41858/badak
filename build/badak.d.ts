@@ -1,17 +1,22 @@
 /// <reference types="node" />
-import { IncomingMessage, ServerResponse } from 'http';
 import { Server } from 'net';
-export interface RouteRule {
-    [uri: string]: RouteRule | RouteRuleSeed | Function;
-}
-export interface RouteRuleSeed {
-    GET?: RouteFunction;
-    POST?: RouteFunction;
-    PUT?: RouteFunction;
-    DELETE?: RouteFunction;
-}
-export declare type RouteFunction = (param: Object, req: IncomingMessage, res: ServerResponse) => any;
-export declare type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse) => void;
+import { MiddlewareFunction, RouteFunction, RouteRule } from './interfaces';
+/**
+ * rule format, reserved keyword is 4-methods in upper cases
+ * example)
+ * {
+ *     'users' : {
+ *         'GET' : getUserList,
+ *         'POST' : addUser,
+ *
+ *         ':id' : {
+ *             'GET' : getUser,
+ *             'PUT' : updateUser,
+ *             'DELETE' : deleteUser
+ *         }
+ *     }
+ * }
+ */
 export declare class Badak {
     private _http;
     private _authFnc;

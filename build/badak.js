@@ -36,6 +36,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var http = require("http");
+var constants_1 = require("./constants");
 /**
  * rule format, reserved keyword is 4-methods in upper cases
  * example)
@@ -53,13 +54,6 @@ var http = require("http");
  * }
  */
 // rule format, reserved keyword is 4-methods
-var METHODS;
-(function (METHODS) {
-    METHODS["GET"] = "GET";
-    METHODS["POST"] = "POST";
-    METHODS["PUT"] = "PUT";
-    METHODS["DELETE"] = "DELETE";
-})(METHODS || (METHODS = {}));
 var Badak = /** @class */ (function () {
     function Badak() {
         this._http = null;
@@ -136,7 +130,7 @@ var Badak = /** @class */ (function () {
                     if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
                         throw new Error('invalid plus route');
                     }
-                    if (Object.values(METHODS).includes(uriFrag)) {
+                    if (Object.values(constants_1.METHODS).includes(uriFrag)) {
                         var method = uriFrag; // re-assign for readability
                         targetObj_1[method] = rule[method];
                     }
@@ -222,7 +216,7 @@ var Badak = /** @class */ (function () {
         this._checkUriDuplication(Object.keys(resultRule).concat(Object.keys(newRule)));
         Object.keys(newRule).forEach(function (newRuleKey) {
             // assign
-            if (!!resultRule[newRuleKey] && !Object.keys(METHODS).includes(newRuleKey)) {
+            if (!!resultRule[newRuleKey] && !Object.keys(constants_1.METHODS).includes(newRuleKey)) {
                 resultRule[newRuleKey] = _this._getMergedRule(resultRule[newRuleKey], newRule[newRuleKey]);
             }
             else {
@@ -301,7 +295,7 @@ var Badak = /** @class */ (function () {
                             if (typeof value !== 'string') {
                                 throw new Error('invalid method parameter');
                             }
-                            if (!Object.values(METHODS).some(function (method) {
+                            if (!Object.values(constants_1.METHODS).some(function (method) {
                                 return method === value;
                             })) {
                                 throw new Error('not defined method');
@@ -337,7 +331,7 @@ var Badak = /** @class */ (function () {
                 // assign to route rule
                 this._assignRule((_a = {},
                     _a[address] = (_b = {},
-                        _b[METHODS.GET] = fnc,
+                        _b[constants_1.METHODS.GET] = fnc,
                         _b),
                     _a));
                 return [2 /*return*/];
@@ -352,7 +346,7 @@ var Badak = /** @class */ (function () {
                 // assign to route rule
                 this._assignRule((_a = {},
                     _a[address] = (_b = {},
-                        _b[METHODS.POST] = fnc,
+                        _b[constants_1.METHODS.POST] = fnc,
                         _b),
                     _a));
                 return [2 /*return*/];
@@ -367,7 +361,7 @@ var Badak = /** @class */ (function () {
                 // assign to route rule
                 this._assignRule((_a = {},
                     _a[address] = (_b = {},
-                        _b[METHODS.PUT] = fnc,
+                        _b[constants_1.METHODS.PUT] = fnc,
                         _b),
                     _a));
                 return [2 /*return*/];
@@ -382,7 +376,7 @@ var Badak = /** @class */ (function () {
                 // assign to route rule
                 this._assignRule((_a = {},
                     _a[address] = (_b = {},
-                        _b[METHODS.DELETE] = fnc,
+                        _b[constants_1.METHODS.DELETE] = fnc,
                         _b),
                     _a));
                 return [2 /*return*/];
@@ -682,8 +676,8 @@ var Badak = /** @class */ (function () {
                                                     }
                                                     _a = req.method.toUpperCase();
                                                     switch (_a) {
-                                                        case METHODS.PUT: return [3 /*break*/, 4];
-                                                        case METHODS.POST: return [3 /*break*/, 4];
+                                                        case constants_1.METHODS.PUT: return [3 /*break*/, 4];
+                                                        case constants_1.METHODS.POST: return [3 /*break*/, 4];
                                                     }
                                                     return [3 /*break*/, 9];
                                                 case 4:
@@ -847,4 +841,4 @@ var Badak = /** @class */ (function () {
     return Badak;
 }());
 exports.Badak = Badak;
-//# sourceMappingURL=index.js.map
+//# sourceMappingURL=badak.js.map

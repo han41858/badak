@@ -2,6 +2,9 @@ import * as http from 'http';
 import { IncomingMessage, ServerResponse } from 'http';
 import { Server } from 'net';
 
+import { MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed } from './interfaces';
+import { Method } from './constants';
+
 /**
  * rule format, reserved keyword is 4-methods in upper cases
  * example)
@@ -20,28 +23,6 @@ import { Server } from 'net';
  */
 
 // rule format, reserved keyword is 4-methods
-
-enum METHODS {
-	GET = 'GET',
-	POST = 'POST',
-	PUT = 'PUT',
-	DELETE = 'DELETE'
-}
-
-export interface RouteRule {
-	[uri : string] : RouteRule | RouteRuleSeed | Function; // function can be assigned after config('defaultMethod', [method_type])
-}
-
-export interface RouteRuleSeed {
-	GET? : RouteFunction;
-	POST? : RouteFunction;
-	PUT? : RouteFunction;
-	DELETE? : RouteFunction;
-}
-
-// function type definition for IDE
-export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
-export type MiddlewareFunction = (req : IncomingMessage, res : ServerResponse) => void;
 
 export class Badak {
 	private _http : Server = null;
@@ -102,8 +83,7 @@ export class Badak {
 			// slash is permitted only '/', for others remove slash
 			if (uri === '/') {
 				refinedRuleObj['/'] = this._refineRouteRule(rule[uri]);
-			}
-			else {
+			} else {
 				if (uri.includes('//')) {
 					throw new Error('invalid double slash');
 				}
@@ -135,12 +115,11 @@ export class Badak {
 						throw new Error('invalid plus route');
 					}
 
-					if (Object.values(METHODS).includes(uriFrag)) {
+					if (Object.values(Method).includes(uriFrag)) {
 						const method : string = uriFrag; // re-assign for readability
 
 						targetObj[method] = rule[method];
-					}
-					else {
+					} else {
 						if (i < arr.length - 1) {
 							// unzip abbreviation path
 							if (!targetObj[uriFrag]) {
@@ -148,19 +127,16 @@ export class Badak {
 							}
 
 							targetObj = targetObj[uriFrag];
-						}
-						else {
+						} else {
 							// last uri frag
 							if (typeof rule[uri] === 'object') {
 								targetObj[uriFrag] = this._refineRouteRule(rule[uri]);
-							}
-							else if (typeof rule[uri] === 'function') {
+							} else if (typeof rule[uri] === 'function') {
 								if (!!this._config.defaultMethod) {
 									targetObj[uriFrag] = {
 										[this._config.defaultMethod] : rule[uri]
 									};
-								}
-								else {
+								} else {
 									throw new Error('invalid rule or defaultMethod not set');
 								}
 							}
@@ -212,8 +188,7 @@ export class Badak {
 
 					if (plusUrisSanitized.includes(plusIncluded) || plusUrisSanitized.includes(plusExcluded)) {
 						throw new Error('duplicated plus routing');
-					}
-					else {
+					} else {
 						plusUrisSanitized.push(plusIncluded, plusExcluded);
 					}
 				});
@@ -239,10 +214,9 @@ export class Badak {
 
 		Object.keys(newRule).forEach(newRuleKey => {
 			// assign
-			if (!!resultRule[newRuleKey] && !Object.keys(METHODS).includes(newRuleKey)) {
+			if (!!resultRule[newRuleKey] && !Object.keys(Method).includes(newRuleKey)) {
 				resultRule[newRuleKey] = this._getMergedRule(resultRule[newRuleKey], newRule[newRuleKey]);
-			}
-			else {
+			} else {
 				resultRule[newRuleKey] = newRule[newRuleKey];
 			}
 		});
@@ -319,7 +293,7 @@ export class Badak {
 						throw new Error('invalid method parameter');
 					}
 
-					if (!Object.values(METHODS).some(method => {
+					if (!Object.values(Method).some(method => {
 						return method === value;
 					})) {
 						throw new Error('not defined method');
@@ -328,8 +302,7 @@ export class Badak {
 					this._config[key] = value;
 					break;
 			}
-		}
-		else {
+		} else {
 			throw new Error('not defined option');
 		}
 	}
@@ -355,7 +328,7 @@ export class Badak {
 		// assign to route rule
 		this._assignRule({
 			[address] : {
-				[METHODS.GET] : fnc
+				[Method.GET] : fnc
 			}
 		});
 	}
@@ -366,7 +339,7 @@ export class Badak {
 		// assign to route rule
 		this._assignRule({
 			[address] : {
-				[METHODS.POST] : fnc
+				[Method.POST] : fnc
 			}
 		});
 	}
@@ -377,7 +350,7 @@ export class Badak {
 		// assign to route rule
 		this._assignRule({
 			[address] : {
-				[METHODS.PUT] : fnc
+				[Method.PUT] : fnc
 			}
 		});
 	}
@@ -388,7 +361,7 @@ export class Badak {
 		// assign to route rule
 		this._assignRule({
 			[address] : {
-				[METHODS.DELETE] : fnc
+				[Method.DELETE] : fnc
 			}
 		});
 	}
@@ -511,8 +484,7 @@ export class Badak {
 							if (!!bodyStr) {
 								try {
 									paramObj = JSON.parse(bodyStr);
-								}
-								catch (e) {
+								} catch (e) {
 									throw new Error('parsing parameter failed');
 								}
 							}
@@ -541,8 +513,7 @@ export class Badak {
 					}
 
 					_resolve(paramObj);
-				}
-				else {
+				} else {
 					// no content-type, but ok
 					_resolve();
 				}
@@ -580,8 +551,7 @@ export class Badak {
 						await Promise.all(this._middlewaresBefore.map((middlewareFnc : MiddlewareFunction) => {
 							return middlewareFnc(req, res);
 						}));
-					}
-					catch (err) {
+					} catch (err) {
 						// catch middleware exception
 					}
 
@@ -602,8 +572,7 @@ export class Badak {
 						if (!!req.method && !!targetRouteObj['/'] && !!targetRouteObj['/'][req.method]) {
 							targetFnc = targetRouteObj['/'][req.method.toUpperCase()];
 						}
-					}
-					else {
+					} else {
 						const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
 
 						// TODO: static files
@@ -656,7 +625,7 @@ export class Badak {
 									const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
 									const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
 
-									return new RegExp(`^${mandatoryKey}${optionalCharacter}?${restKey}$`).test(uriFrag);
+									return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
 								});
 
 								if (targetQuestionKey !== undefined) {
@@ -747,12 +716,11 @@ export class Badak {
 					}
 
 					switch (req.method.toUpperCase()) {
-						case METHODS.PUT:
-						case METHODS.POST:
+						case Method.PUT:
+						case Method.POST:
 							if (param === undefined) {
 								param = await this._paramParser(req);
-							}
-							else {
+							} else {
 								// TODO: overwrite? uri param & param object
 								param = Object.assign(param, await this._paramParser(req));
 							}
@@ -763,8 +731,7 @@ export class Badak {
 						// can be normal or async function
 						try {
 							await this._authFnc(req, res);
-						}
-						catch (e) {
+						} catch (e) {
 							// create new error instance
 							throw new Error('auth failed');
 						}
@@ -788,13 +755,11 @@ export class Badak {
 								res.setHeader('Content-Type', 'text/plain');
 								res.end(resObj);
 							}
-						}
-						else {
+						} else {
 							res.setHeader('Content-Type', 'text/plain');
 							res.end(resObj);
 						}
-					}
-					else {
+					} else {
 						res.end();
 					}
 				})()
@@ -826,12 +791,10 @@ export class Badak {
 									if (err instanceof Object) {
 										res.setHeader('Content-Type', 'application/json');
 										res.end(JSON.stringify(err));
-									}
-									else {
+									} else {
 										res.end(err);
 									}
-								}
-								else {
+								} else {
 									res.end();
 								}
 								break;
@@ -843,8 +806,7 @@ export class Badak {
 							await Promise.all(this._middlewaresAfter.map((middlewareFnc : MiddlewareFunction) => {
 								return middlewareFnc(req, res);
 							}));
-						}
-						catch (err) {
+						} catch (err) {
 							// catch middleware exception
 						}
 					});
@@ -857,8 +819,7 @@ export class Badak {
 			this._http.listen(port, (err : Error) => {
 				if (!err) {
 					resolve();
-				}
-				else {
+				} else {
 					reject(err);
 				}
 			});

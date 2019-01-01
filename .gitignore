@@ -3,3 +3,6 @@ node_modules/
 
 package-lock.json
 yarn.lock
+
+build/src
+build/spec
