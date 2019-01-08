@@ -621,7 +621,7 @@ describe('core', () => {
 	});
 
 	describe('route()', () => {
-		let app = null;
+		let app = null; // not specify type to access private members
 
 		beforeEach(() => {
 			app = new Badak;

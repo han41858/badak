@@ -4,6 +4,8 @@
     "target": "es5",
     "sourceMap": true,
     "outDir": "./build",
+    "declaration": true,
+    "declarationDir": "build",
     "lib": [
       "es2018",
       "dom"

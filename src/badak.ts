@@ -542,6 +542,8 @@ export class Badak {
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject) => {
 			this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
+				let responseBody : any;
+
 				// new Promise loop to catch error
 				(async () => {
 					// run before middleware functions in parallel
@@ -744,20 +746,22 @@ export class Badak {
 						if (typeof resObj === 'object') {
 							try {
 								// try to stringify()
-								JSON.stringify(resObj);
+								responseBody = JSON.stringify(resObj);
 
 								res.setHeader('Content-Type', 'application/json');
-
-								res.end(JSON.stringify(resObj));
+								res.end(responseBody);
 							} catch (err) {
 								// no json
+								responseBody = resObj;
 
 								res.setHeader('Content-Type', 'text/plain');
-								res.end(resObj);
+								res.end(responseBody);
 							}
 						} else {
+							responseBody = resObj;
+
 							res.setHeader('Content-Type', 'text/plain');
-							res.end(resObj);
+							res.end(responseBody);
 						}
 					} else {
 						res.end();
@@ -788,12 +792,18 @@ export class Badak {
 								res.statusCode = 500; // Internal Server Error
 
 								if (!!err) {
-									if (err instanceof Object) {
+									if (err instanceof Error) {
+										responseBody = err.message;
+										res.setHeader('Content-Type', 'text/plain');
+									} else if (err instanceof Object) {
+										responseBody = JSON.stringify(err);
 										res.setHeader('Content-Type', 'application/json');
-										res.end(JSON.stringify(err));
 									} else {
-										res.end(err);
+										responseBody = err;
+										res.setHeader('Content-Type', 'text/plain');
 									}
+
+									res.end(responseBody);
 								} else {
 									res.end();
 								}
@@ -804,7 +814,7 @@ export class Badak {
 						// run after middleware functions
 						try {
 							await Promise.all(this._middlewaresAfter.map((middlewareFnc : MiddlewareFunction) => {
-								return middlewareFnc(req, res);
+								return middlewareFnc(req, res, responseBody);
 							}));
 						} catch (err) {
 							// catch middleware exception

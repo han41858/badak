@@ -340,8 +340,11 @@ describe('middleware', () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : Function = () => {
+				const afterFnc : Function = (req, res, responseBody) => {
 					afterFncRunFlag = true;
+
+					expect(responseBody).to.be.a('string');
+					expect(responseBody).to.be.eql('dev error');
 				};
 
 				await app.before(beforeFnc);
