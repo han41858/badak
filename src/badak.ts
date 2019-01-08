@@ -542,7 +542,7 @@ export class Badak {
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject) => {
 			this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
-				let responseBody : any;
+				let responseBody : string;
 
 				// new Promise loop to catch error
 				(async () => {
