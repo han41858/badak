@@ -542,6 +542,7 @@ var Badak = /** @class */ (function () {
                         // use new Promise for http.listen() callback
                         return [4 /*yield*/, new Promise(function (resolve, reject) {
                                 _this._http = http.createServer(function (req, res) {
+                                    var responseBody;
                                     // new Promise loop to catch error
                                     (function () { return __awaiter(_this, void 0, void 0, function () {
                                         var err_1, targetFnc, param, targetRouteObj, uri, uriArr, ruleFound_1, _a, _b, _c, _d, e_1, resObj;
@@ -716,19 +717,21 @@ var Badak = /** @class */ (function () {
                                                         if (typeof resObj === 'object') {
                                                             try {
                                                                 // try to stringify()
-                                                                JSON.stringify(resObj);
+                                                                responseBody = JSON.stringify(resObj);
                                                                 res.setHeader('Content-Type', 'application/json');
-                                                                res.end(JSON.stringify(resObj));
+                                                                res.end(responseBody);
                                                             }
                                                             catch (err) {
                                                                 // no json
+                                                                responseBody = resObj;
                                                                 res.setHeader('Content-Type', 'text/plain');
-                                                                res.end(resObj);
+                                                                res.end(responseBody);
                                                             }
                                                         }
                                                         else {
+                                                            responseBody = resObj;
                                                             res.setHeader('Content-Type', 'text/plain');
-                                                            res.end(resObj);
+                                                            res.end(responseBody);
                                                         }
                                                     }
                                                     else {
@@ -757,13 +760,19 @@ var Badak = /** @class */ (function () {
                                                 default:
                                                     res.statusCode = 500; // Internal Server Error
                                                     if (!!err) {
-                                                        if (err instanceof Object) {
+                                                        if (err instanceof Error) {
+                                                            responseBody = err.message;
+                                                            res.setHeader('Content-Type', 'text/plain');
+                                                        }
+                                                        else if (err instanceof Object) {
+                                                            responseBody = JSON.stringify(err);
                                                             res.setHeader('Content-Type', 'application/json');
-                                                            res.end(JSON.stringify(err));
                                                         }
                                                         else {
-                                                            res.end(err);
+                                                            responseBody = err;
+                                                            res.setHeader('Content-Type', 'text/plain');
                                                         }
+                                                        res.end(responseBody);
                                                     }
                                                     else {
                                                         res.end();
@@ -780,7 +789,7 @@ var Badak = /** @class */ (function () {
                                                 case 0:
                                                     _a.trys.push([0, 2, , 3]);
                                                     return [4 /*yield*/, Promise.all(this._middlewaresAfter.map(function (middlewareFnc) {
-                                                            return middlewareFnc(req, res);
+                                                            return middlewareFnc(req, res, responseBody);
                                                         }))];
                                                 case 1:
                                                     _a.sent();
