@@ -11,7 +11,9 @@
     "prebuild:test": "yarn clean",
     "build:test": "tsc -p tsconfig.spec.json",
     "pretest": "yarn build:test",
-    "test": "mocha ./build/**/*.spec.js"
+    "test": "mocha ./build/**/*.spec.js",
+    "prebuild:sample": "yarn clean",
+    "build:sample": "tsc ./sample/index.ts"
   },
   "repository": {
     "type": "git",
