@@ -4,6 +4,7 @@ import { expect } from 'chai';
 import * as request from 'supertest';
 
 import { Badak } from '../src/badak';
+import { MiddlewareFunction } from '../src/interfaces';
 
 const fail = async () => {
 	throw new Error('this should be not execute');
@@ -12,7 +13,7 @@ const fail = async () => {
 const port = 65030;
 
 describe('middleware', () => {
-	let app = null; // no type for test
+	let app : Badak = null;
 
 	beforeEach(() => {
 		app = new Badak;
@@ -27,7 +28,7 @@ describe('middleware', () => {
 	describe('auth()', () => {
 		describe('error', () => {
 			it('no auth param', () => {
-				return app.auth()
+				return app.auth(undefined)
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
 						expect(err).to.be.instanceof(Error);
@@ -196,11 +197,11 @@ describe('middleware', () => {
 			});
 
 			it('normal functions', async () => {
-				const beforeFnc : Function = () => {
+				const beforeFnc : MiddlewareFunction = () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : Function = () => {
+				const afterFnc : MiddlewareFunction = () => {
 					afterFncRunFlag = true;
 				};
 
@@ -231,11 +232,11 @@ describe('middleware', () => {
 			});
 
 			it('async functions', async () => {
-				const beforeFnc : Function = async () => {
+				const beforeFnc : MiddlewareFunction = async () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : Function = async () => {
+				const afterFnc : MiddlewareFunction = async () => {
 					afterFncRunFlag = true;
 				};
 
@@ -266,7 +267,7 @@ describe('middleware', () => {
 			});
 
 			it('with param', async () => {
-				const beforeFnc : Function = async (req, res) => {
+				const beforeFnc : MiddlewareFunction = async (req, res) => {
 					expect(req).to.be.ok;
 					expect(res).to.be.ok;
 				};
@@ -283,7 +284,7 @@ describe('middleware', () => {
 					return newParam;
 				};
 
-				const afterFnc : Function = async (req, res) => {
+				const afterFnc : MiddlewareFunction = async (req, res) => {
 					expect(req).to.be.ok;
 					expect(res).to.be.ok;
 				};
@@ -309,11 +310,11 @@ describe('middleware', () => {
 			});
 
 			it('with internal failed response', async () => {
-				const beforeFnc : Function = () => {
+				const beforeFnc : MiddlewareFunction = () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : Function = () => {
+				const afterFnc : MiddlewareFunction = () => {
 					afterFncRunFlag = true;
 				};
 
@@ -336,11 +337,11 @@ describe('middleware', () => {
 			});
 
 			it('with function failed response', async () => {
-				const beforeFnc : Function = () => {
+				const beforeFnc : MiddlewareFunction = () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : Function = (req, res, responseBody) => {
+				const afterFnc : MiddlewareFunction = (req, res, responseBody) => {
 					afterFncRunFlag = true;
 
 					expect(responseBody).to.be.a('string');

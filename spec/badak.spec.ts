@@ -441,8 +441,8 @@ describe('core', () => {
 
 			it('default - can\'t set', () => {
 				return app.route({
-					[testUri] : echoFnc
-				})
+						[testUri] : echoFnc
+					})
 					.then(fail, err => {
 						expect(err).to.be.ok;
 						expect(err).to.be.instanceof(Error);
@@ -464,7 +464,7 @@ describe('core', () => {
 
 						methods.forEach((testMethod, j) => {
 							it('test ' + testMethod, async () => {
-								const routeRule = app._routeRule;
+								const routeRule = (app as any)._routeRule;
 
 								expect(routeRule).to.be.ok;
 								expect(routeRule).to.have.property(testUriRefined);
@@ -621,7 +621,7 @@ describe('core', () => {
 	});
 
 	describe('route()', () => {
-		let app = null; // not specify type to access private members
+		let app : Badak = null;
 
 		beforeEach(() => {
 			app = new Badak;
@@ -650,7 +650,7 @@ describe('core', () => {
 
 			describe('error', () => {
 				it('no param', () => {
-					return app.route()
+					return app.route(undefined)
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -659,11 +659,11 @@ describe('core', () => {
 
 				it('empty address - \'\'', () => {
 					return app.route({
-						'' : {
-							'GET' : async () => {
+							'' : {
+								'GET' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -672,11 +672,11 @@ describe('core', () => {
 
 				it('empty address - \' \'', () => {
 					return app.route({
-						' ' : {
-							'GET' : async () => {
+							' ' : {
+								'GET' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -685,11 +685,11 @@ describe('core', () => {
 
 				it('empty address - space', () => {
 					return app.route({
-						' ' : {
-							'GET' : async () => {
+							' ' : {
+								'GET' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -698,11 +698,11 @@ describe('core', () => {
 
 				it('uri include space', () => {
 					return app.route({
-						' users' : {
-							'GET' : async () => {
+							' users' : {
+								'GET' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -711,11 +711,11 @@ describe('core', () => {
 
 				it('uri include space', () => {
 					return app.route({
-						'users ' : {
-							'GET' : async () => {
+							'users ' : {
+								'GET' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -724,8 +724,8 @@ describe('core', () => {
 
 				it('no rule', () => {
 					return app.route({
-						'users' : {}
-					})
+							'users' : {}
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -734,11 +734,11 @@ describe('core', () => {
 
 				it('invalid method', () => {
 					return app.route({
-						'users' : {
-							'get' : async () => {
+							'users' : {
+								'get' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -748,13 +748,13 @@ describe('core', () => {
 				it('included invalid rule', () => {
 					// setting defaultMethod cover this
 					return app.route({
-						'users' : {
-							'GET' : async () => {
-							},
-							'something' : async () => {
+							'users' : {
+								'GET' : async () => {
+								},
+								'something' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -797,11 +797,11 @@ describe('core', () => {
 
 				it('invalid root path', () => {
 					return app.route({
-						' /' : {
-							'GET' : async () => {
+							' /' : {
+								'GET' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -810,11 +810,11 @@ describe('core', () => {
 
 				it('invalid root path', () => {
 					return app.route({
-						'/ ' : {
-							'GET' : async () => {
+							'/ ' : {
+								'GET' : async () => {
+								}
 							}
-						}
-					})
+						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -832,7 +832,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = app._routeRule;
+				const routeRule = (app as any)._routeRule;
 
 				expect(routeRule).to.be.ok;
 				expect(routeRule).to.be.instanceof(Object);
@@ -867,7 +867,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = app._routeRule;
+				const routeRule = (app as any)._routeRule;
 
 				expect(routeRule).to.be.ok;
 				expect(routeRule).to.be.instanceof(Object);
@@ -920,7 +920,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = app._routeRule;
+				const routeRule = (app as any)._routeRule;
 
 				expect(routeRule).to.be.ok;
 				expect(routeRule).to.be.instanceof(Object);
@@ -953,7 +953,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = app._routeRule;
+				const routeRule = (app as any)._routeRule;
 
 				expect(routeRule).to.be.ok;
 				expect(routeRule).to.be.instanceof(Object);
@@ -986,7 +986,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = app._routeRule;
+				const routeRule = (app as any)._routeRule;
 
 				expect(routeRule).to.be.ok;
 				expect(routeRule).to.be.instanceof(Object);
@@ -1099,15 +1099,15 @@ describe('core', () => {
 					}
 				});
 
-				expect(app._routeRule).to.be.ok;
-				expect(app._routeRule).to.be.instanceof(Object);
-				expect(app._routeRule).to.have.property('users');
+				expect((app as any)._routeRule).to.be.ok;
+				expect((app as any)._routeRule).to.be.instanceof(Object);
+				expect((app as any)._routeRule).to.have.property('users');
 
-				expect(app._routeRule['users']).to.be.ok;
-				expect(app._routeRule['users']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['users']).to.be.ok;
+				expect((app as any)._routeRule['users']).to.be.instanceof(Object);
 
-				expect(app._routeRule['users']).to.have.property('GET', fncA);
-				expect(app._routeRule['users']).to.have.property('POST', fncB);
+				expect((app as any)._routeRule['users']).to.have.property('GET', fncA);
+				expect((app as any)._routeRule['users']).to.have.property('POST', fncB);
 			});
 
 			it('ok - multiple assign from root', async () => {
@@ -1130,20 +1130,20 @@ describe('core', () => {
 					}
 				});
 
-				expect(app._routeRule).to.be.ok;
-				expect(app._routeRule).to.be.instanceof(Object);
-				expect(app._routeRule).to.have.property('users');
+				expect((app as any)._routeRule).to.be.ok;
+				expect((app as any)._routeRule).to.be.instanceof(Object);
+				expect((app as any)._routeRule).to.have.property('users');
 
-				expect(app._routeRule['users']).to.be.ok;
-				expect(app._routeRule['users']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['users']).to.be.ok;
+				expect((app as any)._routeRule['users']).to.be.instanceof(Object);
 
-				expect(app._routeRule['users']['a']).to.be.ok;
-				expect(app._routeRule['users']['a']).to.be.instanceof(Object);
-				expect(app._routeRule['users']['a']).to.have.property('GET', fncA);
+				expect((app as any)._routeRule['users']['a']).to.be.ok;
+				expect((app as any)._routeRule['users']['a']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['users']['a']).to.have.property('GET', fncA);
 
-				expect(app._routeRule['users']['b']).to.be.ok;
-				expect(app._routeRule['users']['b']).to.be.instanceof(Object);
-				expect(app._routeRule['users']['b']).to.have.property('GET', fncB);
+				expect((app as any)._routeRule['users']['b']).to.be.ok;
+				expect((app as any)._routeRule['users']['b']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['users']['b']).to.have.property('GET', fncB);
 
 				await app.listen(port);
 
@@ -1180,18 +1180,18 @@ describe('core', () => {
 					}
 				});
 
-				expect(app._routeRule).to.be.ok;
-				expect(app._routeRule).to.be.instanceof(Object);
+				expect((app as any)._routeRule).to.be.ok;
+				expect((app as any)._routeRule).to.be.instanceof(Object);
 
-				expect(app._routeRule).to.have.property('users');
-				expect(app._routeRule['users']).to.be.instanceof(Object);
-				expect(app._routeRule['users']).to.have.property('GET');
-				expect(app._routeRule['users']['GET']).to.be.eql(usersGetFnc);
+				expect((app as any)._routeRule).to.have.property('users');
+				expect((app as any)._routeRule['users']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['users']).to.have.property('GET');
+				expect((app as any)._routeRule['users']['GET']).to.be.eql(usersGetFnc);
 
-				expect(app._routeRule).to.have.property('records');
-				expect(app._routeRule['records']).to.be.instanceof(Object);
-				expect(app._routeRule['records']).to.have.property('GET');
-				expect(app._routeRule['records']['GET']).to.be.eql(recordsGetFnc);
+				expect((app as any)._routeRule).to.have.property('records');
+				expect((app as any)._routeRule['records']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['records']).to.have.property('GET');
+				expect((app as any)._routeRule['records']['GET']).to.be.eql(recordsGetFnc);
 
 				await app.listen(port);
 
@@ -1235,20 +1235,20 @@ describe('core', () => {
 					}
 				});
 
-				expect(app._routeRule).to.be.ok;
-				expect(app._routeRule).to.be.instanceof(Object);
+				expect((app as any)._routeRule).to.be.ok;
+				expect((app as any)._routeRule).to.be.instanceof(Object);
 
-				expect(app._routeRule).to.have.property('root');
-				expect(app._routeRule['root']).to.be.instanceof(Object);
-				expect(app._routeRule['root']).to.have.property('GET', fnc1);
+				expect((app as any)._routeRule).to.have.property('root');
+				expect((app as any)._routeRule['root']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['root']).to.have.property('GET', fnc1);
 
-				expect(app._routeRule['root']).to.have.property('branch1');
-				expect(app._routeRule['root']['branch1']).to.be.instanceof(Object);
-				expect(app._routeRule['root']['branch1']).to.have.property('GET', fnc2);
+				expect((app as any)._routeRule['root']).to.have.property('branch1');
+				expect((app as any)._routeRule['root']['branch1']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['root']['branch1']).to.have.property('GET', fnc2);
 
-				expect(app._routeRule['root']['branch1']).to.have.property('branch2');
-				expect(app._routeRule['root']['branch1']['branch2']).to.be.instanceof(Object);
-				expect(app._routeRule['root']['branch1']['branch2']).to.have.property('GET', fnc3);
+				expect((app as any)._routeRule['root']['branch1']).to.have.property('branch2');
+				expect((app as any)._routeRule['root']['branch1']['branch2']).to.be.instanceof(Object);
+				expect((app as any)._routeRule['root']['branch1']['branch2']).to.have.property('GET', fnc3);
 
 				await app.listen(port);
 
@@ -1313,12 +1313,12 @@ describe('core', () => {
 					}
 				});
 
-				expect(app._routeRule).to.be.ok;
-				expect(app._routeRule).to.have.property('users');
-				expect(app._routeRule['users']).to.have.property('a');
-				expect(app._routeRule['users']['a']).to.have.property('b');
-				expect(app._routeRule['users']['a']['b']).to.have.property('c');
-				expect(app._routeRule['users']['a']['b']['c']).to.have.property('GET', testFnc);
+				expect((app as any)._routeRule).to.be.ok;
+				expect((app as any)._routeRule).to.have.property('users');
+				expect((app as any)._routeRule['users']).to.have.property('a');
+				expect((app as any)._routeRule['users']['a']).to.have.property('b');
+				expect((app as any)._routeRule['users']['a']['b']).to.have.property('c');
+				expect((app as any)._routeRule['users']['a']['b']['c']).to.have.property('GET', testFnc);
 
 				await app.listen(port);
 
@@ -1339,10 +1339,10 @@ describe('core', () => {
 			describe('error', () => {
 				it('invalid format', () => {
 					return app.route({
-						'users///a' : {
-							'GET' : testFnc
-						}
-					})
+							'users///a' : {
+								'GET' : testFnc
+							}
+						})
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -1351,10 +1351,10 @@ describe('core', () => {
 
 				it('include space', () => {
 					return app.route({
-						'users/ a' : {
-							'GET' : testFnc
-						}
-					})
+							'users/ a' : {
+								'GET' : testFnc
+							}
+						})
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -1363,10 +1363,10 @@ describe('core', () => {
 
 				it('include space', () => {
 					return app.route({
-						'users/ /a' : {
-							'GET' : testFnc
-						}
-					})
+							'users/ /a' : {
+								'GET' : testFnc
+							}
+						})
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -1381,7 +1381,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = app._routeRule;
+				const routeRule = (app as any)._routeRule;
 
 				expect(routeRule).to.be.ok;
 				expect(routeRule).to.be.instanceof(Object);
@@ -1423,7 +1423,7 @@ describe('core', () => {
 
 				const uriArr = uri.split('/');
 
-				const routeRule = app._routeRule;
+				const routeRule = (app as any)._routeRule;
 
 				expect(routeRule).to.be.ok;
 				expect(routeRule).to.be.instanceof(Object);
@@ -1450,11 +1450,11 @@ describe('core', () => {
 				describe('error', () => {
 					it('colon in end index', () => {
 						return app.route({
-							'users/some:id' : {
-								'GET' : async () => {
+								'users/some:id' : {
+									'GET' : async () => {
+									}
 								}
-							}
-						})
+							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -1463,11 +1463,11 @@ describe('core', () => {
 
 					it('colon in middle index', () => {
 						return app.route({
-							'users/id:some' : {
-								'GET' : async () => {
+								'users/id:some' : {
+									'GET' : async () => {
+									}
 								}
-							}
-						})
+							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -1476,17 +1476,17 @@ describe('core', () => {
 
 					it('same level & multiple colon routing, in same time', () => {
 						return app.route({
-							'users' : {
-								':id' : {
-									'GET' : async () => {
-									}
-								},
-								':name' : {
-									'GET' : async () => {
+								'users' : {
+									':id' : {
+										'GET' : async () => {
+										}
+									},
+									':name' : {
+										'GET' : async () => {
+										}
 									}
 								}
-							}
-						})
+							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -1495,15 +1495,15 @@ describe('core', () => {
 
 					it('root level & multiple colon routing, in same time', () => {
 						return app.route({
-							':id' : {
-								GET : async () => {
+								':id' : {
+									GET : async () => {
+									}
+								},
+								':name' : {
+									GET : async () => {
+									}
 								}
-							},
-							':name' : {
-								GET : async () => {
-								}
-							}
-						})
+							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -1512,11 +1512,11 @@ describe('core', () => {
 
 					it('root level & multiple colon routing, in different time', () => {
 						return app.route({
-							':id' : {
-								GET : async () => {
+								':id' : {
+									GET : async () => {
+									}
 								}
-							}
-						})
+							})
 							.then(() => {
 								return app.route({
 									':name' : {
@@ -1533,13 +1533,13 @@ describe('core', () => {
 
 					it('same level & multiple colon routing, in different time', () => {
 						return app.route({
-							'users' : {
-								':id' : {
-									'GET' : async () => {
+								'users' : {
+									':id' : {
+										'GET' : async () => {
+										}
 									}
 								}
-							}
-						})
+							})
 							.then(() => {
 								return app.route({
 									'users' : {
@@ -1558,11 +1558,11 @@ describe('core', () => {
 
 					it('same level & multiple colon routing, in different time, in uri', () => {
 						return app.route({
-							'users/:id' : {
-								'GET' : async () => {
+								'users/:id' : {
+									'GET' : async () => {
+									}
 								}
-							}
-						})
+							})
 							.then(() => {
 								return app.route({
 									'users/:name' : {
@@ -1793,11 +1793,11 @@ describe('core', () => {
 						const testUri = '?users';
 
 						return app.route({
-							[testUri] : {
-								'GET' : () => {
+								[testUri] : {
+									'GET' : () => {
+									}
 								}
-							}
-						})
+							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -1809,15 +1809,15 @@ describe('core', () => {
 						const normalUri = 'user';
 
 						return app.route({
-							[normalUri] : {
-								'GET' : () => {
+								[normalUri] : {
+									'GET' : () => {
+									}
+								},
+								[questionUri] : {
+									'GET' : () => {
+									}
 								}
-							},
-							[questionUri] : {
-								'GET' : () => {
-								}
-							}
-						})
+							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -1829,11 +1829,11 @@ describe('core', () => {
 						const normalUri = 'user';
 
 						return app.route({
-							[normalUri] : {
-								'GET' : () => {
+								[normalUri] : {
+									'GET' : () => {
+									}
 								}
-							}
-						})
+							})
 							.then(() => {
 								return app.route({
 									[questionUri] : {
@@ -1853,7 +1853,7 @@ describe('core', () => {
 						const normalUri = 'user';
 
 						return app.get(normalUri, () => {
-						})
+							})
 							.then(() => {
 								return app.get(questionUri, () => {
 								});
@@ -1869,11 +1869,11 @@ describe('core', () => {
 						const normalUri = 'user';
 
 						return app.route({
-							[questionUri] : {
-								'GET' : () => {
+								[questionUri] : {
+									'GET' : () => {
+									}
 								}
-							}
-						})
+							})
 							.then(() => {
 								return app.route({
 									[normalUri] : {
@@ -1893,7 +1893,7 @@ describe('core', () => {
 						const normalUri = 'user';
 
 						return app.get(questionUri, () => {
-						})
+							})
 							.then(() => {
 								return app.get(normalUri, () => {
 								});
@@ -1925,7 +1925,7 @@ describe('core', () => {
 							}
 						});
 
-						const routeRule = app._routeRule;
+						const routeRule = (app as any)._routeRule;
 						expect(routeRule).to.be.ok;
 
 						expect(routeRule[testUri]).to.be.ok;
@@ -2009,7 +2009,7 @@ describe('core', () => {
 							}
 						});
 
-						expect(Object.keys(app._routeRule).length).to.be.eql(2);
+						expect(Object.keys((app as any)._routeRule).length).to.be.eql(2);
 
 						expect(userRunCount).to.be.eql(0);
 						expect(recordRunCount).to.be.eql(0);
@@ -2133,11 +2133,11 @@ describe('core', () => {
 				describe('error', () => {
 					it('start with \'+\'', () => {
 						return app.route({
-							'+abcd' : {
-								'GET' : () => {
+								'+abcd' : {
+									'GET' : () => {
+									}
 								}
-							}
-						})
+							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -2146,11 +2146,11 @@ describe('core', () => {
 
 					it('duplicated routing, normal uri first', () => {
 						return app.route({
-							'abc' : {
-								'GET' : () => {
+								'abc' : {
+									'GET' : () => {
+									}
 								}
-							}
-						})
+							})
 							.then(() => {
 								return app.route({
 									'ab+c' : {
@@ -2167,11 +2167,11 @@ describe('core', () => {
 
 					it('duplicated routing, plus uri first', () => {
 						return app.route({
-							'ab+c' : {
-								'GET' : () => {
+								'ab+c' : {
+									'GET' : () => {
+									}
 								}
-							}
-						})
+							})
 							.then(() => {
 								return app.route({
 									'abc' : {
@@ -2188,11 +2188,11 @@ describe('core', () => {
 
 					it('duplicated routing, duplicated plus uri', () => {
 						return app.route({
-							'ab+c' : {
-								'GET' : () => {
+								'ab+c' : {
+									'GET' : () => {
+									}
 								}
-							}
-						})
+							})
 							.then(() => {
 								return app.route({
 									'abc+' : {
