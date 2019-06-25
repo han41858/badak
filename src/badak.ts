@@ -520,6 +520,16 @@ export class Badak {
 			});
 		});
 
+		if (!path) {
+			throw new Error('no path');
+		}
+
+		// not assign to route rule
+		if (!this._staticRules) {
+			this._staticRules = [];
+		}
+
+		this._staticRules.push();
 	}
 
 	async route (rule : RouteRule) : Promise<void> {
@@ -822,16 +832,12 @@ export class Badak {
 					});
 			});
 
-			// this._http.on('error', (err : Error) => {
-			// 	reject(err);
-			// });
+			this._http.on('error', (err : Error) => {
+				reject(err);
+			});
 
-			this._http.listen(port, (err : Error) => {
-				if (!err) {
-					resolve();
-				} else {
-					reject(err);
-				}
+			this._http.listen(port, () => {
+				resolve();
 			});
 		});
 	}
