@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 import 'mocha';
 
 import { expect } from 'chai';
@@ -618,6 +621,216 @@ describe('core', () => {
 		// 	.attach('someFile', 'someFile.csv')
 		// 	.expect(400)
 		// 	.end(done);
+	});
+
+	describe('static()', () => {
+		let app : Badak = null;
+
+		beforeEach(() => {
+			app = new Badak;
+		});
+
+		afterEach(() => {
+			return app.isRunning() ?
+				app.stop() :
+				Promise.resolve();
+		});
+
+		it('defined', () => {
+			expect(app.static).to.be.ok;
+		});
+
+		describe('error', () => {
+			describe('uri', () => {
+				it('no parameter', () => {
+					return app.static(undefined, '.')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('invalid parameter === null', () => {
+					return app.static(null, '.')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('not absolute path', () => {
+					return app.static('someUri', 'something')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+			});
+
+			describe('path', () => {
+				it('no parameter', () => {
+					return app.static('/', undefined)
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('invalid parameter === null', () => {
+					return app.static('/', null)
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('not absolute path', () => {
+					return app.static('/', 'something')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+			});
+
+			// TODO: duplicated uri with GET method
+			// static, GET
+			// GET, static
+		});
+
+		it('ok - /', async () => {
+			const fileName : string = 'static-test.text';
+			const filePath : string = path.join(__dirname, '/static');
+			const fullPath : string = path.join(filePath, fileName);
+
+			const fileData : string = await new Promise<string>((resolve, reject) => {
+				fs.readFile(fullPath, (err : Error, data : Buffer) => {
+					if (!err) {
+						resolve(data.toString());
+					} else {
+						reject(err);
+					}
+				});
+			});
+
+			const uri : string = '/';
+			const fullUri : string = `${ uri }${ fileName }`;
+
+			await app.static(uri, filePath);
+
+			const staticRules = (app as any)._staticRules;
+
+			expect(staticRules).to.be.ok;
+			expect(staticRules).to.be.instanceof(Object);
+			expect(Object.keys(staticRules)).to.includes(uri);
+
+			expect(staticRules[uri]).to.be.ok;
+			expect(staticRules[uri]).to.be.a('string');
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get(fullUri)
+				.expect(200)
+				.expect('Content-Type', /text/)
+				.then((res) : void => {
+					const resAsResponse : Response = res as any as Response;
+
+					expect(resAsResponse).to.be.ok;
+					expect(resAsResponse.text).to.be.ok;
+					expect(resAsResponse.text).to.be.eql(fileData);
+				});
+
+			await request(app.getHttpServer())
+				.post(fullUri)
+				.expect(404);
+
+			await request(app.getHttpServer())
+				.put(fullUri)
+				.expect(404);
+
+			await request(app.getHttpServer())
+				.delete(fullUri)
+				.expect(404);
+
+			// check cache
+			const staticCache = (app as any)._staticCache;
+
+			expect(staticCache).to.be.ok;
+			expect(staticCache).to.be.instanceof(Object);
+			expect(staticCache[fullUri]).to.be.eql(fileData);
+		});
+
+		it('ok - start with /', async () => {
+			const fileName : string = 'static-test.text';
+			const filePath : string = path.join(__dirname, '/static');
+			const fullPath : string = path.join(filePath, fileName);
+
+			const fileData : string = await new Promise<string>((resolve, reject) => {
+				fs.readFile(fullPath, (err : Error, data : Buffer) => {
+					if (!err) {
+						resolve(data.toString());
+					} else {
+						reject(err);
+					}
+				});
+			});
+
+			const uri : string = '/static';
+			const fullUri : string = `${ uri }/${ fileName }`;
+
+			await app.static(uri, filePath);
+
+			const staticRules = (app as any)._staticRules;
+
+			expect(staticRules).to.be.ok;
+			expect(staticRules).to.be.instanceof(Object);
+			expect(Object.keys(staticRules)).to.includes(uri);
+
+			expect(staticRules[uri]).to.be.ok;
+			expect(staticRules[uri]).to.be.a('string');
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get(fullUri)
+				.expect(200)
+				.expect('Content-Type', /text/)
+				.then((res) : void => {
+					const resAsResponse : Response = res as any as Response;
+
+					expect(resAsResponse).to.be.ok;
+					expect(resAsResponse.text).to.be.ok;
+					expect(resAsResponse.text).to.be.eql(fileData);
+				});
+
+			await request(app.getHttpServer())
+				.post(fullUri)
+				.expect(404);
+
+			await request(app.getHttpServer())
+				.put(fullUri)
+				.expect(404);
+
+			await request(app.getHttpServer())
+				.delete(fullUri)
+				.expect(404);
+
+			// check cache
+			const staticCache = (app as any)._staticCache;
+
+			expect(staticCache).to.be.ok;
+			expect(staticCache).to.be.instanceof(Object);
+			expect(staticCache[fullUri]).to.be.eql(fileData);
+		});
+
+		// TODO: start with / (/static)
+		// TODO: end with / (static/)
+		// TODO: /static/images
+		// TODO: multiple assign
+		// TODO: override same url?
+
+		// TODO: cache
 	});
 
 	describe('route()', () => {

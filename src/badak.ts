@@ -2,6 +2,9 @@ import * as http from 'http';
 import { IncomingMessage, ServerResponse } from 'http';
 import { Server } from 'net';
 
+import * as path from 'path';
+import * as fs from 'fs';
+
 import { MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed } from './interfaces';
 import { Method } from './constants';
 
@@ -35,6 +38,12 @@ export class Badak {
 	private _middlewaresAfter : MiddlewareFunction[] = [];
 
 	private _routeRule : RouteRule = null;
+	private _staticRules : {
+		[uri : string] : any; // value is path
+	} = null;
+	private _staticCache : {
+		[uri : string] : any; // value is data
+	};
 
 	private _config : {
 		[key : string] : any
@@ -519,17 +528,33 @@ export class Badak {
 				}
 			});
 		});
+	}
+
+	async static (uri : string, path : string) : Promise<void> {
+		if (!uri) {
+			throw new Error('no uri');
+		}
+
+		if (!uri.startsWith('/')) {
+			throw new Error('uri should be start with slash(/)');
+		}
 
 		if (!path) {
 			throw new Error('no path');
 		}
 
-		// not assign to route rule
-		if (!this._staticRules) {
-			this._staticRules = [];
+		if (!path.startsWith('/') // for unix
+			&& !/^\w:\\/.test(path) // for windows
+		) {
+			throw new Error('path should be absolute');
 		}
 
-		this._staticRules.push();
+		// not assign to route rule
+		if (!this._staticRules) {
+			this._staticRules = {};
+		}
+
+		this._staticRules[uri] = path;
 	}
 
 	async route (rule : RouteRule) : Promise<void> {
@@ -567,167 +592,224 @@ export class Badak {
 						// catch middleware exception
 					}
 
+					if (this._routeRule === null && this._staticRules === null) {
+						// no rule assigned
+						throw new Error('no rule');
+					}
+
 					let targetFnc : RouteFunction;
 					let param : any;
 
 					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
 
-					if (targetRouteObj === null) {
-						// no rule assigned
-						throw new Error('no rule');
-					}
-
 					// find route rule
+					const method : string = req.method.toUpperCase();
 					const uri : string = req.url;
 
-					if (uri === '/') {
-						if (!!req.method && !!targetRouteObj['/'] && !!targetRouteObj['/'][req.method]) {
-							targetFnc = targetRouteObj['/'][req.method.toUpperCase()];
+					if (!!method) {
+						if (uri === '/') {
+							// no static case
+							if (!!targetRouteObj['/'] && !!targetRouteObj['/'][method]) {
+								targetFnc = targetRouteObj['/'][method];
+							}
+						} else {
+							if (method === Method.GET && !!this._staticRules && Object.keys(this._staticRules).some(staticUri => {
+								return uri.startsWith(staticUri);
+							})) {
+								let fileData : string;
+
+								// check cache
+								if (!!this._staticCache && !!this._staticCache[uri]) {
+									fileData = this._staticCache[uri];
+								} else {
+									const targetStaticUri : string = Object.keys(this._staticRules).find(staticUri => {
+										return uri.startsWith(staticUri);
+									});
+
+									const staticFilePath : string = this._staticRules[targetStaticUri];
+									const staticFileFullPath : string = path.join(staticFilePath, uri.replace(targetStaticUri, ''));
+
+									const isExist : boolean = await new Promise<boolean>((resolve) => {
+										fs.access(staticFileFullPath, (err : Error) => {
+											if (!err) {
+												resolve(true);
+											} else {
+												resolve(false);
+											}
+										});
+									});
+
+									if (isExist) {
+										fileData = await new Promise<string>((resolve, reject) => {
+											fs.readFile(staticFileFullPath, (err : Error, data : Buffer) => {
+												if (!err) {
+													// cache
+													const fileData : string = data.toString();
+
+													if (!this._staticCache) {
+														this._staticCache = {};
+													}
+
+													this._staticCache[uri] = fileData;
+
+													resolve(fileData);
+												} else {
+													reject(err);
+												}
+											});
+										});
+									}
+
+									if (!!fileData) {
+										targetFnc = () => {
+											return fileData;
+										};
+									}
+								}
+							} else if (!!targetRouteObj) {
+								const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
+
+								let ruleFound : boolean = false;
+
+								// find target function
+								uriArr.forEach((uriFrag, i, arr) => {
+									ruleFound = false;
+
+									const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
+
+									if (targetRouteObj[uriFrag] !== undefined) {
+										targetRouteObj = targetRouteObj[uriFrag];
+
+										ruleFound = true;
+									}
+
+									if (!ruleFound) {
+										// colon routing
+										const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+
+										if (colonParam !== undefined) {
+											targetRouteObj = targetRouteObj[colonParam];
+
+											if (param === undefined) {
+												param = {};
+											}
+
+											// if (param.matcher === undefined) {
+											// 	param.matcher = [];
+											// }
+
+											// param.matcher.push(colonParam);
+											param[colonParam.replace(':', '')] = uriFrag;
+
+											ruleFound = true;
+										}
+									}
+
+									if (!ruleFound) {
+										// find question routing
+
+										const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+											return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+										});
+
+										const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+											const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+											const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+											const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
+
+											return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
+										});
+
+										if (targetQuestionKey !== undefined) {
+											targetRouteObj = targetRouteObj[targetQuestionKey];
+
+											if (param === undefined) {
+												param = {};
+											}
+
+											// if (param.matcher === undefined) {
+											// 	param.matcher = [];
+											// }
+
+											// param.matcher.push(targetQuestionKey);
+											param[targetQuestionKey] = uriFrag;
+
+											ruleFound = true;
+										}
+									}
+
+									if (!ruleFound) {
+										// find plus routing
+										const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+											return routeRuleKey.includes('+');
+										});
+
+										const targetPlusKey : string = plusKeyArr.find(plusKey => {
+											return new RegExp(plusKey).test(uriFrag);
+										});
+
+										if (targetPlusKey !== undefined) {
+											targetRouteObj = targetRouteObj[targetPlusKey];
+
+											if (param === undefined) {
+												param = {};
+											}
+
+											// if (param.matcher === undefined) {
+											// 	param.matcher = [];
+											// }
+
+											// param.matcher.push(targetPlusKey);
+											param[targetPlusKey] = uriFrag;
+
+											ruleFound = true;
+										}
+									}
+
+									if (!ruleFound) {
+										// find asterisk routing
+										const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+											return routeRuleKey.includes('*');
+										});
+
+										const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
+											// replace '*' to '\\w*'
+											return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
+										});
+
+										if (targetAsteriskKey !== undefined) {
+											targetRouteObj = targetRouteObj[targetAsteriskKey];
+
+											if (param === undefined) {
+												param = {};
+											}
+
+											// if (param.matcher === undefined) {
+											// 	param.matcher = [];
+											// }
+
+											// param.matcher.push(targetAsteriskKey);
+											param[targetAsteriskKey] = uriFrag;
+
+											ruleFound = true;
+										}
+									}
+
+									if (i === arr.length - 1) {
+										if (ruleFound && !!targetRouteObj && !!targetRouteObj[method]) {
+											targetFnc = targetRouteObj[method];
+										}
+									}
+								});
+							}
 						}
-					} else {
-						const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
-
-						// TODO: static files
-
-						let ruleFound : boolean = false;
-
-						// find target function
-						uriArr.forEach((uriFrag, i, arr) => {
-							ruleFound = false;
-
-							const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
-
-							if (targetRouteObj[uriFrag] !== undefined) {
-								targetRouteObj = targetRouteObj[uriFrag];
-
-								ruleFound = true;
-							}
-
-							if (!ruleFound) {
-								// colon routing
-								const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
-
-								if (colonParam !== undefined) {
-									targetRouteObj = targetRouteObj[colonParam];
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(colonParam);
-									param[colonParam.replace(':', '')] = uriFrag;
-
-									ruleFound = true;
-								}
-							}
-
-							if (!ruleFound) {
-								// find question routing
-
-								const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-									return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
-								});
-
-								const targetQuestionKey : string = questionKeyArr.find(questionKey => {
-									const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-									const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-									const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
-
-									return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
-								});
-
-								if (targetQuestionKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetQuestionKey];
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(targetQuestionKey);
-									param[targetQuestionKey] = uriFrag;
-
-									ruleFound = true;
-								}
-							}
-
-							if (!ruleFound) {
-								// find plus routing
-								const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-									return routeRuleKey.includes('+');
-								});
-
-								const targetPlusKey : string = plusKeyArr.find(plusKey => {
-									return new RegExp(plusKey).test(uriFrag);
-								});
-
-								if (targetPlusKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetPlusKey];
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(targetPlusKey);
-									param[targetPlusKey] = uriFrag;
-
-									ruleFound = true;
-								}
-							}
-
-							if (!ruleFound) {
-								// find asterisk routing
-								const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-									return routeRuleKey.includes('*');
-								});
-
-								const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
-									// replace '*' to '\\w*'
-									return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
-								});
-
-								if (targetAsteriskKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetAsteriskKey];
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(targetAsteriskKey);
-									param[targetAsteriskKey] = uriFrag;
-
-									ruleFound = true;
-								}
-							}
-
-							if (i === arr.length - 1) {
-								if (ruleFound && !!req.method && !!targetRouteObj && !!targetRouteObj[req.method]) {
-									targetFnc = targetRouteObj[req.method.toUpperCase()];
-								}
-							}
-						});
 					}
 
 					if (targetFnc === undefined) {
 						throw new Error('no rule');
 					}
 
-					switch (req.method.toUpperCase()) {
+					switch (method) {
 						case Method.PUT:
 						case Method.POST:
 							if (param === undefined) {

@@ -9,7 +9,7 @@
     "prebuild": "yarn clean",
     "build": "tsc",
     "prebuild:test": "yarn clean",
-    "build:test": "tsc -p tsconfig.spec.json",
+    "build:test": "tsc -p tsconfig.spec.json&cp -rf spec/static build/spec/static",
     "pretest": "yarn build:test",
     "test": "mocha ./build/**/*.spec.js",
     "prebuild:sample": "yarn clean",
