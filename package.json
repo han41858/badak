@@ -1,6 +1,6 @@
 {
   "name": "badak",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "node.js Server framework based on Promise and TypeScript",
   "main": "build/public_api.js",
   "types": "build/public_api.d.ts",
