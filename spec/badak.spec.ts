@@ -705,7 +705,7 @@ describe('core', () => {
 			let fileData : string;
 
 			before(async () => {
-				fileName = 'static-test.text';
+				fileName = 'test.text';
 				filePath = path.join(__dirname, '/static');
 				fullPath = path.join(filePath, fileName);
 
@@ -720,85 +720,151 @@ describe('core', () => {
 				});
 			});
 
-			['/', '/static']
-				.forEach(uri => {
-					it.only(`ok : ${ uri }`, async () => {
-						const fullUri : string = `${ uri === '/' ? '' : uri }/${ fileName }`;
+			['/', '/static'].forEach(uri => {
+				it(`ok : ${ uri }`, async () => {
+					const fullUri : string = `${ uri === '/' ? '' : uri }/${ fileName }`;
 
-						await app.static(uri, filePath);
+					await app.static(uri, filePath);
 
-						const staticRules = (app as any)._staticRules;
+					const staticRules = (app as any)._staticRules;
 
-						expect(staticRules).to.be.ok;
-						expect(staticRules).to.be.instanceof(Object);
-						expect(Object.keys(staticRules)).to.includes(uri);
+					expect(staticRules).to.be.ok;
+					expect(staticRules).to.be.instanceof(Object);
+					expect(Object.keys(staticRules)).to.includes(uri);
 
-						expect(staticRules[uri]).to.be.ok;
-						expect(staticRules[uri]).to.be.a('string');
+					expect(staticRules[uri]).to.be.ok;
+					expect(staticRules[uri]).to.be.a('string');
 
-						await app.listen(port);
+					await app.listen(port);
 
-						// check once
-						await Promise.all([
-							request(app.getHttpServer())
-								.get(fullUri)
-								.expect(200)
-								.then((_res : any) : void => {
-									const res : Response = _res as Response;
+					// check once
+					await Promise.all([
+						request(app.getHttpServer())
+							.get(fullUri)
+							.expect(200)
+							.then((_res : any) : void => {
+								const res : Response = _res as Response;
 
-									const contentType : string = res.headers['content-type'];
-									expect(contentType).to.be.eql('text/plain');
+								const contentType : string = res.headers['content-type'];
+								expect(contentType).to.be.eql('text/plain');
 
-									expect(res).to.be.ok;
-									expect(res.text).to.be.ok;
-									expect(res.text).to.be.eql(fileData);
-								}),
-							request(app.getHttpServer()).post(fullUri).expect(404),
-							request(app.getHttpServer()).put(fullUri).expect(404),
-							request(app.getHttpServer()).delete(fullUri).expect(404)
-						]);
+								expect(res).to.be.ok;
+								expect(res.text).to.be.ok;
+								expect(res.text).to.be.eql(fileData);
+							}),
+						request(app.getHttpServer()).post(fullUri).expect(404),
+						request(app.getHttpServer()).put(fullUri).expect(404),
+						request(app.getHttpServer()).delete(fullUri).expect(404)
+					]);
 
-						// check cache
-						const staticCache = (app as any)._staticCache;
+					// check cache
+					const staticCache = (app as any)._staticCache;
 
-						expect(staticCache).to.be.ok;
-						expect(staticCache).to.be.instanceof(Object);
-						expect(staticCache[fullUri]).to.be.ok;
-						expect(staticCache[fullUri].mime).to.be.eql('text/plain');
-						expect(staticCache[fullUri].fileData).to.be.eql(fileData);
+					expect(staticCache).to.be.ok;
+					expect(staticCache).to.be.instanceof(Object);
+					expect(staticCache[fullUri]).to.be.ok;
+					expect(staticCache[fullUri].mime).to.be.eql('text/plain');
+					expect(staticCache[fullUri].fileData).to.be.eql(fileData);
 
-						// request twice to check cache working
-						await Promise.all([
-							request(app.getHttpServer())
-								.get(fullUri)
-								.expect(200)
-								.then((_res : any) : void => {
-									const res : Response = _res as Response;
+					// request twice to check cache working
+					await Promise.all([
+						request(app.getHttpServer())
+							.get(fullUri)
+							.expect(200)
+							.then((_res : any) : void => {
+								const res : Response = _res as Response;
 
-									const contentType : string = res.headers['content-type'];
-									expect(contentType).to.be.eql('text/plain');
+								const contentType : string = res.headers['content-type'];
+								expect(contentType).to.be.eql('text/plain');
 
-									expect(res).to.be.ok;
-									expect(res.text).to.be.ok;
-									expect(res.text).to.be.eql(fileData);
-								}),
-							request(app.getHttpServer()).post(fullUri).expect(404),
-							request(app.getHttpServer()).put(fullUri).expect(404),
-							request(app.getHttpServer()).delete(fullUri).expect(404)
-						]);
-					});
+								expect(res).to.be.ok;
+								expect(res.text).to.be.ok;
+								expect(res.text).to.be.eql(fileData);
+							}),
+						request(app.getHttpServer()).post(fullUri).expect(404),
+						request(app.getHttpServer()).put(fullUri).expect(404),
+						request(app.getHttpServer()).delete(fullUri).expect(404)
+					]);
 				});
+			});
 
 			// TODO: end with / (static/)
 			// TODO: /static/images
 			// TODO: multiple assign
 			// TODO: override same url?
-
-			// TODO: cache
 		});
 
 		describe('about MIME', () => {
+			[
+				['bmp', 'image/bmp'],
+				['css', 'text/css'],
+				['gif', 'image/gif'],
+				['htm', 'text/html'],
+				['html', 'text/html'],
+				['jpeg', 'image/jpeg'],
+				['jpg', 'image/jpeg'],
+				['js', 'text/javascript'],
+				['json', 'application/json'],
+				['pdf', 'application/pdf'],
+				['png', 'image/png'],
+				['txt', 'text/plain'],
+				['text', 'text/plain'],
+				['tif', 'image/tiff'],
+				['tiff', 'image/tiff'],
+				['xls', 'application/vnd.ms-excel'],
+				['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+			].forEach(([extension, mime] : [string, string]) => {
+				it(`ok : .${ extension }`, async () => {
+					const fileName : string = `test.${ extension }`;
+					const filePath : string = path.join(__dirname, '/static');
 
+					const fullUri : string = `/static/${ fileName }`;
+
+					await app.static('/static', filePath);
+
+					await app.listen(port);
+
+					// check once
+					await Promise.all([
+						request(app.getHttpServer())
+							.get(fullUri)
+							.expect(200)
+							.then((_res : any) : void => {
+								const res : Response = _res as Response;
+
+								expect(res).to.be.ok;
+
+								const contentType : string = res.headers['content-type'];
+								expect(contentType).to.be.eql(mime);
+
+								expect(!!res.body || !!res.text).to.be.ok;
+							}),
+						request(app.getHttpServer()).post(fullUri).expect(404),
+						request(app.getHttpServer()).put(fullUri).expect(404),
+						request(app.getHttpServer()).delete(fullUri).expect(404)
+					]);
+
+					// request twice to check cache working
+					await Promise.all([
+						request(app.getHttpServer())
+							.get(fullUri)
+							.expect(200)
+							.then((_res : any) : void => {
+								const res : Response = _res as Response;
+
+								expect(res).to.be.ok;
+
+								const contentType : string = res.headers['content-type'];
+								expect(contentType).to.be.eql(mime);
+
+								expect(!!res.body || !!res.text).to.be.ok;
+							}),
+						request(app.getHttpServer()).post(fullUri).expect(404),
+						request(app.getHttpServer()).put(fullUri).expect(404),
+						request(app.getHttpServer()).delete(fullUri).expect(404)
+					]);
+				});
+			});
 		});
 	});
 

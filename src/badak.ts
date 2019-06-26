@@ -651,13 +651,30 @@ export class Badak {
 								let mime : string = 'application/octet-stream'; // default
 
 								if (!!matchArr) {
-									const extension : string = matchArr[0];
+									const extension : string = matchArr[0].replace(/^\./, ''); // remove starting '.'
 
-									switch (extension) {
-										case '.txt':
-										case '.text':
-											mime = 'text/plain';
-											break;
+									const mimeMap = {
+										['bmp'] : 'image/bmp',
+										['css'] : 'text/css',
+										['gif'] : 'image/gif',
+										['htm'] : 'text/html',
+										['html'] : 'text/html',
+										['jpeg'] : 'image/jpeg',
+										['jpg'] : 'image/jpeg',
+										['js'] : 'text/javascript',
+										['json'] : 'application/json',
+										['pdf'] : 'application/pdf',
+										['png'] : 'image/png',
+										['txt'] : 'text/plain',
+										['text'] : 'text/plain',
+										['tif'] : 'image/tiff',
+										['tiff'] : 'image/tiff',
+										['xls'] : 'application/vnd.ms-excel',
+										['xlsx'] : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+									};
+
+									if (!!mimeMap[extension]) {
+										mime = mimeMap[extension];
 									}
 								}
 
