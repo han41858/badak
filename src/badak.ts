@@ -25,7 +25,13 @@ import { Method } from './constants';
  * }
  */
 
-// rule format, reserved keyword is 4-methods
+interface ResponseObj {
+	headers : {
+		[key : string] : any
+	}[];
+
+	result : any;
+}
 
 export class Badak {
 	private _http : Server = null;
@@ -42,7 +48,10 @@ export class Badak {
 		[uri : string] : any; // value is path
 	} = null;
 	private _staticCache : {
-		[uri : string] : any; // value is data
+		[uri : string] : {
+			mime : string;
+			fileData : any;
+		}
 	};
 
 	private _config : {
@@ -78,12 +87,6 @@ export class Badak {
 		if (keyArr.length === 0) {
 			throw new Error('no rule in rule object');
 		}
-
-		keyArr.forEach(key => {
-			if (!key) {
-				throw new Error('empty rule in rule object');
-			}
-		});
 
 		const refinedRuleObj = {};
 
@@ -433,7 +436,7 @@ export class Badak {
 
 	// for POST, PUT
 	private async _paramParser (req : IncomingMessage) : Promise<any> {
-		return new Promise((_resolve, _reject) => {
+		return new Promise((resolve, reject) => {
 			const bodyBuffer : Buffer[] = [];
 			let bodyStr : string = null;
 
@@ -442,7 +445,7 @@ export class Badak {
 			});
 
 			req.on('error', (err) => {
-				_reject(err);
+				reject(err);
 			});
 
 			req.on('end', async () => {
@@ -521,10 +524,10 @@ export class Badak {
 						paramObj = this._paramConverter(paramObj);
 					}
 
-					_resolve(paramObj);
+					resolve(paramObj);
 				} else {
 					// no content-type, but ok
-					_resolve();
+					resolve();
 				}
 			});
 		});
@@ -597,264 +600,296 @@ export class Badak {
 						throw new Error('no rule');
 					}
 
-					let targetFnc : RouteFunction;
-					let param : any;
-
 					let targetRouteObj : RouteRule | RouteRuleSeed = this._routeRule;
 
 					// find route rule
+					if (!req.method) {
+						throw new Error('no method');
+					}
+
 					const method : string = req.method.toUpperCase();
 					const uri : string = req.url;
 
-					if (!!method) {
+					const isStaticCase : boolean = method === Method.GET
+						&& !!this._staticRules
+						&& Object.keys(this._staticRules).some(staticUri => {
+							return uri.startsWith(staticUri);
+						});
+
+					if (isStaticCase) {
+						// static case
+						let resFileObj : {
+							mime : string;
+							fileData : any;
+						};
+
+						// check cache
+						if (!!this._staticCache && !!this._staticCache[uri]) {
+							resFileObj = this._staticCache[uri];
+						} else {
+							const targetStaticUri : string = Object.keys(this._staticRules).find(staticUri => {
+								return uri.startsWith(staticUri);
+							});
+
+							const staticFilePath : string = this._staticRules[targetStaticUri];
+							const staticFileFullPath : string = path.join(staticFilePath, uri.replace(targetStaticUri, ''));
+
+							const isExist : boolean = await new Promise<boolean>((resolve) => {
+								fs.access(staticFileFullPath, (err : Error) => {
+									if (!err) {
+										resolve(true);
+									} else {
+										resolve(false);
+									}
+								});
+							});
+
+							if (isExist) {
+								// response with prefer MIME
+								const matchArr : RegExpMatchArray = uri.match(/(\.[\w\d]+)?\.[\w\d]+$/);
+
+								let mime : string = 'application/octet-stream'; // default
+
+								if (!!matchArr) {
+									const extension : string = matchArr[0];
+
+									switch (extension) {
+										case '.txt':
+										case '.text':
+											mime = 'text/plain';
+											break;
+									}
+								}
+
+								const fileData : string = await new Promise<string>((resolve, reject) => {
+									fs.readFile(staticFileFullPath, (err : Error, data : Buffer) => {
+										if (!err) {
+											resolve(data.toString());
+										} else {
+											reject(err);
+										}
+									});
+								});
+
+								resFileObj = {
+									mime,
+									fileData
+								};
+
+								// cache
+								if (!this._staticCache) {
+									this._staticCache = {};
+								}
+
+								this._staticCache[uri] = resFileObj;
+							}
+						}
+
+						if (!!resFileObj) {
+							res.setHeader('Content-Type', resFileObj.mime);
+							res.end(resFileObj.fileData);
+						} else {
+							res.statusCode = 404; // not found
+							res.end();
+						}
+					} else {
+						let targetFnc : RouteFunction;
+						let param : any;
+
 						if (uri === '/') {
-							// no static case
 							if (!!targetRouteObj['/'] && !!targetRouteObj['/'][method]) {
 								targetFnc = targetRouteObj['/'][method];
 							}
-						} else {
-							if (method === Method.GET && !!this._staticRules && Object.keys(this._staticRules).some(staticUri => {
-								return uri.startsWith(staticUri);
-							})) {
-								let fileData : string;
+						} else if (!!targetRouteObj) {
+							// normal routing
+							const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
 
-								// check cache
-								if (!!this._staticCache && !!this._staticCache[uri]) {
-									fileData = this._staticCache[uri];
-								} else {
-									const targetStaticUri : string = Object.keys(this._staticRules).find(staticUri => {
-										return uri.startsWith(staticUri);
-									});
+							let ruleFound : boolean = false;
 
-									const staticFilePath : string = this._staticRules[targetStaticUri];
-									const staticFileFullPath : string = path.join(staticFilePath, uri.replace(targetStaticUri, ''));
+							// find target function
+							uriArr.forEach((uriFrag, i, arr) => {
+								ruleFound = false;
 
-									const isExist : boolean = await new Promise<boolean>((resolve) => {
-										fs.access(staticFileFullPath, (err : Error) => {
-											if (!err) {
-												resolve(true);
-											} else {
-												resolve(false);
-											}
-										});
-									});
+								const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
 
-									if (isExist) {
-										fileData = await new Promise<string>((resolve, reject) => {
-											fs.readFile(staticFileFullPath, (err : Error, data : Buffer) => {
-												if (!err) {
-													resolve(data.toString());
-												} else {
-													reject(err);
-												}
-											});
-										});
+								if (targetRouteObj[uriFrag] !== undefined) {
+									targetRouteObj = targetRouteObj[uriFrag];
 
-										// cache
-										if (!this._staticCache) {
-											this._staticCache = {};
+									ruleFound = true;
+								}
+
+								if (!ruleFound) {
+									// colon routing
+									const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+
+									if (colonParam !== undefined) {
+										targetRouteObj = targetRouteObj[colonParam];
+
+										if (param === undefined) {
+											param = {};
 										}
 
-										this._staticCache[uri] = fileData;
-									}
-								}
+										// if (param.matcher === undefined) {
+										// 	param.matcher = [];
+										// }
 
-								if (!!fileData) {
-									targetFnc = () => {
-										return fileData;
-									};
-								}
-							} else if (!!targetRouteObj) {
-								const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
-
-								let ruleFound : boolean = false;
-
-								// find target function
-								uriArr.forEach((uriFrag, i, arr) => {
-									ruleFound = false;
-
-									const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
-
-									if (targetRouteObj[uriFrag] !== undefined) {
-										targetRouteObj = targetRouteObj[uriFrag];
+										// param.matcher.push(colonParam);
+										param[colonParam.replace(':', '')] = uriFrag;
 
 										ruleFound = true;
 									}
+								}
 
-									if (!ruleFound) {
-										// colon routing
-										const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+								if (!ruleFound) {
+									// find question routing
+									const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+										return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+									});
 
-										if (colonParam !== undefined) {
-											targetRouteObj = targetRouteObj[colonParam];
+									const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+										const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+										const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+										const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
 
-											if (param === undefined) {
-												param = {};
-											}
+										return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
+									});
 
-											// if (param.matcher === undefined) {
-											// 	param.matcher = [];
-											// }
+									if (targetQuestionKey !== undefined) {
+										targetRouteObj = targetRouteObj[targetQuestionKey];
 
-											// param.matcher.push(colonParam);
-											param[colonParam.replace(':', '')] = uriFrag;
-
-											ruleFound = true;
+										if (param === undefined) {
+											param = {};
 										}
+
+										// if (param.matcher === undefined) {
+										// 	param.matcher = [];
+										// }
+
+										// param.matcher.push(targetQuestionKey);
+										param[targetQuestionKey] = uriFrag;
+
+										ruleFound = true;
 									}
+								}
 
-									if (!ruleFound) {
-										// find question routing
+								if (!ruleFound) {
+									// find plus routing
+									const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+										return routeRuleKey.includes('+');
+									});
 
-										const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-											return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
-										});
+									const targetPlusKey : string = plusKeyArr.find(plusKey => {
+										return new RegExp(plusKey).test(uriFrag);
+									});
 
-										const targetQuestionKey : string = questionKeyArr.find(questionKey => {
-											const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-											const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-											const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
+									if (targetPlusKey !== undefined) {
+										targetRouteObj = targetRouteObj[targetPlusKey];
 
-											return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
-										});
-
-										if (targetQuestionKey !== undefined) {
-											targetRouteObj = targetRouteObj[targetQuestionKey];
-
-											if (param === undefined) {
-												param = {};
-											}
-
-											// if (param.matcher === undefined) {
-											// 	param.matcher = [];
-											// }
-
-											// param.matcher.push(targetQuestionKey);
-											param[targetQuestionKey] = uriFrag;
-
-											ruleFound = true;
+										if (param === undefined) {
+											param = {};
 										}
+
+										// if (param.matcher === undefined) {
+										// 	param.matcher = [];
+										// }
+
+										// param.matcher.push(targetPlusKey);
+										param[targetPlusKey] = uriFrag;
+
+										ruleFound = true;
 									}
+								}
 
-									if (!ruleFound) {
-										// find plus routing
-										const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-											return routeRuleKey.includes('+');
-										});
+								if (!ruleFound) {
+									// find asterisk routing
+									const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+										return routeRuleKey.includes('*');
+									});
 
-										const targetPlusKey : string = plusKeyArr.find(plusKey => {
-											return new RegExp(plusKey).test(uriFrag);
-										});
+									const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
+										// replace '*' to '\\w*'
+										return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
+									});
 
-										if (targetPlusKey !== undefined) {
-											targetRouteObj = targetRouteObj[targetPlusKey];
+									if (targetAsteriskKey !== undefined) {
+										targetRouteObj = targetRouteObj[targetAsteriskKey];
 
-											if (param === undefined) {
-												param = {};
-											}
-
-											// if (param.matcher === undefined) {
-											// 	param.matcher = [];
-											// }
-
-											// param.matcher.push(targetPlusKey);
-											param[targetPlusKey] = uriFrag;
-
-											ruleFound = true;
+										if (param === undefined) {
+											param = {};
 										}
+
+										// if (param.matcher === undefined) {
+										// 	param.matcher = [];
+										// }
+
+										// param.matcher.push(targetAsteriskKey);
+										param[targetAsteriskKey] = uriFrag;
+
+										ruleFound = true;
 									}
+								}
 
-									if (!ruleFound) {
-										// find asterisk routing
-										const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-											return routeRuleKey.includes('*');
-										});
-
-										const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
-											// replace '*' to '\\w*'
-											return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
-										});
-
-										if (targetAsteriskKey !== undefined) {
-											targetRouteObj = targetRouteObj[targetAsteriskKey];
-
-											if (param === undefined) {
-												param = {};
-											}
-
-											// if (param.matcher === undefined) {
-											// 	param.matcher = [];
-											// }
-
-											// param.matcher.push(targetAsteriskKey);
-											param[targetAsteriskKey] = uriFrag;
-
-											ruleFound = true;
-										}
+								if (i === arr.length - 1) {
+									if (ruleFound && !!targetRouteObj && !!targetRouteObj[method]) {
+										targetFnc = targetRouteObj[method];
 									}
-
-									if (i === arr.length - 1) {
-										if (ruleFound && !!targetRouteObj && !!targetRouteObj[method]) {
-											targetFnc = targetRouteObj[method];
-										}
-									}
-								});
-							}
+								}
+							});
 						}
-					}
 
-					if (targetFnc === undefined) {
-						throw new Error('no rule');
-					}
-
-					switch (method) {
-						case Method.PUT:
-						case Method.POST:
-							if (param === undefined) {
-								param = await this._paramParser(req);
-							} else {
-								// TODO: overwrite? uri param & param object
-								param = Object.assign(param, await this._paramParser(req));
-							}
-							break;
-					}
-
-					if (!!this._authFnc) {
-						// can be normal or async function
-						try {
-							await this._authFnc(req, res);
-						} catch (e) {
-							// create new error instance
-							throw new Error('auth failed');
+						if (targetFnc === undefined) {
+							throw new Error('no rule');
 						}
-					}
 
-					const resObj : any = await targetFnc(param, req, res);
+						switch (method) {
+							case Method.PUT:
+							case Method.POST:
+								if (param === undefined) {
+									param = await this._paramParser(req);
+								} else {
+									// TODO: overwrite? uri param & param object
+									param = Object.assign(param, await this._paramParser(req));
+								}
+								break;
+						}
 
-					if (!!resObj) {
-						// check result is json
-						if (typeof resObj === 'object') {
+						if (!!this._authFnc) {
+							// can be normal or async function
 							try {
-								// try to stringify()
-								responseBody = JSON.stringify(resObj);
+								await this._authFnc(req, res);
+							} catch (e) {
+								// create new error instance
+								throw new Error('auth failed');
+							}
+						}
 
-								res.setHeader('Content-Type', 'application/json');
-								res.end(responseBody);
-							} catch (err) {
-								// no json
+						const resObj : any = await targetFnc(param, req, res);
+
+						if (!!resObj) {
+							// check result is json
+							if (typeof resObj === 'object') {
+								try {
+									// try to stringify()
+									responseBody = JSON.stringify(resObj);
+
+									res.setHeader('Content-Type', 'application/json');
+									res.end(responseBody);
+								} catch (err) {
+									// no json
+									responseBody = resObj;
+
+									res.setHeader('Content-Type', 'text/plain');
+									res.end(responseBody);
+								}
+							} else {
 								responseBody = resObj;
 
 								res.setHeader('Content-Type', 'text/plain');
 								res.end(responseBody);
 							}
 						} else {
-							responseBody = resObj;
-
-							res.setHeader('Content-Type', 'text/plain');
-							res.end(responseBody);
+							res.end();
 						}
-					} else {
-						res.end();
 					}
 				})()
 					.catch(async (err : any) => {

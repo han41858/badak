@@ -695,8 +695,10 @@ describe('core', () => {
 			// GET, static
 		});
 
+		// TODO: not exist file
+
 		describe('about uri', () => {
-			it.only('ok - /', async () => {
+			it('ok - /', async () => {
 				const fileName : string = 'static-test.text';
 				const filePath : string = path.join(__dirname, '/static');
 				const fullPath : string = path.join(filePath, fileName);
@@ -758,7 +760,9 @@ describe('core', () => {
 
 				expect(staticCache).to.be.ok;
 				expect(staticCache).to.be.instanceof(Object);
-				expect(staticCache[fullUri]).to.be.eql(fileData);
+				expect(staticCache[fullUri]).to.be.ok;
+				expect(staticCache[fullUri].mime).to.be.eql('text/plain');
+				expect(staticCache[fullUri].fileData).to.be.eql(fileData);
 
 				await request(app.getHttpServer())
 					.get(fullUri)
@@ -850,7 +854,9 @@ describe('core', () => {
 
 				expect(staticCache).to.be.ok;
 				expect(staticCache).to.be.instanceof(Object);
-				expect(staticCache[fullUri]).to.be.eql(fileData);
+				expect(staticCache[fullUri]).to.be.ok;
+				expect(staticCache[fullUri].mime).to.be.eql('text/plain');
+				expect(staticCache[fullUri].fileData).to.be.eql(fileData);
 
 				await request(app.getHttpServer())
 					.get(fullUri)
