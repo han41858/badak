@@ -698,12 +698,18 @@ describe('core', () => {
 		// TODO: not exist file
 
 		describe('about uri', () => {
-			it('ok - /', async () => {
-				const fileName : string = 'static-test.text';
-				const filePath : string = path.join(__dirname, '/static');
-				const fullPath : string = path.join(filePath, fileName);
+			let fileName : string;
+			let filePath : string;
+			let fullPath : string;
 
-				const fileData : string = await new Promise<string>((resolve, reject) => {
+			let fileData : string;
+
+			before(async () => {
+				fileName = 'static-test.text';
+				filePath = path.join(__dirname, '/static');
+				fullPath = path.join(filePath, fileName);
+
+				fileData = await new Promise<string>((resolve, reject) => {
 					fs.readFile(fullPath, (err : Error, data : Buffer) => {
 						if (!err) {
 							resolve(data.toString());
@@ -712,181 +718,77 @@ describe('core', () => {
 						}
 					});
 				});
-
-				const uri : string = '/';
-				const fullUri : string = `${ uri }${ fileName }`;
-
-				await app.static(uri, filePath);
-
-				const staticRules = (app as any)._staticRules;
-
-				expect(staticRules).to.be.ok;
-				expect(staticRules).to.be.instanceof(Object);
-				expect(Object.keys(staticRules)).to.includes(uri);
-
-				expect(staticRules[uri]).to.be.ok;
-				expect(staticRules[uri]).to.be.a('string');
-
-				await app.listen(port);
-
-				await request(app.getHttpServer())
-					.get(fullUri)
-					.expect(200)
-					.then((_res : any) : void => {
-						const res : Response = _res as Response;
-
-						const contentType : string = res.headers['content-type'];
-						expect(contentType).to.be.eql('text/plain');
-
-						expect(res).to.be.ok;
-						expect(res.text).to.be.ok;
-						expect(res.text).to.be.eql(fileData);
-					});
-
-				await request(app.getHttpServer())
-					.post(fullUri)
-					.expect(404);
-
-				await request(app.getHttpServer())
-					.put(fullUri)
-					.expect(404);
-
-				await request(app.getHttpServer())
-					.delete(fullUri)
-					.expect(404);
-
-				// check cache
-				const staticCache = (app as any)._staticCache;
-
-				expect(staticCache).to.be.ok;
-				expect(staticCache).to.be.instanceof(Object);
-				expect(staticCache[fullUri]).to.be.ok;
-				expect(staticCache[fullUri].mime).to.be.eql('text/plain');
-				expect(staticCache[fullUri].fileData).to.be.eql(fileData);
-
-				await request(app.getHttpServer())
-					.get(fullUri)
-					.expect(200)
-					.then((_res : any) : void => {
-						const res : Response = _res as Response;
-
-						const contentType : string = res.headers['content-type'];
-						expect(contentType).to.be.eql('text/plain');
-
-						expect(res).to.be.ok;
-						expect(res.text).to.be.ok;
-						expect(res.text).to.be.eql(fileData);
-					});
-
-				await request(app.getHttpServer())
-					.post(fullUri)
-					.expect(404);
-
-				await request(app.getHttpServer())
-					.put(fullUri)
-					.expect(404);
-
-				await request(app.getHttpServer())
-					.delete(fullUri)
-					.expect(404);
-
 			});
 
-			it('ok - start with /', async () => {
-				const fileName : string = 'static-test.text';
-				const filePath : string = path.join(__dirname, '/static');
-				const fullPath : string = path.join(filePath, fileName);
+			['/', '/static']
+				.forEach(uri => {
+					it.only(`ok : ${ uri }`, async () => {
+						const fullUri : string = `${ uri === '/' ? '' : uri }/${ fileName }`;
 
-				const fileData : string = await new Promise<string>((resolve, reject) => {
-					fs.readFile(fullPath, (err : Error, data : Buffer) => {
-						if (!err) {
-							resolve(data.toString());
-						} else {
-							reject(err);
-						}
+						await app.static(uri, filePath);
+
+						const staticRules = (app as any)._staticRules;
+
+						expect(staticRules).to.be.ok;
+						expect(staticRules).to.be.instanceof(Object);
+						expect(Object.keys(staticRules)).to.includes(uri);
+
+						expect(staticRules[uri]).to.be.ok;
+						expect(staticRules[uri]).to.be.a('string');
+
+						await app.listen(port);
+
+						// check once
+						await Promise.all([
+							request(app.getHttpServer())
+								.get(fullUri)
+								.expect(200)
+								.then((_res : any) : void => {
+									const res : Response = _res as Response;
+
+									const contentType : string = res.headers['content-type'];
+									expect(contentType).to.be.eql('text/plain');
+
+									expect(res).to.be.ok;
+									expect(res.text).to.be.ok;
+									expect(res.text).to.be.eql(fileData);
+								}),
+							request(app.getHttpServer()).post(fullUri).expect(404),
+							request(app.getHttpServer()).put(fullUri).expect(404),
+							request(app.getHttpServer()).delete(fullUri).expect(404)
+						]);
+
+						// check cache
+						const staticCache = (app as any)._staticCache;
+
+						expect(staticCache).to.be.ok;
+						expect(staticCache).to.be.instanceof(Object);
+						expect(staticCache[fullUri]).to.be.ok;
+						expect(staticCache[fullUri].mime).to.be.eql('text/plain');
+						expect(staticCache[fullUri].fileData).to.be.eql(fileData);
+
+						// request twice to check cache working
+						await Promise.all([
+							request(app.getHttpServer())
+								.get(fullUri)
+								.expect(200)
+								.then((_res : any) : void => {
+									const res : Response = _res as Response;
+
+									const contentType : string = res.headers['content-type'];
+									expect(contentType).to.be.eql('text/plain');
+
+									expect(res).to.be.ok;
+									expect(res.text).to.be.ok;
+									expect(res.text).to.be.eql(fileData);
+								}),
+							request(app.getHttpServer()).post(fullUri).expect(404),
+							request(app.getHttpServer()).put(fullUri).expect(404),
+							request(app.getHttpServer()).delete(fullUri).expect(404)
+						]);
 					});
 				});
 
-				const uri : string = '/static';
-				const fullUri : string = `${ uri }/${ fileName }`;
-
-				await app.static(uri, filePath);
-
-				const staticRules = (app as any)._staticRules;
-
-				expect(staticRules).to.be.ok;
-				expect(staticRules).to.be.instanceof(Object);
-				expect(Object.keys(staticRules)).to.includes(uri);
-
-				expect(staticRules[uri]).to.be.ok;
-				expect(staticRules[uri]).to.be.a('string');
-
-				await app.listen(port);
-
-				await request(app.getHttpServer())
-					.get(fullUri)
-					.expect(200)
-					.then((_res : any) : void => {
-						const res : Response = _res as Response;
-
-						const contentType : string = res.headers['content-type'];
-						expect(contentType).to.be.eql('text/plain');
-
-						expect(res).to.be.ok;
-						expect(res.text).to.be.ok;
-						expect(res.text).to.be.eql(fileData);
-					});
-
-				await request(app.getHttpServer())
-					.post(fullUri)
-					.expect(404);
-
-				await request(app.getHttpServer())
-					.put(fullUri)
-					.expect(404);
-
-				await request(app.getHttpServer())
-					.delete(fullUri)
-					.expect(404);
-
-				// check cache
-				const staticCache = (app as any)._staticCache;
-
-				expect(staticCache).to.be.ok;
-				expect(staticCache).to.be.instanceof(Object);
-				expect(staticCache[fullUri]).to.be.ok;
-				expect(staticCache[fullUri].mime).to.be.eql('text/plain');
-				expect(staticCache[fullUri].fileData).to.be.eql(fileData);
-
-				await request(app.getHttpServer())
-					.get(fullUri)
-					.expect(200)
-					.then((_res : any) : void => {
-						const res : Response = _res as Response;
-
-						const contentType : string = res.headers['content-type'];
-						expect(contentType).to.be.eql('text/plain');
-
-						expect(res).to.be.ok;
-						expect(res.text).to.be.ok;
-						expect(res.text).to.be.eql(fileData);
-					});
-
-				await request(app.getHttpServer())
-					.post(fullUri)
-					.expect(404);
-
-				await request(app.getHttpServer())
-					.put(fullUri)
-					.expect(404);
-
-				await request(app.getHttpServer())
-					.delete(fullUri)
-					.expect(404);
-
-			});
-
-			// TODO: start with / (/static)
 			// TODO: end with / (static/)
 			// TODO: /static/images
 			// TODO: multiple assign
