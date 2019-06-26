@@ -643,28 +643,26 @@ export class Badak {
 										fileData = await new Promise<string>((resolve, reject) => {
 											fs.readFile(staticFileFullPath, (err : Error, data : Buffer) => {
 												if (!err) {
-													// cache
-													const fileData : string = data.toString();
-
-													if (!this._staticCache) {
-														this._staticCache = {};
-													}
-
-													this._staticCache[uri] = fileData;
-
-													resolve(fileData);
+													resolve(data.toString());
 												} else {
 													reject(err);
 												}
 											});
 										});
-									}
 
-									if (!!fileData) {
-										targetFnc = () => {
-											return fileData;
-										};
+										// cache
+										if (!this._staticCache) {
+											this._staticCache = {};
+										}
+
+										this._staticCache[uri] = fileData;
 									}
+								}
+
+								if (!!fileData) {
+									targetFnc = () => {
+										return fileData;
+									};
 								}
 							} else if (!!targetRouteObj) {
 								const uriArr : string[] = uri.split('/').filter(frag => frag !== '');

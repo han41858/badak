@@ -566,8 +566,7 @@ describe('core', () => {
 						firstName,
 						lastName
 					})
-					.expect(200)
-					.expect('Content-Type', /json/);
+					.expect(200);
 
 				expect(res).to.be.ok;
 				expect(testFncCalled).to.be.true;
@@ -583,8 +582,7 @@ describe('core', () => {
 					.post('/users')
 					.field('firstName', firstName)
 					.field('lastName', lastName)
-					.expect(200)
-					.expect('Content-Type', /json/);
+					.expect(200);
 
 				expect(res).to.be.ok;
 				expect(testFncCalled).to.be.true;
@@ -599,8 +597,7 @@ describe('core', () => {
 				const res = await request(app.getHttpServer())
 					.post('/users')
 					.send(`firstName=${ firstName }&lastName=${ lastName }`)
-					.expect(200)
-					.expect('Content-Type', /json/);
+					.expect(200);
 
 				expect(res).to.be.ok;
 				expect(testFncCalled).to.be.true;
@@ -698,139 +695,203 @@ describe('core', () => {
 			// GET, static
 		});
 
-		it('ok - /', async () => {
-			const fileName : string = 'static-test.text';
-			const filePath : string = path.join(__dirname, '/static');
-			const fullPath : string = path.join(filePath, fileName);
+		describe('about uri', () => {
+			it.only('ok - /', async () => {
+				const fileName : string = 'static-test.text';
+				const filePath : string = path.join(__dirname, '/static');
+				const fullPath : string = path.join(filePath, fileName);
 
-			const fileData : string = await new Promise<string>((resolve, reject) => {
-				fs.readFile(fullPath, (err : Error, data : Buffer) => {
-					if (!err) {
-						resolve(data.toString());
-					} else {
-						reject(err);
-					}
+				const fileData : string = await new Promise<string>((resolve, reject) => {
+					fs.readFile(fullPath, (err : Error, data : Buffer) => {
+						if (!err) {
+							resolve(data.toString());
+						} else {
+							reject(err);
+						}
+					});
 				});
+
+				const uri : string = '/';
+				const fullUri : string = `${ uri }${ fileName }`;
+
+				await app.static(uri, filePath);
+
+				const staticRules = (app as any)._staticRules;
+
+				expect(staticRules).to.be.ok;
+				expect(staticRules).to.be.instanceof(Object);
+				expect(Object.keys(staticRules)).to.includes(uri);
+
+				expect(staticRules[uri]).to.be.ok;
+				expect(staticRules[uri]).to.be.a('string');
+
+				await app.listen(port);
+
+				await request(app.getHttpServer())
+					.get(fullUri)
+					.expect(200)
+					.then((_res : any) : void => {
+						const res : Response = _res as Response;
+
+						const contentType : string = res.headers['content-type'];
+						expect(contentType).to.be.eql('text/plain');
+
+						expect(res).to.be.ok;
+						expect(res.text).to.be.ok;
+						expect(res.text).to.be.eql(fileData);
+					});
+
+				await request(app.getHttpServer())
+					.post(fullUri)
+					.expect(404);
+
+				await request(app.getHttpServer())
+					.put(fullUri)
+					.expect(404);
+
+				await request(app.getHttpServer())
+					.delete(fullUri)
+					.expect(404);
+
+				// check cache
+				const staticCache = (app as any)._staticCache;
+
+				expect(staticCache).to.be.ok;
+				expect(staticCache).to.be.instanceof(Object);
+				expect(staticCache[fullUri]).to.be.eql(fileData);
+
+				await request(app.getHttpServer())
+					.get(fullUri)
+					.expect(200)
+					.then((_res : any) : void => {
+						const res : Response = _res as Response;
+
+						const contentType : string = res.headers['content-type'];
+						expect(contentType).to.be.eql('text/plain');
+
+						expect(res).to.be.ok;
+						expect(res.text).to.be.ok;
+						expect(res.text).to.be.eql(fileData);
+					});
+
+				await request(app.getHttpServer())
+					.post(fullUri)
+					.expect(404);
+
+				await request(app.getHttpServer())
+					.put(fullUri)
+					.expect(404);
+
+				await request(app.getHttpServer())
+					.delete(fullUri)
+					.expect(404);
+
 			});
 
-			const uri : string = '/';
-			const fullUri : string = `${ uri }${ fileName }`;
+			it('ok - start with /', async () => {
+				const fileName : string = 'static-test.text';
+				const filePath : string = path.join(__dirname, '/static');
+				const fullPath : string = path.join(filePath, fileName);
 
-			await app.static(uri, filePath);
-
-			const staticRules = (app as any)._staticRules;
-
-			expect(staticRules).to.be.ok;
-			expect(staticRules).to.be.instanceof(Object);
-			expect(Object.keys(staticRules)).to.includes(uri);
-
-			expect(staticRules[uri]).to.be.ok;
-			expect(staticRules[uri]).to.be.a('string');
-
-			await app.listen(port);
-
-			await request(app.getHttpServer())
-				.get(fullUri)
-				.expect(200)
-				.expect('Content-Type', /text/)
-				.then((res) : void => {
-					const resAsResponse : Response = res as any as Response;
-
-					expect(resAsResponse).to.be.ok;
-					expect(resAsResponse.text).to.be.ok;
-					expect(resAsResponse.text).to.be.eql(fileData);
+				const fileData : string = await new Promise<string>((resolve, reject) => {
+					fs.readFile(fullPath, (err : Error, data : Buffer) => {
+						if (!err) {
+							resolve(data.toString());
+						} else {
+							reject(err);
+						}
+					});
 				});
 
-			await request(app.getHttpServer())
-				.post(fullUri)
-				.expect(404);
+				const uri : string = '/static';
+				const fullUri : string = `${ uri }/${ fileName }`;
 
-			await request(app.getHttpServer())
-				.put(fullUri)
-				.expect(404);
+				await app.static(uri, filePath);
 
-			await request(app.getHttpServer())
-				.delete(fullUri)
-				.expect(404);
+				const staticRules = (app as any)._staticRules;
 
-			// check cache
-			const staticCache = (app as any)._staticCache;
+				expect(staticRules).to.be.ok;
+				expect(staticRules).to.be.instanceof(Object);
+				expect(Object.keys(staticRules)).to.includes(uri);
 
-			expect(staticCache).to.be.ok;
-			expect(staticCache).to.be.instanceof(Object);
-			expect(staticCache[fullUri]).to.be.eql(fileData);
-		});
+				expect(staticRules[uri]).to.be.ok;
+				expect(staticRules[uri]).to.be.a('string');
 
-		it('ok - start with /', async () => {
-			const fileName : string = 'static-test.text';
-			const filePath : string = path.join(__dirname, '/static');
-			const fullPath : string = path.join(filePath, fileName);
+				await app.listen(port);
 
-			const fileData : string = await new Promise<string>((resolve, reject) => {
-				fs.readFile(fullPath, (err : Error, data : Buffer) => {
-					if (!err) {
-						resolve(data.toString());
-					} else {
-						reject(err);
-					}
-				});
+				await request(app.getHttpServer())
+					.get(fullUri)
+					.expect(200)
+					.then((_res : any) : void => {
+						const res : Response = _res as Response;
+
+						const contentType : string = res.headers['content-type'];
+						expect(contentType).to.be.eql('text/plain');
+
+						expect(res).to.be.ok;
+						expect(res.text).to.be.ok;
+						expect(res.text).to.be.eql(fileData);
+					});
+
+				await request(app.getHttpServer())
+					.post(fullUri)
+					.expect(404);
+
+				await request(app.getHttpServer())
+					.put(fullUri)
+					.expect(404);
+
+				await request(app.getHttpServer())
+					.delete(fullUri)
+					.expect(404);
+
+				// check cache
+				const staticCache = (app as any)._staticCache;
+
+				expect(staticCache).to.be.ok;
+				expect(staticCache).to.be.instanceof(Object);
+				expect(staticCache[fullUri]).to.be.eql(fileData);
+
+				await request(app.getHttpServer())
+					.get(fullUri)
+					.expect(200)
+					.then((_res : any) : void => {
+						const res : Response = _res as Response;
+
+						const contentType : string = res.headers['content-type'];
+						expect(contentType).to.be.eql('text/plain');
+
+						expect(res).to.be.ok;
+						expect(res.text).to.be.ok;
+						expect(res.text).to.be.eql(fileData);
+					});
+
+				await request(app.getHttpServer())
+					.post(fullUri)
+					.expect(404);
+
+				await request(app.getHttpServer())
+					.put(fullUri)
+					.expect(404);
+
+				await request(app.getHttpServer())
+					.delete(fullUri)
+					.expect(404);
+
 			});
 
-			const uri : string = '/static';
-			const fullUri : string = `${ uri }/${ fileName }`;
+			// TODO: start with / (/static)
+			// TODO: end with / (static/)
+			// TODO: /static/images
+			// TODO: multiple assign
+			// TODO: override same url?
 
-			await app.static(uri, filePath);
-
-			const staticRules = (app as any)._staticRules;
-
-			expect(staticRules).to.be.ok;
-			expect(staticRules).to.be.instanceof(Object);
-			expect(Object.keys(staticRules)).to.includes(uri);
-
-			expect(staticRules[uri]).to.be.ok;
-			expect(staticRules[uri]).to.be.a('string');
-
-			await app.listen(port);
-
-			await request(app.getHttpServer())
-				.get(fullUri)
-				.expect(200)
-				.expect('Content-Type', /text/)
-				.then((res) : void => {
-					const resAsResponse : Response = res as any as Response;
-
-					expect(resAsResponse).to.be.ok;
-					expect(resAsResponse.text).to.be.ok;
-					expect(resAsResponse.text).to.be.eql(fileData);
-				});
-
-			await request(app.getHttpServer())
-				.post(fullUri)
-				.expect(404);
-
-			await request(app.getHttpServer())
-				.put(fullUri)
-				.expect(404);
-
-			await request(app.getHttpServer())
-				.delete(fullUri)
-				.expect(404);
-
-			// check cache
-			const staticCache = (app as any)._staticCache;
-
-			expect(staticCache).to.be.ok;
-			expect(staticCache).to.be.instanceof(Object);
-			expect(staticCache[fullUri]).to.be.eql(fileData);
+			// TODO: cache
 		});
 
-		// TODO: start with / (/static)
-		// TODO: end with / (static/)
-		// TODO: /static/images
-		// TODO: multiple assign
-		// TODO: override same url?
+		describe('about MIME', () => {
 
-		// TODO: cache
+		});
 	});
 
 	describe('route()', () => {
@@ -2643,8 +2704,7 @@ describe('core', () => {
 					}
 
 					const res = await requestFnc
-						.expect(200)
-						.expect('Content-Type', /json/);
+						.expect(200);
 
 					expect(res).to.be.ok;
 					expect(fncRun).to.be.true;
@@ -2691,8 +2751,7 @@ describe('core', () => {
 					}
 
 					const res = await requestFnc
-						.expect(200)
-						.expect('Content-Type', /json/);
+						.expect(200);
 
 					expect(res).to.be.ok;
 					expect(fncRun).to.be.true;
@@ -2739,8 +2798,7 @@ describe('core', () => {
 					}
 
 					const res = await requestFnc
-						.expect(200)
-						.expect('Content-Type', /json/);
+						.expect(200);
 
 					expect(res).to.be.ok;
 					expect(fncRun).to.be.true;
