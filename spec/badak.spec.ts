@@ -764,7 +764,7 @@ describe('core', () => {
 					expect(staticCache).to.be.instanceof(Object);
 					expect(staticCache[fullUri]).to.be.ok;
 					expect(staticCache[fullUri].mime).to.be.eql('text/plain');
-					expect(staticCache[fullUri].fileData).to.be.eql(fileData);
+					expect(staticCache[fullUri].fileData).to.be.ok;
 
 					// request twice to check cache working
 					await Promise.all([

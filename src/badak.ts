@@ -50,7 +50,7 @@ export class Badak {
 	private _staticCache : {
 		[uri : string] : {
 			mime : string;
-			fileData : any;
+			fileData : Buffer;
 		}
 	};
 
@@ -678,10 +678,10 @@ export class Badak {
 									}
 								}
 
-								const fileData : string = await new Promise<string>((resolve, reject) => {
+								const fileData : Buffer = await new Promise<Buffer>((resolve, reject) => {
 									fs.readFile(staticFileFullPath, (err : Error, data : Buffer) => {
 										if (!err) {
-											resolve(data.toString());
+											resolve(data);
 										} else {
 											reject(err);
 										}
@@ -704,11 +704,12 @@ export class Badak {
 
 						if (!!resFileObj) {
 							res.setHeader('Content-Type', resFileObj.mime);
-							res.end(resFileObj.fileData);
+							res.write(resFileObj.fileData);
 						} else {
 							res.statusCode = 404; // not found
-							res.end();
 						}
+
+						res.end();
 					} else {
 						let targetFnc : RouteFunction;
 						let param : any;
