@@ -398,12 +398,11 @@ describe('core', () => {
 							await app.config('defaultMethod', method);
 						});
 
-						it('set value - lower case', () => {
-							return app.config('defaultMethod', method.toLowerCase())
-								.then(fail, err => {
-									expect(err).to.be.ok;
-									expect(err).to.be.instanceof(Error);
-								});
+						it('set value - lower case', async () => {
+							await app.config('defaultMethod', method.toLowerCase());
+
+							const appConfig = app._config;
+							expect(appConfig.defaultMethod).to.be.eql(method.toUpperCase());
 						});
 					});
 				});
@@ -428,9 +427,6 @@ describe('core', () => {
 						});
 				});
 
-				// TODO: method included in uri
-				// TODO: lower case
-
 				it('set value failed - not defined method', async () => {
 					return app.config('defaultMethod', 'something_method')
 						.then(fail, err => {
@@ -438,8 +434,6 @@ describe('core', () => {
 							expect(err).to.be.instanceof(Error);
 						});
 				});
-
-				// TODO: same uri with METHOD
 			});
 
 			it('default - can\'t set', () => {
@@ -478,9 +472,25 @@ describe('core', () => {
 							});
 						});
 					});
-
-					// TODO: nested route
 				});
+			});
+
+			it('after clear - can\'t set', async () => {
+				app.config('defaultMethod', 'GET');
+
+				await app.route({
+					[testUri] : echoFnc
+				});
+
+				app.config('defaultMethod', null);
+
+				return app.route({
+						[testUri] : echoFnc
+					})
+					.then(fail, err => {
+						expect(err).to.be.ok;
+						expect(err).to.be.instanceof(Error);
+					});
 			});
 		});
 	});
@@ -1768,6 +1778,8 @@ describe('core', () => {
 			});
 		});
 
+		// TODO: with query string param
+
 		describe('with route param', () => {
 			describe('colon routing', () => {
 				describe('error', () => {
@@ -2687,6 +2699,7 @@ describe('core', () => {
 					expect(testFncRunCount).to.be.eql(outerCount++);
 				});
 			});
+
 			// TODO: regular expression
 		});
 	});

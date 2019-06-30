@@ -301,17 +301,22 @@ export class Badak {
 					break;
 
 				case 'defaultMethod':
-					if (typeof value !== 'string') {
-						throw new Error('invalid method parameter');
-					}
+					if (value !== null) {
+						if (typeof value !== 'string') {
+							throw new Error('invalid method parameter');
+						}
 
-					if (!Object.values(Method).some(method => {
-						return method === value;
-					})) {
-						throw new Error('not defined method');
-					}
+						if (!Object.values(Method).some((method : string) => {
+							return value.toUpperCase() === method;
+						})) {
+							throw new Error('not defined method');
+						}
 
-					this._config[key] = value;
+						this._config[key] = value.toUpperCase();
+					} else {
+						// null is clearing
+						delete this._config[key];
+					}
 					break;
 			}
 		} else {
