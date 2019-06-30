@@ -662,6 +662,8 @@ describe('core', () => {
 							expect(err).to.be.instanceof(Error);
 						});
 				});
+
+				// invalid url
 			});
 
 			describe('path', () => {
@@ -704,6 +706,55 @@ describe('core', () => {
 
 			let fileData : string;
 
+			const checkBefore = (keyUri : string) => {
+				const staticRules = (app as any)._staticRules;
+
+				expect(staticRules).to.be.ok;
+				expect(staticRules).to.be.instanceof(Object);
+
+				expect(staticRules[keyUri]).to.be.ok;
+				expect(staticRules[keyUri]).to.be.a('string');
+			};
+
+			const checkAfter = async (fullUri : string) => {
+				// request twice to check cache working
+				await Promise.all(
+					new Array(2)
+						.fill(undefined)
+						.map(async (nothing, i) => {
+							await Promise.all([
+								request(app.getHttpServer())
+									.get(fullUri)
+									.expect(200)
+									.then((_res : any) : void => {
+										const res : Response = _res as Response;
+
+										const contentType : string = res.headers['content-type'];
+										expect(contentType).to.be.eql('text/plain');
+
+										expect(res).to.be.ok;
+										expect(res.text).to.be.ok;
+										expect(res.text).to.be.eql(fileData);
+									}),
+								request(app.getHttpServer()).post(fullUri).expect(404),
+								request(app.getHttpServer()).put(fullUri).expect(404),
+								request(app.getHttpServer()).delete(fullUri).expect(404)
+							]);
+
+							if (i === 0) {
+								// check cache
+								const staticCache = (app as any)._staticCache;
+
+								expect(staticCache).to.be.ok;
+								expect(staticCache).to.be.instanceof(Object);
+								expect(staticCache[fullUri]).to.be.ok;
+								expect(staticCache[fullUri].mime).to.be.eql('text/plain');
+								expect(staticCache[fullUri].fileData).to.be.ok;
+							}
+						})
+				);
+			};
+
 			before(async () => {
 				fileName = 'test.text';
 				filePath = path.join(__dirname, '/static');
@@ -720,78 +771,88 @@ describe('core', () => {
 				});
 			});
 
-			['/', '/static'].forEach(uri => {
+			['/', '/static',].forEach(uri => {
 				it(`ok : ${ uri }`, async () => {
 					const fullUri : string = `${ uri === '/' ? '' : uri }/${ fileName }`;
 
 					await app.static(uri, filePath);
 
-					const staticRules = (app as any)._staticRules;
-
-					expect(staticRules).to.be.ok;
-					expect(staticRules).to.be.instanceof(Object);
-					expect(Object.keys(staticRules)).to.includes(uri);
-
-					expect(staticRules[uri]).to.be.ok;
-					expect(staticRules[uri]).to.be.a('string');
+					checkBefore(uri);
 
 					await app.listen(port);
 
-					// check once
-					await Promise.all([
-						request(app.getHttpServer())
-							.get(fullUri)
-							.expect(200)
-							.then((_res : any) : void => {
-								const res : Response = _res as Response;
-
-								const contentType : string = res.headers['content-type'];
-								expect(contentType).to.be.eql('text/plain');
-
-								expect(res).to.be.ok;
-								expect(res.text).to.be.ok;
-								expect(res.text).to.be.eql(fileData);
-							}),
-						request(app.getHttpServer()).post(fullUri).expect(404),
-						request(app.getHttpServer()).put(fullUri).expect(404),
-						request(app.getHttpServer()).delete(fullUri).expect(404)
-					]);
-
-					// check cache
-					const staticCache = (app as any)._staticCache;
-
-					expect(staticCache).to.be.ok;
-					expect(staticCache).to.be.instanceof(Object);
-					expect(staticCache[fullUri]).to.be.ok;
-					expect(staticCache[fullUri].mime).to.be.eql('text/plain');
-					expect(staticCache[fullUri].fileData).to.be.ok;
-
-					// request twice to check cache working
-					await Promise.all([
-						request(app.getHttpServer())
-							.get(fullUri)
-							.expect(200)
-							.then((_res : any) : void => {
-								const res : Response = _res as Response;
-
-								const contentType : string = res.headers['content-type'];
-								expect(contentType).to.be.eql('text/plain');
-
-								expect(res).to.be.ok;
-								expect(res.text).to.be.ok;
-								expect(res.text).to.be.eql(fileData);
-							}),
-						request(app.getHttpServer()).post(fullUri).expect(404),
-						request(app.getHttpServer()).put(fullUri).expect(404),
-						request(app.getHttpServer()).delete(fullUri).expect(404)
-					]);
+					await checkAfter(fullUri);
 				});
 			});
 
-			// TODO: end with / (static/)
-			// TODO: /static/images
-			// TODO: multiple assign
-			// TODO: override same url?
+			it('ok - end with /', async () => {
+				const uri : string = '/static/';
+				const fullUri : string = `${ uri }${ fileName }`;
+
+				await app.static(uri, filePath);
+
+				checkBefore(uri);
+
+				await app.listen(port);
+
+				await checkAfter(fullUri);
+			});
+
+			it('ok - nested url', async () => {
+				const uri : string = '/static/some/inner/path';
+				const fullUri : string = `${ uri }/${ fileName }`;
+
+				await app.static(uri, filePath);
+
+				checkBefore(uri);
+
+				await app.listen(port);
+
+				await checkAfter(fullUri);
+			});
+
+			it('ok - multiple assign', async () => {
+				const uris : string[] = ['/static1', '/static2'];
+
+				const testObj : [string, string][] = uris.map(uri => {
+					return [uri, `${ uri }/${ fileName }`];
+				});
+
+				await Promise.all(
+					testObj.map(async ([uri, fullUri] : [string, string]) => {
+						await app.static(uri, filePath);
+
+						checkBefore(uri);
+					})
+				);
+
+				await app.listen(port);
+
+				await Promise.all(
+					testObj.map(async ([uri, fullUri] : [string, string]) => {
+						await checkAfter(fullUri);
+					})
+				);
+			});
+
+			it('ok - override same url', async () => {
+				const uri : string = '/static';
+				const fullUri : string = `${ uri }${ fileName }`;
+
+				await app.static(uri, path.join(__dirname, '/1'));
+				await app.static(uri, path.join(__dirname, '/2'));
+				await app.static(uri, path.join(__dirname, '/3'));
+				await app.static(uri, path.join(__dirname, '/4'));
+				await app.static(uri, path.join(__dirname, '/5'));
+				await app.static(uri, path.join(__dirname, '/6'));
+				await app.static(uri, filePath);
+
+				checkBefore(uri);
+
+				await app.listen(port);
+
+				await checkAfter(fullUri);
+			});
 		});
 
 		describe('about MIME', () => {
