@@ -2,7 +2,7 @@ import * as http from 'http';
 import { IncomingMessage, ServerResponse } from 'http';
 import { Server } from 'net';
 
-import * as path from 'path';
+import * as node_path from 'path';
 import * as fs from 'fs';
 
 import { MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed } from './interfaces';
@@ -546,9 +546,7 @@ export class Badak {
 			throw new Error('no path');
 		}
 
-		if (!path.startsWith('/') // for unix
-			&& !/^\w:\\/.test(path) // for windows
-		) {
+		if (!node_path.isAbsolute(path)) {
 			throw new Error('path should be absolute');
 		}
 
@@ -632,7 +630,7 @@ export class Badak {
 							});
 
 							const staticFilePath : string = this._staticRules[targetStaticUri];
-							const staticFileFullPath : string = path.join(staticFilePath, uri.replace(targetStaticUri, ''));
+							const staticFileFullPath : string = node_path.join(staticFilePath, uri.replace(targetStaticUri, ''));
 
 							const isExist : boolean = await new Promise<boolean>((resolve) => {
 								fs.access(staticFileFullPath, (err : Error) => {

@@ -663,7 +663,13 @@ describe('core', () => {
 						});
 				});
 
-				// invalid url
+				it('invalid path', () => {
+					return app.static('/some///thing', 'something')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
 			});
 
 			describe('path', () => {
@@ -691,13 +697,21 @@ describe('core', () => {
 						});
 				});
 			});
-
-			// TODO: duplicated uri with GET method
-			// static, GET
-			// GET, static
 		});
 
-		// TODO: not exist file
+		it('not exist file', async () => {
+			const fullUri : string = `/static/notExistFile.text'`;
+			const filePath = path.join(__dirname, '/static');
+
+			await app.static('/static', filePath);
+
+			await app.listen(port);
+
+			await request(app.getHttpServer()).post(fullUri).expect(404);
+			await request(app.getHttpServer()).post(fullUri).expect(404);
+			await request(app.getHttpServer()).put(fullUri).expect(404);
+			await request(app.getHttpServer()).delete(fullUri).expect(404);
+		});
 
 		describe('about uri', () => {
 			let fileName : string;
