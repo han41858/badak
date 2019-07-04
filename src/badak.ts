@@ -596,6 +596,7 @@ export class Badak {
 						}));
 					} catch (err) {
 						// catch middleware exception
+						console.error('badak before() middleware failed :', err);
 					}
 
 					if (this._routeRule === null && this._staticRules === null) {
@@ -724,138 +725,131 @@ export class Badak {
 						} else if (!!targetRouteObj) {
 							// normal routing
 							const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
-
-							let ruleFound : boolean = false;
+							const uriArrLength : number = uriArr.length;
 
 							// find target function
-							uriArr.forEach((uriFrag, i, arr) => {
-								ruleFound = false;
-
+							// use 'for' instead of 'forEach' to break
+							for (let i = 0; i < uriArrLength; i++) {
+								const uriFrag : string = uriArr[i];
 								const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
 
 								if (targetRouteObj[uriFrag] !== undefined) {
 									targetRouteObj = targetRouteObj[uriFrag];
 
-									ruleFound = true;
+									continue;
 								}
 
-								if (!ruleFound) {
-									// colon routing
-									const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+								// colon routing
+								const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
 
-									if (colonParam !== undefined) {
-										targetRouteObj = targetRouteObj[colonParam];
+								if (colonParam !== undefined) {
+									targetRouteObj = targetRouteObj[colonParam];
 
-										if (param === undefined) {
-											param = {};
-										}
-
-										// if (param.matcher === undefined) {
-										// 	param.matcher = [];
-										// }
-
-										// param.matcher.push(colonParam);
-										param[colonParam.replace(':', '')] = uriFrag;
-
-										ruleFound = true;
+									if (param === undefined) {
+										param = {};
 									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(colonParam);
+									param[colonParam.replace(':', '')] = uriFrag;
+
+									continue;
 								}
 
-								if (!ruleFound) {
-									// find question routing
-									const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-										return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
-									});
+								// question routing
+								const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+									return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+								});
 
-									const targetQuestionKey : string = questionKeyArr.find(questionKey => {
-										const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-										const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-										const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
+								const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+									const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+									const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+									const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
 
-										return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
-									});
+									return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
+								});
 
-									if (targetQuestionKey !== undefined) {
-										targetRouteObj = targetRouteObj[targetQuestionKey];
+								if (targetQuestionKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetQuestionKey];
 
-										if (param === undefined) {
-											param = {};
-										}
-
-										// if (param.matcher === undefined) {
-										// 	param.matcher = [];
-										// }
-
-										// param.matcher.push(targetQuestionKey);
-										param[targetQuestionKey] = uriFrag;
-
-										ruleFound = true;
+									if (param === undefined) {
+										param = {};
 									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(targetQuestionKey);
+									param[targetQuestionKey] = uriFrag;
+
+									continue;
 								}
 
-								if (!ruleFound) {
-									// find plus routing
-									const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-										return routeRuleKey.includes('+');
-									});
+								// plus routing
+								const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+									return routeRuleKey.includes('+');
+								});
 
-									const targetPlusKey : string = plusKeyArr.find(plusKey => {
-										return new RegExp(plusKey).test(uriFrag);
-									});
+								const targetPlusKey : string = plusKeyArr.find(plusKey => {
+									return new RegExp(plusKey).test(uriFrag);
+								});
 
-									if (targetPlusKey !== undefined) {
-										targetRouteObj = targetRouteObj[targetPlusKey];
+								if (targetPlusKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetPlusKey];
 
-										if (param === undefined) {
-											param = {};
-										}
-
-										// if (param.matcher === undefined) {
-										// 	param.matcher = [];
-										// }
-
-										// param.matcher.push(targetPlusKey);
-										param[targetPlusKey] = uriFrag;
-
-										ruleFound = true;
+									if (param === undefined) {
+										param = {};
 									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(targetPlusKey);
+									param[targetPlusKey] = uriFrag;
+
+									continue;
 								}
 
-								if (!ruleFound) {
-									// find asterisk routing
-									const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-										return routeRuleKey.includes('*');
-									});
+								// asterisk routing
+								const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+									return routeRuleKey.includes('*');
+								});
 
-									const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
-										// replace '*' to '\\w*'
-										return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
-									});
+								const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
+									// replace '*' to '\\w*'
+									return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
+								});
 
-									if (targetAsteriskKey !== undefined) {
-										targetRouteObj = targetRouteObj[targetAsteriskKey];
+								if (targetAsteriskKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetAsteriskKey];
 
-										if (param === undefined) {
-											param = {};
-										}
-
-										// if (param.matcher === undefined) {
-										// 	param.matcher = [];
-										// }
-
-										// param.matcher.push(targetAsteriskKey);
-										param[targetAsteriskKey] = uriFrag;
-
-										ruleFound = true;
+									if (param === undefined) {
+										param = {};
 									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(targetAsteriskKey);
+									param[targetAsteriskKey] = uriFrag;
+
+									continue;
 								}
 
-								if (i === arr.length - 1) {
-									if (ruleFound && !!targetRouteObj && !!targetRouteObj[method]) {
-										targetFnc = targetRouteObj[method];
-									}
-								}
-							});
+								// not found
+								targetRouteObj = null;
+								break;
+							}
+
+							if (!!targetRouteObj && !!targetRouteObj[method]) {
+								targetFnc = targetRouteObj[method];
+							}
 						}
 
 						if (targetFnc === undefined) {
@@ -914,6 +908,8 @@ export class Badak {
 					}
 				})()
 					.catch(async (err : any) => {
+						console.error('badak catch error : %o', err);
+
 						switch (err.message) {
 							case 'auth failed':
 								res.statusCode = 401; // Unauthorized, Unauthenticated
@@ -964,6 +960,7 @@ export class Badak {
 							}));
 						} catch (err) {
 							// catch middleware exception
+							console.error('badak after() middleware failed :', err);
 						}
 					});
 			});
