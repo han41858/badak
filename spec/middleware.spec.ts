@@ -27,8 +27,8 @@ describe('middleware', () => {
 
 	describe('auth()', () => {
 		describe('error', () => {
-			it('no auth param', () => {
-				return app.auth(undefined)
+			it('no auth param', async () => {
+				await app.auth(undefined)
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
 						expect(err).to.be.instanceof(Error);
@@ -37,8 +37,8 @@ describe('middleware', () => {
 		});
 
 		describe('assign', () => {
-			it('normal function', () => {
-				return app.auth(() => {
+			it('normal function', async () => {
+				await app.auth(() => {
 				});
 			});
 
@@ -114,32 +114,32 @@ describe('middleware', () => {
 				});
 
 				describe('error', () => {
-					it('no parameter', () => {
-						return app[fncName](undefined)
+					it('no parameter', async () => {
+						await app[fncName](undefined)
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
 					});
 
-					it('invalid parameter - null', () => {
-						return app[fncName](null)
+					it('invalid parameter - null', async () => {
+						await app[fncName](null)
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
 					});
 
-					it('invalid parameter - string', () => {
-						return app[fncName]('hello')
+					it('invalid parameter - string', async () => {
+						await app[fncName]('hello')
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
 					});
 
-					it('invalid parameter - number', () => {
-						return app[fncName](123)
+					it('invalid parameter - number', async () => {
+						await app[fncName](123)
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -150,7 +150,7 @@ describe('middleware', () => {
 						// no route rule
 						await app.listen(port);
 
-						return app[fncName](() => {
+						await app[fncName](() => {
 						})
 							.then(fail, err => {
 								expect(err).to.be.ok;

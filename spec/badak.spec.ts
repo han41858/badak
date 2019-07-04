@@ -15,7 +15,7 @@ const fail = async () => {
 const port = 65030;
 
 describe('core', () => {
-	let app = null;
+	let app : Badak = null;
 
 	beforeEach(() => {
 		app = new Badak;
@@ -39,8 +39,8 @@ describe('core', () => {
 			expect(app.config).to.be.ok;
 		});
 
-		it('not defined key', () => {
-			return app.config('somethingNotDefinedKey', true)
+		it('not defined key', async () => {
+			await app.config('somethingNotDefinedKey', true)
 				.then(fail, (err) => {
 					expect(err).to.be.ok;
 					expect(err).to.be.instanceof(Error);
@@ -51,32 +51,32 @@ describe('core', () => {
 			const booleanKeys : string[] = ['parseNumber', 'parseDate'];
 
 			booleanKeys.forEach(key => {
-				it(key + ' - undefined', () => {
-					return app.config(key, undefined)
+				it(key + ' - undefined', async () => {
+					await app.config(key, undefined)
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
 						});
 				});
 
-				it(key + ' - null', () => {
-					return app.config(key, null)
+				it(key + ' - null', async () => {
+					await app.config(key, null)
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
 						});
 				});
 
-				it(key + ' - string', () => {
-					return app.config(key, 'hello')
+				it(key + ' - string', async () => {
+					await app.config(key, 'hello')
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
 						});
 				});
 
-				it(key + ' - number', () => {
-					return app.config(key, 123)
+				it(key + ' - number', async () => {
+					await app.config(key, 123)
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -401,7 +401,7 @@ describe('core', () => {
 						it('set value - lower case', async () => {
 							await app.config('defaultMethod', method.toLowerCase());
 
-							const appConfig = app._config;
+							const appConfig = (app as any)._config;
 							expect(appConfig.defaultMethod).to.be.eql(method.toUpperCase());
 						});
 					});
@@ -428,7 +428,7 @@ describe('core', () => {
 				});
 
 				it('set value failed - not defined method', async () => {
-					return app.config('defaultMethod', 'something_method')
+					await app.config('defaultMethod', 'something_method')
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -436,8 +436,8 @@ describe('core', () => {
 				});
 			});
 
-			it('default - can\'t set', () => {
-				return app.route({
+			it('default - can\'t set', async () => {
+				await app.route({
 						[testUri] : echoFnc
 					})
 					.then(fail, err => {
@@ -467,7 +467,7 @@ describe('core', () => {
 								expect(routeRule).to.have.property(testUriRefined);
 								expect(routeRule[testUriRefined]).to.have.property(setMethod);
 
-								return getReqFnc(testMethod)
+								await getReqFnc(testMethod)
 									.expect(setMethod === testMethod ? 200 : 404);
 							});
 						});
@@ -484,7 +484,7 @@ describe('core', () => {
 
 				app.config('defaultMethod', null);
 
-				return app.route({
+				await app.route({
 						[testUri] : echoFnc
 					})
 					.then(fail, err => {
@@ -501,24 +501,24 @@ describe('core', () => {
 		});
 
 		describe('error', () => {
-			it('no port param', () => {
-				return app.listen()
+			it('no port param', async () => {
+				await app.listen(undefined)
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
 						expect(err).to.be.instanceof(Error);
 					});
 			});
 
-			it('port param - string', () => {
-				return app.listen('3000')
+			it('port param - string', async () => {
+				await app.listen('3000' as any)
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
 						expect(err).to.be.instanceof(Error);
 					});
 			});
 
-			it('run twice', () => {
-				return app.listen(port)
+			it('run twice', async () => {
+				await app.listen(port)
 					.then(() => {
 						return app.listen(port);
 					})
@@ -649,32 +649,32 @@ describe('core', () => {
 
 		describe('error', () => {
 			describe('uri', () => {
-				it('no parameter', () => {
-					return app.static(undefined, '.')
+				it('no parameter', async () => {
+					await app.static(undefined, '.')
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
 						});
 				});
 
-				it('invalid parameter === null', () => {
-					return app.static(null, '.')
+				it('invalid parameter === null', async () => {
+					await app.static(null, '.')
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
 						});
 				});
 
-				it('not absolute path', () => {
-					return app.static('someUri', 'something')
+				it('not absolute path', async () => {
+					await app.static('someUri', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
 						});
 				});
 
-				it('invalid path', () => {
-					return app.static('/some///thing', 'something')
+				it('invalid path', async () => {
+					await app.static('/some///thing', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -683,24 +683,24 @@ describe('core', () => {
 			});
 
 			describe('path', () => {
-				it('no parameter', () => {
-					return app.static('/', undefined)
+				it('no parameter', async () => {
+					await app.static('/', undefined)
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
 						});
 				});
 
-				it('invalid parameter === null', () => {
-					return app.static('/', null)
+				it('invalid parameter === null', async () => {
+					await app.static('/', null)
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
 						});
 				});
 
-				it('not absolute path', () => {
-					return app.static('/', 'something')
+				it('not absolute path', async () => {
+					await app.static('/', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
 							expect(err).to.be.instanceof(Error);
@@ -910,44 +910,40 @@ describe('core', () => {
 					await app.listen(port);
 
 					// check once
-					await Promise.all([
-						request(app.getHttpServer())
-							.get(fullUri)
-							.expect(200)
-							.then((_res : any) : void => {
-								const res : Response = _res as Response;
+					await request(app.getHttpServer())
+						.get(fullUri)
+						.expect(200)
+						.then((_res : any) : void => {
+							const res : Response = _res as Response;
 
-								expect(res).to.be.ok;
+							expect(res).to.be.ok;
 
-								const contentType : string = res.headers['content-type'];
-								expect(contentType).to.be.eql(mime);
+							const contentType : string = res.headers['content-type'];
+							expect(contentType).to.be.eql(mime);
 
-								expect(!!res.body || !!res.text).to.be.ok;
-							}),
-						request(app.getHttpServer()).post(fullUri).expect(404),
-						request(app.getHttpServer()).put(fullUri).expect(404),
-						request(app.getHttpServer()).delete(fullUri).expect(404)
-					]);
+							expect(!!res.body || !!res.text).to.be.ok;
+						});
+					await request(app.getHttpServer()).post(fullUri).expect(404);
+					await request(app.getHttpServer()).put(fullUri).expect(404);
+					await request(app.getHttpServer()).delete(fullUri).expect(404);
 
 					// request twice to check cache working
-					await Promise.all([
-						request(app.getHttpServer())
-							.get(fullUri)
-							.expect(200)
-							.then((_res : any) : void => {
-								const res : Response = _res as Response;
+					await request(app.getHttpServer())
+						.get(fullUri)
+						.expect(200)
+						.then((_res : any) : void => {
+							const res : Response = _res as Response;
 
-								expect(res).to.be.ok;
+							expect(res).to.be.ok;
 
-								const contentType : string = res.headers['content-type'];
-								expect(contentType).to.be.eql(mime);
+							const contentType : string = res.headers['content-type'];
+							expect(contentType).to.be.eql(mime);
 
-								expect(!!res.body || !!res.text).to.be.ok;
-							}),
-						request(app.getHttpServer()).post(fullUri).expect(404),
-						request(app.getHttpServer()).put(fullUri).expect(404),
-						request(app.getHttpServer()).delete(fullUri).expect(404)
-					]);
+							expect(!!res.body || !!res.text).to.be.ok;
+						}),
+						await request(app.getHttpServer()).post(fullUri).expect(404);
+					await request(app.getHttpServer()).put(fullUri).expect(404);
+					await request(app.getHttpServer()).delete(fullUri).expect(404);
 				});
 			});
 		});
@@ -1182,7 +1178,7 @@ describe('core', () => {
 
 				await app.listen(port);
 
-				return request(app.getHttpServer())
+				await request(app.getHttpServer())
 					.get('/users')
 					.expect(200);
 			});
@@ -1558,11 +1554,11 @@ describe('core', () => {
 
 				await app.route({
 					'root' : {
-						GET : fnc1,
+						'GET' : fnc1,
 						'branch1' : {
-							GET : fnc2,
+							'GET' : fnc2,
 							'branch2' : {
-								GET : fnc3
+								'GET' : fnc3
 							}
 						}
 					}
@@ -1670,8 +1666,8 @@ describe('core', () => {
 			};
 
 			describe('error', () => {
-				it('invalid format', () => {
-					return app.route({
+				it('invalid format', async () => {
+					await app.route({
 							'users///a' : {
 								'GET' : testFnc
 							}
@@ -1682,8 +1678,8 @@ describe('core', () => {
 						});
 				});
 
-				it('include space', () => {
-					return app.route({
+				it('include space', async () => {
+					await app.route({
 							'users/ a' : {
 								'GET' : testFnc
 							}
@@ -1694,8 +1690,8 @@ describe('core', () => {
 						});
 				});
 
-				it('include space', () => {
-					return app.route({
+				it('include space', async () => {
+					await app.route({
 							'users/ /a' : {
 								'GET' : testFnc
 							}
@@ -1770,6 +1766,7 @@ describe('core', () => {
 
 					if (i === arr.length - 1) {
 						const targetFnc = targetRuleObj['GET'];
+
 						expect(targetFnc).to.be.ok;
 						expect(targetFnc).to.be.instanceof(Function);
 						expect(targetFnc).to.eql(testFnc);
@@ -1783,8 +1780,8 @@ describe('core', () => {
 		describe('with route param', () => {
 			describe('colon routing', () => {
 				describe('error', () => {
-					it('colon in end index', () => {
-						return app.route({
+					it('colon in end index', async () => {
+						await app.route({
 								'users/some:id' : {
 									'GET' : async () => {
 									}
@@ -1796,8 +1793,8 @@ describe('core', () => {
 							});
 					});
 
-					it('colon in middle index', () => {
-						return app.route({
+					it('colon in middle index', async () => {
+						await app.route({
 								'users/id:some' : {
 									'GET' : async () => {
 									}
@@ -1809,8 +1806,8 @@ describe('core', () => {
 							});
 					});
 
-					it('same level & multiple colon routing, in same time', () => {
-						return app.route({
+					it('same level & multiple colon routing, in same time', async () => {
+						await app.route({
 								'users' : {
 									':id' : {
 										'GET' : async () => {
@@ -1828,8 +1825,8 @@ describe('core', () => {
 							});
 					});
 
-					it('root level & multiple colon routing, in same time', () => {
-						return app.route({
+					it('root level & multiple colon routing, in same time', async () => {
+						await app.route({
 								':id' : {
 									GET : async () => {
 									}
@@ -1845,66 +1842,63 @@ describe('core', () => {
 							});
 					});
 
-					it('root level & multiple colon routing, in different time', () => {
+					it('root level & multiple colon routing, in different time', async () => {
+						await app.route({
+							':id' : {
+								GET : async () => {
+								}
+							}
+						});
+
 						return app.route({
-								':id' : {
+								':name' : {
 									GET : async () => {
 									}
 								}
 							})
-							.then(() => {
-								return app.route({
-									':name' : {
-										GET : async () => {
-										}
-									}
-								});
-							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
 					});
 
-					it('same level & multiple colon routing, in different time', () => {
-						return app.route({
-								'users' : {
-									':id' : {
-										'GET' : async () => {
-										}
-									}
-								}
-							})
-							.then(() => {
-								return app.route({
-									'users' : {
-										':name' : {
-											'GET' : async () => {
-											}
-										}
-									}
-								});
-							})
-							.then(fail, err => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
-							});
-					});
-
-					it('same level & multiple colon routing, in different time, in uri', () => {
-						return app.route({
-								'users/:id' : {
+					it('same level & multiple colon routing, in different time', async () => {
+						await app.route({
+							'users' : {
+								':id' : {
 									'GET' : async () => {
 									}
 								}
-							})
-							.then(() => {
-								return app.route({
-									'users/:name' : {
+							}
+						});
+
+						return app.route({
+								'users' : {
+									':name' : {
 										'GET' : async () => {
 										}
 									}
-								});
+								}
+							})
+							.then(fail, err => {
+								expect(err).to.be.ok;
+								expect(err).to.be.instanceof(Error);
+							});
+					});
+
+					it('same level & multiple colon routing, in different time, in uri', async () => {
+						await app.route({
+							'users/:id' : {
+								'GET' : async () => {
+								}
+							}
+						});
+
+						return app.route({
+								'users/:name' : {
+									'GET' : async () => {
+									}
+								}
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
@@ -2124,10 +2118,10 @@ describe('core', () => {
 			// ab?cd - abc, abcd
 			describe('question routing', () => {
 				describe('error', () => {
-					it('start with \'?\'', () => {
+					it('start with \'?\'', async () => {
 						const testUri = '?users';
 
-						return app.route({
+						await app.route({
 								[testUri] : {
 									'GET' : () => {
 									}
@@ -2139,11 +2133,11 @@ describe('core', () => {
 							});
 					});
 
-					it('duplicated routing - normal uri first with route() in same time', () => {
+					it('duplicated routing - normal uri first with route() in same time', async () => {
 						const questionUri = 'users?';
 						const normalUri = 'user';
 
-						return app.route({
+						await app.route({
 								[normalUri] : {
 									'GET' : () => {
 									}
@@ -2159,23 +2153,22 @@ describe('core', () => {
 							});
 					});
 
-					it('duplicated routing - normal uri first with route()', () => {
+					it('duplicated routing - normal uri first with route()', async () => {
 						const questionUri = 'users?';
 						const normalUri = 'user';
 
-						return app.route({
-								[normalUri] : {
+						await app.route({
+							[normalUri] : {
+								'GET' : () => {
+								}
+							}
+						});
+
+						await app.route({
+								[questionUri] : {
 									'GET' : () => {
 									}
 								}
-							})
-							.then(() => {
-								return app.route({
-									[questionUri] : {
-										'GET' : () => {
-										}
-									}
-								});
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
@@ -2183,11 +2176,11 @@ describe('core', () => {
 							});
 					});
 
-					it('duplicated routing - normal uri first with get()', () => {
+					it('duplicated routing - normal uri first with get()', async () => {
 						const questionUri = 'users?';
 						const normalUri = 'user';
 
-						return app.get(normalUri, () => {
+						await app.get(normalUri, () => {
 							})
 							.then(() => {
 								return app.get(questionUri, () => {
@@ -2199,11 +2192,11 @@ describe('core', () => {
 							});
 					});
 
-					it('duplicated routing - question uri first with route()', () => {
+					it('duplicated routing - question uri first with route()', async () => {
 						const questionUri = 'users?';
 						const normalUri = 'user';
 
-						return app.route({
+						await app.route({
 								[questionUri] : {
 									'GET' : () => {
 									}
@@ -2223,11 +2216,11 @@ describe('core', () => {
 							});
 					});
 
-					it('duplicated routing - question uri first with get()', () => {
+					it('duplicated routing - question uri first with get()', async () => {
 						const questionUri = 'users?';
 						const normalUri = 'user';
 
-						return app.get(questionUri, () => {
+						await app.get(questionUri, () => {
 							})
 							.then(() => {
 								return app.get(normalUri, () => {
@@ -2466,8 +2459,8 @@ describe('core', () => {
 			// ab+cd - abcd, abbcd, abbbcd
 			describe('plus routing', () => {
 				describe('error', () => {
-					it('start with \'+\'', () => {
-						return app.route({
+					it('start with \'+\'', async () => {
+						await app.route({
 								'+abcd' : {
 									'GET' : () => {
 									}
@@ -2479,62 +2472,59 @@ describe('core', () => {
 							});
 					});
 
-					it('duplicated routing, normal uri first', () => {
-						return app.route({
+					it('duplicated routing, normal uri first', async () => {
+						await app.route({
+							'abc' : {
+								'GET' : () => {
+								}
+							}
+						});
+
+						await app.route({
+								'ab+c' : {
+									'GET' : () => {
+									}
+								}
+							})
+							.then(fail, err => {
+								expect(err).to.be.ok;
+								expect(err).to.be.instanceof(Error);
+							});
+					});
+
+					it('duplicated routing, plus uri first', async () => {
+						await app.route({
+							'ab+c' : {
+								'GET' : () => {
+								}
+							}
+						});
+
+						await app.route({
 								'abc' : {
 									'GET' : () => {
 									}
 								}
 							})
-							.then(() => {
-								return app.route({
-									'ab+c' : {
-										'GET' : () => {
-										}
-									}
-								});
-							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
 					});
 
-					it('duplicated routing, plus uri first', () => {
-						return app.route({
-								'ab+c' : {
-									'GET' : () => {
-									}
+					it('duplicated routing, duplicated plus uri', async () => {
+						await app.route({
+							'ab+c' : {
+								'GET' : () => {
 								}
-							})
-							.then(() => {
-								return app.route({
-									'abc' : {
-										'GET' : () => {
-										}
-									}
-								});
-							})
-							.then(fail, err => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
-							});
-					});
+							}
+						});
 
-					it('duplicated routing, duplicated plus uri', () => {
-						return app.route({
-								'ab+c' : {
+						await app.route({
+								'abc+' : {
 									'GET' : () => {
 									}
 								}
-							})
-							.then(() => {
-								return app.route({
-									'abc+' : {
-										'GET' : () => {
-										}
-									}
-								});
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
@@ -2714,16 +2704,16 @@ describe('core', () => {
 				});
 
 				describe('error', () => {
-					it('no address', () => {
-						return app[method]()
+					it('no address', async () => {
+						await app[method]()
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
 					});
 
-					it('no function', () => {
-						return app[method]('/users')
+					it('no function', async () => {
+						await app[method]('/users')
 							.then(fail, err => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
@@ -2747,6 +2737,7 @@ describe('core', () => {
 
 					const requestObj = request(app.getHttpServer());
 					let requestFnc = null;
+
 					switch (method) {
 						case 'get':
 							requestFnc = requestObj.get(uri);
@@ -2765,8 +2756,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res = await requestFnc
-						.expect(200);
+					const res = await requestFnc.expect(200);
 
 					expect(res).to.be.ok;
 					expect(fncRun).to.be.true;
@@ -2794,6 +2784,7 @@ describe('core', () => {
 
 					const requestObj = request(app.getHttpServer());
 					let requestFnc = null;
+
 					switch (method) {
 						case 'get':
 							requestFnc = requestObj.get(uri);
@@ -2812,8 +2803,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res = await requestFnc
-						.expect(200);
+					const res = await requestFnc.expect(200);
 
 					expect(res).to.be.ok;
 					expect(fncRun).to.be.true;
@@ -2841,6 +2831,7 @@ describe('core', () => {
 
 					const requestObj = request(app.getHttpServer());
 					let requestFnc = null;
+
 					switch (method) {
 						case 'get':
 							requestFnc = requestObj.get(uri);
@@ -2859,8 +2850,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res = await requestFnc
-						.expect(200);
+					const res = await requestFnc.expect(200);
 
 					expect(res).to.be.ok;
 					expect(fncRun).to.be.true;
@@ -2892,6 +2882,7 @@ describe('core', () => {
 
 					const requestObj = request(app.getHttpServer());
 					let requestFnc = null;
+
 					switch (method) {
 						case 'get':
 							requestFnc = requestObj.get(uri);
@@ -2910,8 +2901,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res = await requestFnc
-						.expect(200);
+					const res = await requestFnc.expect(200);
 
 					expect(res).to.be.ok;
 					expect(beforeFncRunFlag).to.be.false;
@@ -2939,6 +2929,7 @@ describe('core', () => {
 
 					const requestObj1 = request(app.getHttpServer());
 					let requestFnc1 = null;
+
 					switch (method) {
 						case 'get':
 							requestFnc1 = requestObj1.get(uri1);
@@ -2957,8 +2948,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res1 = await requestFnc1
-						.expect(200);
+					const res1 = await requestFnc1.expect(200);
 
 					expect(res1).to.be.ok;
 					expect(fnc1RunFlag).to.be.true;
@@ -2966,6 +2956,7 @@ describe('core', () => {
 
 					const requestObj2 = request(app.getHttpServer());
 					let requestFnc2 = null;
+
 					switch (method) {
 						case 'get':
 							requestFnc2 = requestObj2.get(uri2);
@@ -2984,8 +2975,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res2 = await requestFnc2
-						.expect(200);
+					const res2 = await requestFnc2.expect(200);
 
 					expect(res2).to.be.ok;
 					expect(fnc1RunFlag).to.be.true;
@@ -3001,8 +2991,8 @@ describe('core', () => {
 		});
 
 		describe('error', () => {
-			it('not started', () => {
-				return app.stop()
+			it('not started', async () => {
+				await app.stop()
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
 						expect(err).to.be.instanceof(Error);
