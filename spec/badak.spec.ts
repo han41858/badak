@@ -2637,11 +2637,111 @@ describe('core', () => {
 				});
 			});
 
-			// asterisk routing : ab*cd - abcd, abxcd, abblahcd
+			// asterisk routing
+			// ** : all after this
+			// * : all uri fragment
+			// ab*cd : abcd, abxcd, abblahcd
 			describe('asterisk routing', () => {
-				it('normal', async () => {
+				it('**', async () => {
+					const testUri = '**';
+					let checkCount = 0;
+
+					let testFncRunCount = 0;
+
+					const testFnc = (param) => {
+						expect(param).to.be.ok;
+						expect(param).to.have.property('**');
+
+						testFncRunCount++;
+					};
+
+					await app.route({
+						[testUri] : {
+							'GET' : testFnc
+						}
+					});
+
+					expect((app as any)._routeRule).to.have.property('**');
+
+					await app.listen(port);
+
+					expect(testFncRunCount).to.be.eql(checkCount++);
+
+					await request(app.getHttpServer())
+						.get('/abcd')
+						.expect(200);
+
+					expect(testFncRunCount).to.be.eql(checkCount++);
+
+					await request(app.getHttpServer())
+						.get('/abbcd')
+						.expect(200);
+
+					expect(testFncRunCount).to.be.eql(checkCount++);
+
+					await request(app.getHttpServer())
+						.get('/abbecd')
+						.expect(200);
+
+					expect(testFncRunCount).to.be.eql(checkCount++);
+
+					await request(app.getHttpServer())
+						.get('/abbasdflkjsaecd')
+						.expect(200);
+
+					expect(testFncRunCount).to.be.eql(checkCount++);
+
+					// inner rule
+					await request(app.getHttpServer())
+						.get('/ab/cd/e')
+						.expect(200);
+
+					expect(testFncRunCount).to.be.eql(checkCount++);
+				});
+
+				it('*', async () => {
+					const testUri = '*';
+					let checkCount = 0;
+
+					let testFncRunCount = 0;
+
+					const testFnc = (param) => {
+						expect(param).to.be.ok;
+						expect(param).to.have.property('*');
+
+						testFncRunCount++;
+					};
+
+					await app.route({
+						[testUri] : {
+							'GET' : testFnc
+						}
+					});
+
+					expect((app as any)._routeRule).to.have.property('*');
+
+					await app.listen(port);
+
+					expect(testFncRunCount).to.be.eql(checkCount++);
+
+					await request(app.getHttpServer())
+						.get('/abcd')
+						.expect(200);
+
+					expect(testFncRunCount).to.be.eql(checkCount++);
+
+					// TODO:
+					// // inner rule
+					// await request(app.getHttpServer())
+					// 	.get('/ab/cd/e')
+					// 	.expect(200);
+					//
+					// expect(testFncRunCount).to.be.eql(checkCount++);
+				});
+
+				it('partial *', async () => {
 					const testUri = 'ab*cd';
-					let outerCount = 0;
+					let checkCount = 0;
 
 					let testFncRunCount = 0;
 					const testFnc = (param) => {
@@ -2660,33 +2760,35 @@ describe('core', () => {
 						}
 					});
 
+					expect((app as any)._routeRule).to.have.property(testUri);
+
 					await app.listen(port);
 
-					expect(testFncRunCount).to.be.eql(outerCount++);
+					expect(testFncRunCount).to.be.eql(checkCount++);
 
 					await request(app.getHttpServer())
 						.get('/abcd')
 						.expect(200);
 
-					expect(testFncRunCount).to.be.eql(outerCount++);
+					expect(testFncRunCount).to.be.eql(checkCount++);
 
 					await request(app.getHttpServer())
 						.get('/abbcd')
 						.expect(200);
 
-					expect(testFncRunCount).to.be.eql(outerCount++);
+					expect(testFncRunCount).to.be.eql(checkCount++);
 
 					await request(app.getHttpServer())
 						.get('/abbecd')
 						.expect(200);
 
-					expect(testFncRunCount).to.be.eql(outerCount++);
+					expect(testFncRunCount).to.be.eql(checkCount++);
 
 					await request(app.getHttpServer())
 						.get('/abbasdflkjsaecd')
 						.expect(200);
 
-					expect(testFncRunCount).to.be.eql(outerCount++);
+					expect(testFncRunCount).to.be.eql(checkCount++);
 				});
 			});
 

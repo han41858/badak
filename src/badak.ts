@@ -820,26 +820,50 @@ export class Badak {
 									return routeRuleKey.includes('*');
 								});
 
-								const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
-									// replace '*' to '\\w*'
-									return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
-								});
-
-								if (targetAsteriskKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetAsteriskKey];
+								if (asteriskKeyArr.includes('**')) {
+									targetRouteObj = targetRouteObj['**'];
 
 									if (param === undefined) {
 										param = {};
 									}
 
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
+									param['**'] = uriFrag;
 
-									// param.matcher.push(targetAsteriskKey);
-									param[targetAsteriskKey] = uriFrag;
+									// ignore after uri
+									break;
+								} else if (asteriskKeyArr.includes('*')) {
+									targetRouteObj = targetRouteObj['*'];
 
+									if (param === undefined) {
+										param = {};
+									}
+
+									param['*'] = uriFrag;
+
+									// continue after uri
 									continue;
+								} else {
+									const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
+										// replace '*' to '\\w*'
+										return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
+									});
+
+									if (targetAsteriskKey !== undefined) {
+										targetRouteObj = targetRouteObj[targetAsteriskKey];
+
+										if (param === undefined) {
+											param = {};
+										}
+
+										// if (param.matcher === undefined) {
+										// 	param.matcher = [];
+										// }
+
+										// param.matcher.push(targetAsteriskKey);
+										param[targetAsteriskKey] = uriFrag;
+
+										continue;
+									}
 								}
 
 								// not found
