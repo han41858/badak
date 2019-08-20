@@ -16,7 +16,9 @@ describe('middleware', () => {
 	let app : Badak = null;
 
 	beforeEach(() => {
-		app = new Badak;
+		app = new Badak({
+			catchErrorLog : false
+		});
 	});
 
 	afterEach(() => {

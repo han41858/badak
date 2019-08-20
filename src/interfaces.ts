@@ -17,7 +17,8 @@ export interface RouteRuleSeed {
 }
 
 export interface BadakOption {
-	preventError : boolean; // default true, it false, badak pass error to node
+	catchErrorLog : boolean; // default true, if false, badak will not show error catching log
+	preventError : boolean; // default true, if false, badak pass error to node
 
 	defaultMethod : Method; // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
 	/**

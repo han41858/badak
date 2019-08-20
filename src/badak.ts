@@ -47,6 +47,7 @@ export class Badak {
 	};
 
 	private _config : BadakOption = {
+		catchErrorLog : true,
 		preventError : true,
 
 		defaultMethod : null,
@@ -75,7 +76,7 @@ export class Badak {
 			throw new Error('no rule in rule object');
 		}
 
-		const refinedRuleObj = {};
+		const refinedRuleObj : RouteRule = {};
 
 		// called recursively
 		keyArr.forEach(uri => {
@@ -92,7 +93,8 @@ export class Badak {
 					uri.split('/').filter(uriFrag => uriFrag !== '') :
 					[uri];
 
-				let targetObj = refinedRuleObj;
+				let targetObj : RouteRule | RouteRuleSeed = refinedRuleObj;
+
 				uriArr.forEach((uriFrag, i, arr) => {
 					if (uriFrag.trim() !== uriFrag) {
 						throw new Error('uri include space');
@@ -141,8 +143,6 @@ export class Badak {
 							}
 						}
 					}
-
-					this._checkUriDuplication(Object.keys(targetObj));
 				});
 			}
 		});
@@ -150,23 +150,53 @@ export class Badak {
 		return refinedRuleObj;
 	}
 
-	private _checkUriDuplication (uriKeys : string[]) : void {
-		// sift keys, uriKeys can have duplicated item
-		const uris : string[] = uriKeys.filter((key, i, arr) => {
-			return i === arr.indexOf(key);
+	// call recursively
+	private getUriKeyArr (routeRule : RouteRule | RouteRuleSeed) : string[][] {
+		const allKeys : string[] = Object.keys(routeRule);
+
+		const result : string[][] = [];
+
+		allKeys.forEach((key) => {
+			if (typeof routeRule[key] === 'object') {
+				this.getUriKeyArr(routeRule[key]).forEach((one : string[]) => {
+					result.push([key, ...one]);
+				});
+			} else {
+				result.push([key]);
+			}
 		});
 
-		if (uris.length > 1) {
+		return result;
+	}
+
+	private _checkUriDuplication (currentRouteRule : RouteRule[], newRouteRule : RouteRule) : void {
+		const allUriKeys : string[][] = [];
+
+		currentRouteRule.forEach(oneRouteRule => {
+			allUriKeys.push(...this.getUriKeyArr(oneRouteRule));
+		});
+
+		allUriKeys.push(...this.getUriKeyArr(newRouteRule));
+
+		const maxDepthLength : number = allUriKeys.reduce((maxLength : number, cur : string[]) => {
+			return maxLength > cur.length ? maxLength : cur.length;
+		}, 0);
+
+		for (let i = 0; i < maxDepthLength; i++) {
+			const targetKeys : string[] = allUriKeys
+				.map(oneTree => oneTree[i])
+				.filter(frag => !!frag); // for different depth
+
 			// colon routing
-			const colonRouteArr : string[] = uris.filter(uri => uri.startsWith(':'));
+			const colonRouteArr : string[] = targetKeys.filter(uri => uri.startsWith(':'));
 			if (colonRouteArr.length > 1) {
 				throw new Error('duplicated colon routing');
 			}
 
 			// question routing
-			const questionRouteArr : string[] = uris.filter(uri => uri.includes('?'));
+			const questionRouteArr : string[] = targetKeys.filter(uri => uri.includes('?'));
 			if (questionRouteArr.length > 0) {
-				const targetUris : string[] = uris.filter(uri => !questionRouteArr.includes(uri));
+				const targetUris : string[] = targetKeys.filter(uri => !questionRouteArr.includes(uri));
 
 				const matchingResult : string = questionRouteArr.find(regSrc => {
 					return targetUris.some(uri => new RegExp(regSrc).test(uri));
@@ -178,9 +208,9 @@ export class Badak {
 			}
 
 			// plus routing
-			const plusRouteArr : string[] = uris.filter(uri => uri.includes('+'));
+			const plusRouteArr : string[] = targetKeys.filter(uri => uri.includes('+'));
 			if (plusRouteArr.length > 0) {
-				const plusUrisSanitized : string[] = [...uris]; // start with all keys
+				const plusUrisSanitized : string[] = [...targetKeys]; // start with all keys
 				plusRouteArr.forEach(uri => {
 					const plusIncluded : string = uri.replace('+', '');
 					const plusExcluded : string = uri.replace(/.\+/, '');
@@ -192,39 +222,15 @@ export class Badak {
 					}
 				});
 			}
+
+			// TODO: asterisk routing
 		}
-	}
-
-
-	// divided with _assignRule for nested object, can be called recursively
-	// Object.assign() overwrite existing tree, do this manually
-	// param type is any, not RouteRule, different methods can be merged
-	private _getMergedRule (currentRule : any, newRule : any) : RouteRule {
-		if (newRule === undefined) {
-			throw new Error('no newRule to merge');
-		}
-
-		const resultRule : RouteRule = Object.assign({}, currentRule);
-
-		this._checkUriDuplication([
-			...Object.keys(resultRule),
-			...Object.keys(newRule)]
-		);
-
-		Object.keys(newRule).forEach(newRuleKey => {
-			// assign
-			if (!!resultRule[newRuleKey] && !Object.keys(Method).includes(newRuleKey)) {
-				resultRule[newRuleKey] = this._getMergedRule(resultRule[newRuleKey], newRule[newRuleKey]);
-			} else {
-				resultRule[newRuleKey] = newRule[newRuleKey];
-			}
-		});
-
-		return resultRule;
 	}
 
 	private _assignRule (rule : RouteRule) : void {
 		const refinedRule : RouteRule = this._refineRouteRule(rule);
+
+		this._checkUriDuplication(this._routeRule, refinedRule);
 
 		this._routeRule.push(refinedRule);
 	}
@@ -583,7 +589,9 @@ export class Badak {
 						}));
 					} catch (err) {
 						// catch middleware exception
-						console.error('badak before() middleware failed :', err);
+						if (this._config.catchErrorLog) {
+							console.error('badak before() middleware failed :', err);
+						}
 					}
 
 					if (!req.method) {
@@ -929,7 +937,9 @@ export class Badak {
 					}
 				})()
 					.catch(async (err : any) => {
-						console.error('badak catch error : %o', err);
+						if (this._config.catchErrorLog) {
+							console.error('badak catch error : %o', err);
+						}
 
 						switch (err.message) {
 							case 'auth failed':
@@ -985,7 +995,9 @@ export class Badak {
 							}));
 						} catch (err) {
 							// catch middleware exception
-							console.error('badak after() middleware failed :', err);
+							if (this._config.catchErrorLog) {
+								console.error('badak after() middleware failed :', err);
+							}
 						}
 					});
 			});
