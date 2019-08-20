@@ -1,5 +1,6 @@
 // function type definition for IDE
 import { IncomingMessage, ServerResponse } from 'http';
+import { Method } from './constants';
 
 export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
 export type MiddlewareFunction = (req : IncomingMessage, res : ServerResponse, responseBody? : string) => void;
@@ -13,4 +14,26 @@ export interface RouteRuleSeed {
 	POST? : RouteFunction;
 	PUT? : RouteFunction;
 	DELETE? : RouteFunction;
+}
+
+export interface BadakOption {
+	preventError : boolean; // default true, it false, badak pass error to node
+
+	defaultMethod : Method; // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
+	/**
+	 * before rule :
+	 * {
+	 *     '/users' : {
+	 *         GET : getUserList
+	 *     }
+	 * }
+	 *
+	 * after set app.config('defaultMethod', 'GET') :
+	 * {
+	 *     '/users' : getUserList
+	 * }
+	 */
+
+	parseNumber : boolean; // default false, if true, convert number string to Number
+	parseDate : boolean; // default false, if true, convert date string to Date object
 }

@@ -5,7 +5,7 @@ import { Server } from 'net';
 import * as node_path from 'path';
 import * as fs from 'fs';
 
-import { MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed } from './interfaces';
+import { BadakOption, MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed } from './interfaces';
 import { Method } from './constants';
 
 /**
@@ -24,14 +24,6 @@ import { Method } from './constants';
  *     }
  * }
  */
-
-interface ResponseObj {
-	headers : {
-		[key : string] : any
-	}[];
-
-	result : any;
-}
 
 export class Badak {
 	private _http : Server = null;
@@ -54,27 +46,22 @@ export class Badak {
 		}
 	};
 
-	private _config : {
-		[key : string] : any
-	} = {
-		defaultMethod : null, // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
-		/**
-		 * before rule :
-		 * {
-		 *     '/users' : {
-		 *         GET : getUserList
-		 *     }
-		 * }
-		 *
-		 * after set app.config('defaultMethod', 'GET') :
-		 * {
-		 *     '/users' : getUserList
-		 * }
-		 */
+	private _config : BadakOption = {
+		preventError : true,
 
-		parseNumber : false, // default false, if true, convert number string to Number
-		parseDate : false // default false, if true, convert date string to Date object
+		defaultMethod : null,
+
+		parseNumber : false,
+		parseDate : false
 	};
+
+	constructor (option? : Partial<BadakOption>) {
+		if (!!option) {
+			Object.keys(option).forEach((key : Extract<keyof BadakOption, never>) => {
+				this._config[key] = option[key];
+			});
+		}
+	}
 
 	// refine route rule, this function can be called recursively
 	private _refineRouteRule (rule : RouteRule | RouteRuleSeed) {
@@ -312,7 +299,7 @@ export class Badak {
 							throw new Error('not defined method');
 						}
 
-						this._config[key] = value.toUpperCase();
+						this._config.defaultMethod = value.toUpperCase() as Method;
 					} else {
 						// null is clearing
 						delete this._config[key];
@@ -984,6 +971,10 @@ export class Badak {
 									res.end();
 								}
 								break;
+						}
+
+						if (this._config.preventError === false) {
+							throw err;
 						}
 					})
 					.then(async () => {

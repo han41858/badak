@@ -1,3 +1,3 @@
 export { Badak } from './badak';
 export { Method } from './constants';
-export { RouteRule, RouteFunction, MiddlewareFunction } from './interfaces';
+export { BadakOption, RouteRule, RouteFunction, MiddlewareFunction } from './interfaces';
