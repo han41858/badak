@@ -38,3 +38,14 @@ export interface BadakOption {
 	parseNumber : boolean; // default false, if true, convert number string to Number
 	parseDate : boolean; // default false, if true, convert date string to Date object
 }
+
+export interface StaticRule {
+	uri : string;
+	path : string;
+}
+
+export interface StaticCache {
+	uri : string;
+	mime : string;
+	fileData : Buffer;
+}
