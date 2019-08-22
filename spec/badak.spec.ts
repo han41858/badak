@@ -7,7 +7,7 @@ import { expect } from 'chai';
 import * as request from 'supertest';
 
 import { Badak } from '../src/badak';
-import { RouteRule, RouteRuleSeed } from '../src/interfaces';
+import { RouteRule, RouteRuleSeed, StaticCache, StaticRule } from '../src/interfaces';
 
 const fail = async () => {
 	throw new Error('this should be not execute');
@@ -635,7 +635,7 @@ describe('core', () => {
 		// 	.end(done);
 	});
 
-	describe('static()', () => {
+	describe.only('static()', () => {
 		it('defined', () => {
 			expect(app.static).to.be.ok;
 		});
@@ -699,21 +699,43 @@ describe('core', () => {
 							expect(err).to.be.instanceof(Error);
 						});
 				});
+
+				it('not folder', async () => {
+					await app.static('/', path.join(__dirname, 'static', 'test.txt'))
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
 			});
-		});
 
-		it('not exist file', async () => {
-			const fullUri : string = `/static/notExistFile.text'`;
-			const filePath = path.join(__dirname, '/static');
+			it('not exist file', async () => {
+				const fullUri : string = `/static/notExistFile.text'`;
+				const folderPath = path.join(__dirname, '/static');
 
-			await app.static('/static', filePath);
+				await app.static('/static', folderPath);
 
-			await app.listen(port);
+				await app.listen(port);
 
-			await request(app.getHttpServer()).post(fullUri).expect(404);
-			await request(app.getHttpServer()).post(fullUri).expect(404);
-			await request(app.getHttpServer()).put(fullUri).expect(404);
-			await request(app.getHttpServer()).delete(fullUri).expect(404);
+				await request(app.getHttpServer()).post(fullUri).expect(404);
+				await request(app.getHttpServer()).post(fullUri).expect(404);
+				await request(app.getHttpServer()).put(fullUri).expect(404);
+				await request(app.getHttpServer()).delete(fullUri).expect(404);
+			});
+
+			it('not exist folder', async () => {
+				const fullUri : string = `/static`;
+				const folderPath = path.join(__dirname, '/static/notExistFolder');
+
+				await app.static('/static', folderPath);
+
+				await app.listen(port);
+
+				await request(app.getHttpServer()).post(fullUri).expect(404);
+				await request(app.getHttpServer()).post(fullUri).expect(404);
+				await request(app.getHttpServer()).put(fullUri).expect(404);
+				await request(app.getHttpServer()).delete(fullUri).expect(404);
+			});
 		});
 
 		describe('about uri', () => {
@@ -724,13 +746,16 @@ describe('core', () => {
 			let fileData : string;
 
 			const checkBefore = (keyUri : string) => {
-				const staticRules = (app as any)._staticRules;
+				const staticRules : StaticRule[] = (app as any)._staticRules;
 
 				expect(staticRules).to.be.ok;
-				expect(staticRules).to.be.instanceof(Object);
+				expect(staticRules).to.be.instanceof(Array);
 
-				expect(staticRules[keyUri]).to.be.ok;
-				expect(staticRules[keyUri]).to.be.a('string');
+				const targetRule : StaticRule = staticRules.find(rule => {
+					return rule.uri === keyUri;
+				});
+
+				expect(targetRule).to.be.ok;
 			};
 
 			const checkAfter = async (fullUri : string) => {
@@ -760,13 +785,18 @@ describe('core', () => {
 
 							if (i === 0) {
 								// check cache
-								const staticCache = (app as any)._staticCache;
+								const staticCache : StaticCache[] = (app as any)._staticCache;
 
 								expect(staticCache).to.be.ok;
-								expect(staticCache).to.be.instanceof(Object);
-								expect(staticCache[fullUri]).to.be.ok;
-								expect(staticCache[fullUri].mime).to.be.eql('text/plain');
-								expect(staticCache[fullUri].fileData).to.be.ok;
+								expect(staticCache).to.be.instanceof(Array);
+
+								const targetCache : StaticCache = staticCache.find(cache => {
+									return cache.uri === fullUri;
+								});
+
+								expect(targetCache).to.be.ok;
+								expect(targetCache).to.have.property('mime', 'text/plain');
+								expect(targetCache).to.have.property('fileData');
 							}
 						})
 				);
@@ -870,6 +900,43 @@ describe('core', () => {
 
 				await checkAfter(fullUri);
 			});
+		});
+
+		it('folder', async () => {
+			const uri : string = '/static';
+
+			await app.static(uri, path.join(__dirname, 'static'));
+
+			await app.listen(port);
+
+			// check static cache
+			const staticCache : StaticCache[] = (app as any)._staticCache;
+
+			expect(staticCache).to.be.instanceof(Array);
+			expect(staticCache.length).to.be.above(0);
+
+			const targetStaticCache : StaticCache = staticCache[0];
+
+			expect(targetStaticCache).to.be.instanceof(Object);
+
+			expect(targetStaticCache).to.have.property('uri');
+			expect(targetStaticCache.uri).to.be.a('string');
+
+			expect(targetStaticCache).to.have.property('mime');
+			expect(targetStaticCache.mime).to.be.a('string');
+
+			expect(targetStaticCache).to.have.property('fileData');
+
+			await request(app.getHttpServer())
+				.get('/static/test.txt')
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					expect(!!res.body || !!res.text).to.be.ok;
+				});
 		});
 
 		describe('about MIME', () => {

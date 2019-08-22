@@ -4,8 +4,9 @@ import { Server } from 'net';
 
 import * as node_path from 'path';
 import * as fs from 'fs';
+import { Stats } from 'fs';
 
-import { BadakOption, MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed } from './interfaces';
+import { BadakOption, MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed, StaticCache, StaticRule } from './interfaces';
 import { Method } from './constants';
 
 /**
@@ -36,15 +37,9 @@ export class Badak {
 	private _middlewaresAfter : MiddlewareFunction[] = [];
 
 	private _routeRule : RouteRule[] = [];
-	private _staticRules : {
-		[uri : string] : any; // value is path
-	} = null;
-	private _staticCache : {
-		[uri : string] : {
-			mime : string;
-			fileData : Buffer;
-		}
-	};
+
+	private _staticRules : StaticRule[] = [];
+	private _staticCache : StaticCache[] = [];
 
 	private _config : BadakOption = {
 		catchErrorLog : true,
@@ -548,16 +543,118 @@ export class Badak {
 			throw new Error('path should be absolute');
 		}
 
-		// not assign to route rule
-		if (!this._staticRules) {
-			this._staticRules = {};
+		if (!this._isFolder(path)) {
+			throw new Error('target should be a folder');
 		}
 
-		this._staticRules[uri] = path;
+		// not assign to route rule
+		if (!this._staticRules) {
+			this._staticRules = [{ uri, path }];
+		} else {
+			this._staticRules.push({ uri, path });
+		}
 	}
 
 	async route (rule : RouteRule) : Promise<void> {
 		this._assignRule(rule);
+	}
+
+	async _isFolder (path : string) : Promise<boolean> {
+		return new Promise<boolean>((resolve, reject) => {
+			fs.stat(path, (err : Error, stats : Stats) => {
+				if (!err) {
+					resolve(stats.isDirectory());
+				} else {
+					reject(new Error(`_isFolder() failed : ${ path }`));
+				}
+			});
+		});
+	}
+
+	async _loadFolder (uri : string, path : string) : Promise<StaticCache[]> {
+		console.log(`uri : [${ uri }], path : [${ path }]`);
+		const foldersAndFiles : string[] = await new Promise<string[]>(async (resolve, reject) => {
+			fs.readdir(path, (err : Error, _foldersAndFiles : string[]) => {
+				if (!err) {
+					resolve(_foldersAndFiles);
+				} else {
+					reject(new Error(`_loadFolder() failed : ${ path }`));
+				}
+			});
+		});
+
+		console.log('foldersAndFiles');
+		console.table(foldersAndFiles);
+
+		const cache : StaticCache[] = [];
+
+		const allFileData : StaticCache[][] = await Promise.all(foldersAndFiles.map(async (folderOrFileName : string) : Promise<StaticCache[]> => {
+			const fullPath : string = node_path.join(path, folderOrFileName);
+
+			let cacheSet : StaticCache[];
+
+			if (await this._isFolder(fullPath)) {
+				console.log('folder');
+			} else {
+				const matchArr : RegExpMatchArray = uri.match(/(\.[\w\d]+)?\.[\w\d]+$/);
+
+				let mime : string = 'application/octet-stream'; // default
+
+				if (!!matchArr) {
+					const extension : string = matchArr[0].replace(/^\./, ''); // remove starting '.'
+
+					const mimeMap = {
+						['bmp'] : 'image/bmp',
+						['css'] : 'text/css',
+						['gif'] : 'image/gif',
+						['htm'] : 'text/html',
+						['html'] : 'text/html',
+						['jpeg'] : 'image/jpeg',
+						['jpg'] : 'image/jpeg',
+						['js'] : 'text/javascript',
+						['json'] : 'application/json',
+						['pdf'] : 'application/pdf',
+						['png'] : 'image/png',
+						['txt'] : 'text/plain',
+						['text'] : 'text/plain',
+						['tif'] : 'image/tiff',
+						['tiff'] : 'image/tiff',
+						['xls'] : 'application/vnd.ms-excel',
+						['xlsx'] : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+					};
+
+					if (!!mimeMap[extension]) {
+						mime = mimeMap[extension];
+					}
+				}
+
+				cacheSet = [{
+					uri : [uri, folderOrFileName].join('/'),
+					mime : mime,
+					fileData : await this._loadFile(fullPath)
+				}];
+			}
+
+			return cacheSet;
+		}));
+
+		allFileData.forEach((oneFileData, i) => {
+			cache.push(...oneFileData);
+		});
+
+		return cache;
+	}
+
+	async _loadFile (path : string) : Promise<Buffer> {
+		return new Promise<Buffer>((resolve, reject) => {
+			fs.readFile(path, (err : Error, data : Buffer) => {
+				if (!err) {
+					resolve(data);
+				} else {
+					reject(new Error(`_loadFile() failed : ${ path }`));
+				}
+			});
+		});
 	}
 
 	async listen (port : number) : Promise<void> {
@@ -572,6 +669,27 @@ export class Badak {
 		if (this.isRunning()) {
 			throw new Error('server is running already');
 		}
+
+		// load static files
+		console.log('this._staticRules');
+		console.table(this._staticRules);
+
+		if (!!this._staticRules && this._staticRules.length > 0) {
+			const allCache : StaticCache[][] = await Promise.all<StaticCache[]>(this._staticRules.map(async (staticRule : StaticRule) : Promise<StaticCache[]> => {
+				return this._loadFolder(staticRule.uri, staticRule.path);
+			}));
+
+			console.log('allCache');
+			console.table(allCache);
+
+			allCache.forEach(oneCacheSet => [
+				this._staticCache.push(...oneCacheSet)
+			]);
+		}
+
+		console.log('staticCache');
+		console.table(this._staticCache);
+
 
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject) => {
@@ -610,104 +728,29 @@ export class Badak {
 					}
 
 					const isStaticCase : boolean = method === Method.GET
-						&& !!this._staticRules
-						&& Object.keys(this._staticRules).some(staticUri => {
-							return uri.startsWith(staticUri);
+						&& !!this._staticCache
+						&& !!this._staticCache.find(one => {
+							return one.uri === uri;
 						});
+
+					console.log('isStaticCase :', isStaticCase);
 
 					if (isStaticCase) {
 						// static case
-						let resFileObj : {
+						const targetCache : StaticCache = this._staticCache.find(one => {
+							return one.uri === uri;
+						});
+
+						const resFileObj : {
 							mime : string;
 							fileData : any;
+						} = {
+							mime : targetCache.mime,
+							fileData : targetCache.fileData
 						};
 
-						// check cache
-						if (!!this._staticCache && !!this._staticCache[uri]) {
-							resFileObj = this._staticCache[uri];
-						} else {
-							const targetStaticUri : string = Object.keys(this._staticRules).find(staticUri => {
-								return uri.startsWith(staticUri);
-							});
-
-							const staticFilePath : string = this._staticRules[targetStaticUri];
-							const staticFileFullPath : string = node_path.join(staticFilePath, uri.replace(targetStaticUri, ''));
-
-							const isExist : boolean = await new Promise<boolean>((resolve) => {
-								fs.access(staticFileFullPath, (err : Error) => {
-									if (!err) {
-										resolve(true);
-									} else {
-										resolve(false);
-									}
-								});
-							});
-
-							if (isExist) {
-								// response with prefer MIME
-								const matchArr : RegExpMatchArray = uri.match(/(\.[\w\d]+)?\.[\w\d]+$/);
-
-								let mime : string = 'application/octet-stream'; // default
-
-								if (!!matchArr) {
-									const extension : string = matchArr[0].replace(/^\./, ''); // remove starting '.'
-
-									const mimeMap = {
-										['bmp'] : 'image/bmp',
-										['css'] : 'text/css',
-										['gif'] : 'image/gif',
-										['htm'] : 'text/html',
-										['html'] : 'text/html',
-										['jpeg'] : 'image/jpeg',
-										['jpg'] : 'image/jpeg',
-										['js'] : 'text/javascript',
-										['json'] : 'application/json',
-										['pdf'] : 'application/pdf',
-										['png'] : 'image/png',
-										['txt'] : 'text/plain',
-										['text'] : 'text/plain',
-										['tif'] : 'image/tiff',
-										['tiff'] : 'image/tiff',
-										['xls'] : 'application/vnd.ms-excel',
-										['xlsx'] : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-									};
-
-									if (!!mimeMap[extension]) {
-										mime = mimeMap[extension];
-									}
-								}
-
-								const fileData : Buffer = await new Promise<Buffer>((resolve, reject) => {
-									fs.readFile(staticFileFullPath, (err : Error, data : Buffer) => {
-										if (!err) {
-											resolve(data);
-										} else {
-											reject(err);
-										}
-									});
-								});
-
-								resFileObj = {
-									mime,
-									fileData
-								};
-
-								// cache
-								if (!this._staticCache) {
-									this._staticCache = {};
-								}
-
-								this._staticCache[uri] = resFileObj;
-							}
-						}
-
-						if (!!resFileObj) {
-							res.setHeader('Content-Type', resFileObj.mime);
-							res.write(resFileObj.fileData);
-						} else {
-							res.statusCode = 404; // not found
-						}
-
+						res.setHeader('Content-Type', resFileObj.mime);
+						res.write(resFileObj.fileData);
 						res.end();
 					} else {
 						let targetFnc : RouteFunction;
