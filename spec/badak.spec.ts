@@ -724,24 +724,22 @@ describe('core', () => {
 			});
 
 			it('not exist folder', async () => {
-				const fullUri : string = `/static`;
 				const folderPath = path.join(__dirname, '/static/notExistFolder');
 
-				await app.static('/static', folderPath);
-
-				await app.listen(port);
-
-				await request(app.getHttpServer()).post(fullUri).expect(404);
-				await request(app.getHttpServer()).post(fullUri).expect(404);
-				await request(app.getHttpServer()).put(fullUri).expect(404);
-				await request(app.getHttpServer()).delete(fullUri).expect(404);
+				return app.static('/static', folderPath)
+					.then(fail, (err) => {
+						expect(err).to.be.ok;
+						expect(err).to.be.instanceof(Error);
+					});
 			});
 		});
 
 		describe('about uri', () => {
+			let folderName : string;
 			let fileName : string;
+
+			let folderPath : string;
 			let filePath : string;
-			let fullPath : string;
 
 			let fileData : string;
 
@@ -803,12 +801,14 @@ describe('core', () => {
 			};
 
 			before(async () => {
-				fileName = 'test.text';
-				filePath = path.join(__dirname, '/static');
-				fullPath = path.join(filePath, fileName);
+				folderName = 'static';
+				fileName = 'test.txt';
+
+				folderPath = path.join(__dirname, folderName);
+				filePath = path.join(folderPath, fileName);
 
 				fileData = await new Promise<string>((resolve, reject) => {
-					fs.readFile(fullPath, (err : Error, data : Buffer) => {
+					fs.readFile(filePath, (err : Error, data : Buffer) => {
 						if (!err) {
 							resolve(data.toString());
 						} else {
@@ -818,11 +818,14 @@ describe('core', () => {
 				});
 			});
 
-			['/', '/static',].forEach(uri => {
+			[
+				'/',
+				'/static'
+			].forEach(uri => {
 				it(`ok : ${ uri }`, async () => {
 					const fullUri : string = `${ uri === '/' ? '' : uri }/${ fileName }`;
 
-					await app.static(uri, filePath);
+					await app.static(uri, folderPath);
 
 					checkBefore(uri);
 
@@ -836,7 +839,7 @@ describe('core', () => {
 				const uri : string = '/static/';
 				const fullUri : string = `${ uri }${ fileName }`;
 
-				await app.static(uri, filePath);
+				await app.static(uri, folderPath);
 
 				checkBefore(uri);
 
@@ -849,7 +852,7 @@ describe('core', () => {
 				const uri : string = '/static/some/inner/path';
 				const fullUri : string = `${ uri }/${ fileName }`;
 
-				await app.static(uri, filePath);
+				await app.static(uri, folderPath);
 
 				checkBefore(uri);
 
@@ -867,7 +870,7 @@ describe('core', () => {
 
 				await Promise.all(
 					testObj.map(async ([uri, fullUri] : [string, string]) => {
-						await app.static(uri, filePath);
+						await app.static(uri, folderPath);
 
 						checkBefore(uri);
 					})
@@ -880,25 +883,6 @@ describe('core', () => {
 						await checkAfter(fullUri);
 					})
 				);
-			});
-
-			it('ok - override same url', async () => {
-				const uri : string = '/static';
-				const fullUri : string = `${ uri }${ fileName }`;
-
-				await app.static(uri, path.join(__dirname, '/1'));
-				await app.static(uri, path.join(__dirname, '/2'));
-				await app.static(uri, path.join(__dirname, '/3'));
-				await app.static(uri, path.join(__dirname, '/4'));
-				await app.static(uri, path.join(__dirname, '/5'));
-				await app.static(uri, path.join(__dirname, '/6'));
-				await app.static(uri, filePath);
-
-				checkBefore(uri);
-
-				await app.listen(port);
-
-				await checkAfter(fullUri);
 			});
 		});
 

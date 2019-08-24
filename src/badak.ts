@@ -543,7 +543,7 @@ export class Badak {
 			throw new Error('path should be absolute');
 		}
 
-		if (!this._isFolder(path)) {
+		if (!await this._isFolder(path)) {
 			throw new Error('target should be a folder');
 		}
 
@@ -572,7 +572,6 @@ export class Badak {
 	}
 
 	async _loadFolder (uri : string, path : string) : Promise<StaticCache[]> {
-		console.log(`uri : [${ uri }], path : [${ path }]`);
 		const foldersAndFiles : string[] = await new Promise<string[]>(async (resolve, reject) => {
 			fs.readdir(path, (err : Error, _foldersAndFiles : string[]) => {
 				if (!err) {
@@ -582,9 +581,6 @@ export class Badak {
 				}
 			});
 		});
-
-		console.log('foldersAndFiles');
-		console.table(foldersAndFiles);
 
 		const cache : StaticCache[] = [];
 
@@ -596,31 +592,31 @@ export class Badak {
 			if (await this._isFolder(fullPath)) {
 				console.log('folder');
 			} else {
-				const matchArr : RegExpMatchArray = uri.match(/(\.[\w\d]+)?\.[\w\d]+$/);
+				const matchArr : RegExpMatchArray = fullPath.match(/(\.[\w\d]+)?\.[\w\d]+$/);
 
 				let mime : string = 'application/octet-stream'; // default
 
 				if (!!matchArr) {
-					const extension : string = matchArr[0].replace(/^\./, ''); // remove starting '.'
+					const extension : string = matchArr[0];
 
 					const mimeMap = {
-						['bmp'] : 'image/bmp',
-						['css'] : 'text/css',
-						['gif'] : 'image/gif',
-						['htm'] : 'text/html',
-						['html'] : 'text/html',
-						['jpeg'] : 'image/jpeg',
-						['jpg'] : 'image/jpeg',
-						['js'] : 'text/javascript',
-						['json'] : 'application/json',
-						['pdf'] : 'application/pdf',
-						['png'] : 'image/png',
-						['txt'] : 'text/plain',
-						['text'] : 'text/plain',
-						['tif'] : 'image/tiff',
-						['tiff'] : 'image/tiff',
-						['xls'] : 'application/vnd.ms-excel',
-						['xlsx'] : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+						['.bmp'] : 'image/bmp',
+						['.css'] : 'text/css',
+						['.gif'] : 'image/gif',
+						['.htm'] : 'text/html',
+						['.html'] : 'text/html',
+						['.jpeg'] : 'image/jpeg',
+						['.jpg'] : 'image/jpeg',
+						['.js'] : 'text/javascript',
+						['.json'] : 'application/json',
+						['.pdf'] : 'application/pdf',
+						['.png'] : 'image/png',
+						['.txt'] : 'text/plain',
+						['.text'] : 'text/plain',
+						['.tif'] : 'image/tiff',
+						['.tiff'] : 'image/tiff',
+						['.xls'] : 'application/vnd.ms-excel',
+						['.xlsx'] : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 					};
 
 					if (!!mimeMap[extension]) {
@@ -629,7 +625,9 @@ export class Badak {
 				}
 
 				cacheSet = [{
-					uri : [uri, folderOrFileName].join('/'),
+					uri : node_path
+						.join(uri, folderOrFileName)
+						.replace(/\\/g, '/'), // path \\ changed to /
 					mime : mime,
 					fileData : await this._loadFile(fullPath)
 				}];
@@ -671,25 +669,15 @@ export class Badak {
 		}
 
 		// load static files
-		console.log('this._staticRules');
-		console.table(this._staticRules);
-
 		if (!!this._staticRules && this._staticRules.length > 0) {
 			const allCache : StaticCache[][] = await Promise.all<StaticCache[]>(this._staticRules.map(async (staticRule : StaticRule) : Promise<StaticCache[]> => {
 				return this._loadFolder(staticRule.uri, staticRule.path);
 			}));
 
-			console.log('allCache');
-			console.table(allCache);
-
 			allCache.forEach(oneCacheSet => [
 				this._staticCache.push(...oneCacheSet)
 			]);
 		}
-
-		console.log('staticCache');
-		console.table(this._staticCache);
-
 
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject) => {
@@ -732,8 +720,6 @@ export class Badak {
 						&& !!this._staticCache.find(one => {
 							return one.uri === uri;
 						});
-
-					console.log('isStaticCase :', isStaticCase);
 
 					if (isStaticCase) {
 						// static case
