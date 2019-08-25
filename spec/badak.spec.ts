@@ -717,7 +717,7 @@ describe('core', () => {
 
 				await app.listen(port);
 
-				await request(app.getHttpServer()).post(fullUri).expect(404);
+				await request(app.getHttpServer()).get(fullUri).expect(404);
 				await request(app.getHttpServer()).post(fullUri).expect(404);
 				await request(app.getHttpServer()).put(fullUri).expect(404);
 				await request(app.getHttpServer()).delete(fullUri).expect(404);
@@ -1009,12 +1009,146 @@ describe('core', () => {
 							expect(contentType).to.be.eql(mime);
 
 							expect(!!res.body || !!res.text).to.be.ok;
-						}),
-						await request(app.getHttpServer()).post(fullUri).expect(404);
+						});
+
+					await request(app.getHttpServer()).post(fullUri).expect(404);
 					await request(app.getHttpServer()).put(fullUri).expect(404);
 					await request(app.getHttpServer()).delete(fullUri).expect(404);
 				});
 			});
+		});
+	});
+
+	describe('setSPARoot()', () => {
+		const publicPath : string = path.join(__dirname, 'static', 'public');
+
+		it('defined', () => {
+			expect(app.setSPARoot).to.be.ok;
+		});
+
+		describe('error', () => {
+			// same with static()
+			describe('uri', () => {
+				it('no parameter', async () => {
+					await app.setSPARoot(undefined, '.')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('invalid parameter === null', async () => {
+					await app.setSPARoot(null, '.')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('not absolute path', async () => {
+					await app.setSPARoot('someUri', 'something')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('invalid path', async () => {
+					await app.setSPARoot('/some///thing', 'something')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+			});
+
+			describe('path', () => {
+				it('no parameter', async () => {
+					await app.setSPARoot('/', undefined)
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('invalid parameter === null', async () => {
+					await app.setSPARoot('/', null)
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('not absolute path', async () => {
+					await app.setSPARoot('/', 'something')
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+
+				it('not folder', async () => {
+					await app.setSPARoot('/', path.join(__dirname, 'static', 'test.txt'))
+						.then(fail, err => {
+							expect(err).to.be.ok;
+							expect(err).to.be.instanceof(Error);
+						});
+				});
+			});
+
+			it('not exist folder', async () => {
+				const folderPath = path.join(__dirname, '/static/notExistFolder');
+
+				return app.setSPARoot('/public', folderPath)
+					.then(fail, (err) => {
+						expect(err).to.be.ok;
+						expect(err).to.be.instanceof(Error);
+					});
+			});
+
+			it('no index.html', () => {
+				return app.setSPARoot('/public', path.join(__dirname, 'static'))
+					.then(fail, (err) => {
+						expect(err).to.be.ok;
+						expect(err).to.be.instanceof(Error);
+					});
+			});
+		});
+
+		it('ok', async () => {
+			const spaRoot : string = '/public';
+
+			await app.setSPARoot(spaRoot, publicPath);
+
+			await app.listen(port);
+
+			// await request(app.getHttpServer()).get(spaRoot + '/index.html').expect(200);
+			// await request(app.getHttpServer()).get(spaRoot + '/style.css').expect(200);
+
+			await request(app.getHttpServer()).get(spaRoot)
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(!!res.body || !!res.text).to.be.ok;
+				});
+			await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(!!res.body || !!res.text).to.be.ok;
+				});
 		});
 	});
 

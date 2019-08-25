@@ -526,7 +526,7 @@ export class Badak {
 		});
 	}
 
-	async static (uri : string, path : string) : Promise<void> {
+	private async _checkAbsoluteUri (uri : string) : Promise<void> {
 		if (!uri) {
 			throw new Error('no uri');
 		}
@@ -534,7 +534,21 @@ export class Badak {
 		if (!uri.startsWith('/')) {
 			throw new Error('uri should be start with slash(/)');
 		}
+	}
 
+	private async _isExistFile (path : string) : Promise<boolean> {
+		return new Promise<boolean>((resolve, reject) => {
+			fs.access(path, (err) => {
+				if (!err) {
+					resolve(true);
+				} else {
+					resolve(false);
+				}
+			});
+		});
+	}
+
+	private async _checkAbsolutePath (path : string) : Promise<void> {
 		if (!path) {
 			throw new Error('no path');
 		}
@@ -542,11 +556,9 @@ export class Badak {
 		if (!node_path.isAbsolute(path)) {
 			throw new Error('path should be absolute');
 		}
+	}
 
-		if (!await this._isFolder(path)) {
-			throw new Error('target should be a folder');
-		}
-
+	private async _static (uri : string, path : string) : Promise<void> {
 		// not assign to route rule
 		if (!this._staticRules) {
 			this._staticRules = [{ uri, path }];
@@ -555,11 +567,23 @@ export class Badak {
 		}
 	}
 
+	async static (uri : string, path : string) : Promise<void> {
+		await this._checkAbsoluteUri(uri);
+
+		await this._checkAbsolutePath(path);
+
+		if (!await this._isFolder(path)) {
+			throw new Error(`target should be a folder : ${ path }`);
+		}
+
+		this._static(uri, path);
+	}
+
 	async route (rule : RouteRule) : Promise<void> {
 		this._assignRule(rule);
 	}
 
-	async _isFolder (path : string) : Promise<boolean> {
+	private async _isFolder (path : string) : Promise<boolean> {
 		return new Promise<boolean>((resolve, reject) => {
 			fs.stat(path, (err : Error, stats : Stats) => {
 				if (!err) {
@@ -571,7 +595,7 @@ export class Badak {
 		});
 	}
 
-	async _loadFolder (uri : string, path : string) : Promise<StaticCache[]> {
+	private async _loadFolder (uri : string, path : string) : Promise<StaticCache[]> {
 		const foldersAndFiles : string[] = await new Promise<string[]>(async (resolve, reject) => {
 			fs.readdir(path, (err : Error, _foldersAndFiles : string[]) => {
 				if (!err) {
@@ -647,7 +671,7 @@ export class Badak {
 		return cache;
 	}
 
-	async _loadFile (path : string) : Promise<Buffer> {
+	private async _loadFile (path : string) : Promise<Buffer> {
 		return new Promise<Buffer>((resolve, reject) => {
 			fs.readFile(path, (err : Error, data : Buffer) => {
 				if (!err) {
@@ -656,6 +680,48 @@ export class Badak {
 					reject(new Error(`_loadFile() failed : ${ path }`));
 				}
 			});
+		});
+	}
+
+
+	// add folder to static & add route rule for Single Page Application
+	async setSPARoot (uri : string, path : string) : Promise<void> {
+		await this._checkAbsoluteUri(uri);
+
+		await this._checkAbsolutePath(path);
+
+		if (!await this._isFolder(path)) {
+			throw new Error(`target should be a folder : ${ path }`);
+		}
+
+		// check index.file exists
+		const indexExists : boolean = await this._isExistFile(node_path.join(path, 'index.html'));
+
+		if (!indexExists) {
+			throw new Error(`index.html not exists in : ${ path }`);
+		}
+
+		await this._static(uri, path);
+
+		this.get(`${ uri }/**`, async (param, req : IncomingMessage, res : ServerResponse) => {
+			// find index.html in static cache & return
+			const indexHtmlUrl : string = uri + '/index.html';
+
+			const targetCache : StaticCache = this._staticCache.find(cache => {
+				return cache.uri === indexHtmlUrl;
+			});
+
+			const resFileObj : {
+				mime : string;
+				fileData : any;
+			} = {
+				mime : targetCache.mime,
+				fileData : targetCache.fileData
+			};
+
+			res.setHeader('Content-Type', resFileObj.mime);
+			res.write(resFileObj.fileData);
+			res.end();
 		});
 	}
 
@@ -725,6 +791,7 @@ export class Badak {
 							return one.uri === uri;
 						});
 
+
 					if (isStaticCase) {
 						// static case
 						const targetCache : StaticCache = this._staticCache.find(one => {
@@ -764,8 +831,8 @@ export class Badak {
 
 								// find target function
 								// use 'for' instead of 'forEach' to break
-								for (let i = 0; i < uriArrLength; i++) {
-									const uriFrag : string = uriArr[i];
+								for (let j = 0; j < uriArrLength; j++) {
+									const uriFrag : string = uriArr[j];
 									const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
 
 									if (targetRouteObj[uriFrag] !== undefined) {
@@ -904,6 +971,16 @@ export class Badak {
 									// not found
 									targetRouteObj = null;
 									break;
+								}
+
+								// found, but for loop end
+								if (targetRouteObj !== null) {
+									// for SPA
+									const routeKeyArr : string[] = Object.keys(targetRouteObj);
+
+									if (routeKeyArr.includes('**') && !!targetRouteObj['**'][method]) {
+										targetFnc = targetRouteObj['**'][method];
+									}
 								}
 							}
 
