@@ -585,12 +585,18 @@ export class Badak {
 		const cache : StaticCache[] = [];
 
 		const allFileData : StaticCache[][] = await Promise.all(foldersAndFiles.map(async (folderOrFileName : string) : Promise<StaticCache[]> => {
+			const uriSanitized : string = node_path
+				.join(uri, folderOrFileName)
+				.replace(/\\/g, '/'); // path \\ changed to /
+
 			const fullPath : string = node_path.join(path, folderOrFileName);
 
 			let cacheSet : StaticCache[];
 
 			if (await this._isFolder(fullPath)) {
-				console.log('folder');
+				// call recursively
+				cacheSet = await this._loadFolder(uriSanitized, fullPath);
+
 			} else {
 				const matchArr : RegExpMatchArray = fullPath.match(/(\.[\w\d]+)?\.[\w\d]+$/);
 
@@ -625,9 +631,7 @@ export class Badak {
 				}
 
 				cacheSet = [{
-					uri : node_path
-						.join(uri, folderOrFileName)
-						.replace(/\\/g, '/'), // path \\ changed to /
+					uri : uriSanitized,
 					mime : mime,
 					fileData : await this._loadFile(fullPath)
 				}];

@@ -635,7 +635,7 @@ describe('core', () => {
 		// 	.end(done);
 	});
 
-	describe.only('static()', () => {
+	describe('static()', () => {
 		it('defined', () => {
 			expect(app.static).to.be.ok;
 		});
@@ -913,6 +913,31 @@ describe('core', () => {
 
 			await request(app.getHttpServer())
 				.get('/static/test.txt')
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					expect(!!res.body || !!res.text).to.be.ok;
+				});
+		});
+
+		it('nested folder', async () => {
+			const uri : string = '/static';
+
+			await app.static(uri, path.join(__dirname, 'static'));
+
+			await app.listen(port);
+
+			// check static cache
+			const staticCache : StaticCache[] = (app as any)._staticCache;
+
+			expect(staticCache).to.be.instanceof(Array);
+			expect(staticCache.length).to.be.above(0);
+
+			await request(app.getHttpServer())
+				.get('/static/nested/test.txt')
 				.expect(200)
 				.then((_res : any) : void => {
 					const res : Response = _res as Response;
