@@ -1,13 +1,11 @@
 import * as http from 'http';
 import { IncomingMessage, ServerResponse } from 'http';
 import { Server } from 'net';
-
 import * as node_path from 'path';
-import * as fs from 'fs';
-import { Stats } from 'fs';
 
 import { BadakOption, MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed, StaticCache, StaticRule } from './interfaces';
 import { Method } from './constants';
+import { checkAbsolutePath, checkAbsoluteUri, convertDateStr, convertNumberStr, isExistFile, isFolder, loadFolder } from './util';
 
 /**
  * rule format, reserved keyword is 4-methods in upper cases
@@ -373,45 +371,6 @@ export class Badak {
 
 	// parameter can be Object of string because request has string
 	private _paramConverter (param : Object) : Object {
-
-		// convert if number string
-		// if not number string, return itself
-		function convertNumberStr (param : any) : any {
-			let result : any = param;
-
-			if (!isNaN(+param)) {
-				result = +param;
-			}
-
-			return result;
-		}
-
-		// convert if date string
-		// if not date string, return itself
-		function convertDateStr (param : any) : any {
-			let result : any = param;
-
-			// only work for ISO 8601 date format
-			const dateExps : RegExp[] = [
-				/^(\d){4}-(\d){2}-(\d){2}$/, // date : '2018-06-20'
-				/^(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}\+(\d){2}:(\d){2}$/, // combined date and time in UTC : '2018-06-20T21:22:09+00:00'
-				/^(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}(.(\d){3})?Z$/, // combined date and time in UTC : '2018-06-20T21:22:09Z', '2018-06-20T22:00:30.296Z'
-				/^(\d){8}T(\d){6}Z$/, // combined date and time in UTC : '20180620T212209Z'
-				/^(\d){4}-W(\d){2}$/, // week : '2018-W25'
-				/^(\d){4}-W(\d){2}-(\d){1}$/, // date with week number : '2018-W25-3'
-				/^--(\d){2}-(\d){2}$/, // date without year : '--06-20'
-				/^(\d){4}-(\d){3}$/ // ordinal dates : '2018-171'
-			];
-
-			if (dateExps.some(dateExp => {
-				return dateExp.test(param);
-			})) {
-				result = new Date(param);
-			}
-
-			return result;
-		}
-
 		Object.keys(param).forEach((key) => {
 			// only work for string param
 			if (typeof param[key] === 'string') {
@@ -526,38 +485,6 @@ export class Badak {
 		});
 	}
 
-	private async _checkAbsoluteUri (uri : string) : Promise<void> {
-		if (!uri) {
-			throw new Error('no uri');
-		}
-
-		if (!uri.startsWith('/')) {
-			throw new Error('uri should be start with slash(/)');
-		}
-	}
-
-	private async _isExistFile (path : string) : Promise<boolean> {
-		return new Promise<boolean>((resolve, reject) => {
-			fs.access(path, (err) => {
-				if (!err) {
-					resolve(true);
-				} else {
-					resolve(false);
-				}
-			});
-		});
-	}
-
-	private async _checkAbsolutePath (path : string) : Promise<void> {
-		if (!path) {
-			throw new Error('no path');
-		}
-
-		if (!node_path.isAbsolute(path)) {
-			throw new Error('path should be absolute');
-		}
-	}
-
 	private async _static (uri : string, path : string) : Promise<void> {
 		// not assign to route rule
 		if (!this._staticRules) {
@@ -568,11 +495,11 @@ export class Badak {
 	}
 
 	async static (uri : string, path : string) : Promise<void> {
-		await this._checkAbsoluteUri(uri);
+		await checkAbsoluteUri(uri);
 
-		await this._checkAbsolutePath(path);
+		await checkAbsolutePath(path);
 
-		if (!await this._isFolder(path)) {
+		if (!await isFolder(path)) {
 			throw new Error(`target should be a folder : ${ path }`);
 		}
 
@@ -583,119 +510,18 @@ export class Badak {
 		this._assignRule(rule);
 	}
 
-	private async _isFolder (path : string) : Promise<boolean> {
-		return new Promise<boolean>((resolve, reject) => {
-			fs.stat(path, (err : Error, stats : Stats) => {
-				if (!err) {
-					resolve(stats.isDirectory());
-				} else {
-					reject(new Error(`_isFolder() failed : ${ path }`));
-				}
-			});
-		});
-	}
-
-	private async _loadFolder (uri : string, path : string) : Promise<StaticCache[]> {
-		const foldersAndFiles : string[] = await new Promise<string[]>(async (resolve, reject) => {
-			fs.readdir(path, (err : Error, _foldersAndFiles : string[]) => {
-				if (!err) {
-					resolve(_foldersAndFiles);
-				} else {
-					reject(new Error(`_loadFolder() failed : ${ path }`));
-				}
-			});
-		});
-
-		const cache : StaticCache[] = [];
-
-		const allFileData : StaticCache[][] = await Promise.all(foldersAndFiles.map(async (folderOrFileName : string) : Promise<StaticCache[]> => {
-			const uriSanitized : string = node_path
-				.join(uri, folderOrFileName)
-				.replace(/\\/g, '/'); // path \\ changed to /
-
-			const fullPath : string = node_path.join(path, folderOrFileName);
-
-			let cacheSet : StaticCache[];
-
-			if (await this._isFolder(fullPath)) {
-				// call recursively
-				cacheSet = await this._loadFolder(uriSanitized, fullPath);
-
-			} else {
-				const matchArr : RegExpMatchArray = fullPath.match(/(\.[\w\d]+)?\.[\w\d]+$/);
-
-				let mime : string = 'application/octet-stream'; // default
-
-				if (!!matchArr) {
-					const extension : string = matchArr[0];
-
-					const mimeMap = {
-						['.bmp'] : 'image/bmp',
-						['.css'] : 'text/css',
-						['.gif'] : 'image/gif',
-						['.htm'] : 'text/html',
-						['.html'] : 'text/html',
-						['.jpeg'] : 'image/jpeg',
-						['.jpg'] : 'image/jpeg',
-						['.js'] : 'text/javascript',
-						['.json'] : 'application/json',
-						['.pdf'] : 'application/pdf',
-						['.png'] : 'image/png',
-						['.txt'] : 'text/plain',
-						['.text'] : 'text/plain',
-						['.tif'] : 'image/tiff',
-						['.tiff'] : 'image/tiff',
-						['.xls'] : 'application/vnd.ms-excel',
-						['.xlsx'] : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-					};
-
-					if (!!mimeMap[extension]) {
-						mime = mimeMap[extension];
-					}
-				}
-
-				cacheSet = [{
-					uri : uriSanitized,
-					mime : mime,
-					fileData : await this._loadFile(fullPath)
-				}];
-			}
-
-			return cacheSet;
-		}));
-
-		allFileData.forEach((oneFileData, i) => {
-			cache.push(...oneFileData);
-		});
-
-		return cache;
-	}
-
-	private async _loadFile (path : string) : Promise<Buffer> {
-		return new Promise<Buffer>((resolve, reject) => {
-			fs.readFile(path, (err : Error, data : Buffer) => {
-				if (!err) {
-					resolve(data);
-				} else {
-					reject(new Error(`_loadFile() failed : ${ path }`));
-				}
-			});
-		});
-	}
-
-
 	// add folder to static & add route rule for Single Page Application
 	async setSPARoot (uri : string, path : string) : Promise<void> {
-		await this._checkAbsoluteUri(uri);
+		await checkAbsoluteUri(uri);
 
-		await this._checkAbsolutePath(path);
+		await checkAbsolutePath(path);
 
-		if (!await this._isFolder(path)) {
+		if (!await isFolder(path)) {
 			throw new Error(`target should be a folder : ${ path }`);
 		}
 
 		// check index.file exists
-		const indexExists : boolean = await this._isExistFile(node_path.join(path, 'index.html'));
+		const indexExists : boolean = await isExistFile(node_path.join(path, 'index.html'));
 
 		if (!indexExists) {
 			throw new Error(`index.html not exists in : ${ path }`);
@@ -741,7 +567,7 @@ export class Badak {
 		// load static files
 		if (!!this._staticRules && this._staticRules.length > 0) {
 			const allCache : StaticCache[][] = await Promise.all<StaticCache[]>(this._staticRules.map(async (staticRule : StaticRule) : Promise<StaticCache[]> => {
-				return this._loadFolder(staticRule.uri, staticRule.path);
+				return loadFolder(staticRule.uri, staticRule.path);
 			}));
 
 			allCache.forEach(oneCacheSet => [
