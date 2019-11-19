@@ -1020,7 +1020,13 @@ describe('core', () => {
 	});
 
 	describe('setSPARoot()', () => {
-		const publicPath : string = path.join(__dirname, 'static', 'public');
+		let publicPath : string;
+		let indexFileContents : string;
+
+		before(() => {
+			publicPath = path.join(__dirname, 'static', 'public');
+			indexFileContents = fs.readFileSync(path.join(publicPath, 'index.html')).toString();
+		});
 
 		it('defined', () => {
 			expect(app.setSPARoot).to.be.ok;
@@ -1115,7 +1121,46 @@ describe('core', () => {
 			});
 		});
 
-		it('ok', async () => {
+		it('ok - /', async () => {
+			const spaRoot : string = '/';
+
+			await app.setSPARoot(spaRoot, publicPath);
+
+			await app.listen(port);
+
+			// await request(app.getHttpServer()).get(spaRoot + '/index.html').expect(200);
+			// await request(app.getHttpServer()).get(spaRoot + '/style.css').expect(200);
+
+			await request(app.getHttpServer()).get(spaRoot)
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(res.text).to.be.eql(indexFileContents);
+				});
+
+			await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(res.text).to.be.eql(indexFileContents);
+				});
+		});
+
+		// TODO: with auth
+
+		it('ok - /public', async () => {
 			const spaRoot : string = '/public';
 
 			await app.setSPARoot(spaRoot, publicPath);
@@ -1135,8 +1180,9 @@ describe('core', () => {
 					const contentType : string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
-					expect(!!res.body || !!res.text).to.be.ok;
+					expect(res.text).to.be.eql(indexFileContents);
 				});
+
 			await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
 				.expect(200)
 				.then((_res : any) : void => {
@@ -1147,7 +1193,7 @@ describe('core', () => {
 					const contentType : string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
-					expect(!!res.body || !!res.text).to.be.ok;
+					expect(res.text).to.be.eql(indexFileContents);
 				});
 		});
 	});
