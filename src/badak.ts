@@ -635,30 +635,37 @@ export class Badak {
 
 					let targetRouteObj : RouteRule | RouteRuleSeed;
 
+					let withAuth : boolean = true;
+
 					for (let i = 0; i < routeRuleLength; i++) {
 						targetRouteObj = this._routeRule[i];
 
 						const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
 
+						// root deep link
+						if (!!this._spaRoot && this._spaRoot === '/' && !!routeRuleKeyArr.find(routeRuleKey => {
+							return routeRuleKey.includes('**');
+						})) {
+							// ** asterisk routing for root static SPA deep link
+							targetRouteObj = targetRouteObj['**'];
+
+							if (param === undefined) {
+								param = {};
+							}
+
+							param['**'] = '/';
+
+							if (!!targetRouteObj && !!targetRouteObj[method]) {
+								targetFnc = targetRouteObj[method];
+
+								withAuth = false;
+								break;
+							}
+						}
+
 						if (uri === '/') {
 							if (!!targetRouteObj['/'] && !!targetRouteObj['/'][method]) {
 								targetFnc = targetRouteObj['/'][method];
-							} else if (!!routeRuleKeyArr.find(routeRuleKey => {
-								return routeRuleKey.includes('**');
-							})) {
-								// ** asterisk routing for root static SPA
-								targetRouteObj = targetRouteObj['**'];
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								param['**'] = '/';
-
-								if (!!targetRouteObj && !!targetRouteObj[method]) {
-									targetFnc = targetRouteObj[method];
-								}
-								break;
 							}
 						} else {
 							// normal routing
@@ -679,6 +686,8 @@ export class Badak {
 
 										if (routeKeyArr.includes('**') && !!targetRouteObj['**'][method]) {
 											targetRouteObj = targetRouteObj['**'];
+
+											withAuth = false;
 											break;
 										}
 									}
@@ -842,7 +851,7 @@ export class Badak {
 							break;
 					}
 
-					if (!!this._authFnc) {
+					if (!!this._authFnc && withAuth) {
 						// can be normal or async function
 						try {
 							await this._authFnc(req, res);

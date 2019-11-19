@@ -1158,10 +1158,90 @@ describe('core', () => {
 				});
 		});
 
-		// TODO: with auth
-
 		it('ok - /public', async () => {
 			const spaRoot : string = '/public';
+
+			await app.setSPARoot(spaRoot, publicPath);
+
+			await app.listen(port);
+
+			// await request(app.getHttpServer()).get(spaRoot + '/index.html').expect(200);
+			// await request(app.getHttpServer()).get(spaRoot + '/style.css').expect(200);
+
+			await request(app.getHttpServer()).get(spaRoot)
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(res.text).to.be.eql(indexFileContents);
+				});
+
+			await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(res.text).to.be.eql(indexFileContents);
+				});
+		});
+
+		it('ok - / without auth', async () => {
+			const spaRoot : string = '/';
+
+			await app.auth(() => {
+				throw new Error('should be pass this function');
+			});
+
+			await app.setSPARoot(spaRoot, publicPath);
+
+			await app.listen(port);
+
+			// await request(app.getHttpServer()).get(spaRoot + '/index.html').expect(200);
+			// await request(app.getHttpServer()).get(spaRoot + '/style.css').expect(200);
+
+			await request(app.getHttpServer()).get(spaRoot)
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(res.text).to.be.eql(indexFileContents);
+				});
+
+			await request(app.getHttpServer()).get(spaRoot + 'somethingDeepLink')
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(res.text).to.be.eql(indexFileContents);
+				});
+		});
+
+		it('ok - /public without auth', async () => {
+			const spaRoot : string = '/public';
+
+			await app.auth(() => {
+				throw new Error('should be pass this function');
+			});
 
 			await app.setSPARoot(spaRoot, publicPath);
 
