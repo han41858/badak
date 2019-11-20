@@ -3,7 +3,17 @@ import { IncomingMessage, ServerResponse } from 'http';
 import { Server } from 'net';
 import * as node_path from 'path';
 
-import { BadakOption, MiddlewareFunction, RouteFunction, RouteRule, RouteRuleSeed, StaticCache, StaticRule } from './interfaces';
+import {
+	BadakOption,
+	MiddlewareFunction,
+	RouteFunction,
+	RouteFunctionObj,
+	RouteOption,
+	RouteRule,
+	RouteRuleSeed,
+	StaticCache,
+	StaticRule
+} from './interfaces';
 import { Method } from './constants';
 import { checkAbsolutePath, checkAbsoluteUri, convertDateStr, convertNumberStr, isExistFile, isFolder, loadFolder } from './util';
 
@@ -327,46 +337,58 @@ export class Badak {
 	}
 
 	// route abbreviation
-	async get (address : string, fnc : RouteFunction) : Promise<void> {
+	async get (address : string, fnc : RouteFunction, option? : RouteOption) : Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
 		this._assignRule({
 			[address] : {
-				[Method.GET] : fnc
+				[Method.GET] : {
+					fnc : fnc,
+					option : option
+				}
 			}
 		});
 	}
 
-	async post (address : string, fnc : RouteFunction) : Promise<void> {
+	async post (address : string, fnc : RouteFunction, option? : RouteOption) : Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
 		this._assignRule({
 			[address] : {
-				[Method.POST] : fnc
+				[Method.POST] : {
+					fnc : fnc,
+					option : option
+				}
 			}
 		});
 	}
 
-	async put (address : string, fnc : RouteFunction) : Promise<void> {
+	async put (address : string, fnc : RouteFunction, option? : RouteOption) : Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
 		this._assignRule({
 			[address] : {
-				[Method.PUT] : fnc
+				[Method.PUT] : {
+					fnc : fnc,
+					option : option
+				}
 			}
 		});
 	}
 
-	async delete (address : string, fnc : RouteFunction) : Promise<void> {
+	async delete (address : string, fnc : RouteFunction, option? : RouteOption) : Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
 		this._assignRule({
 			[address] : {
-				[Method.DELETE] : fnc
+				[Method.DELETE] : {
+					fnc : fnc,
+					option : option
+				}
 			}
 		});
 	}
@@ -561,6 +583,8 @@ export class Badak {
 						res.setHeader('Content-Type', oneCache.mime);
 						res.write(oneCache.fileData);
 						res.end();
+					}, {
+						auth : false
 					});
 				});
 			});
@@ -588,6 +612,8 @@ export class Badak {
 					res.setHeader('Content-Type', resFileObj.mime);
 					res.write(resFileObj.fileData);
 					res.end();
+				}, {
+					auth : false
 				});
 			}
 		}
@@ -628,14 +654,12 @@ export class Badak {
 						throw new Error('no rule');
 					}
 
-					let targetFnc : RouteFunction;
+					let targetFncObj : RouteFunction | RouteFunctionObj;
 					let param : any;
 
 					let routeRuleLength : number = this._routeRule.length;
 
 					let targetRouteObj : RouteRule | RouteRuleSeed;
-
-					let withAuth : boolean = true;
 
 					for (let i = 0; i < routeRuleLength; i++) {
 						targetRouteObj = this._routeRule[i];
@@ -656,16 +680,14 @@ export class Badak {
 							param['**'] = '/';
 
 							if (!!targetRouteObj && !!targetRouteObj[method]) {
-								targetFnc = targetRouteObj[method];
-
-								withAuth = false;
+								targetFncObj = targetRouteObj[method];
 								break;
 							}
 						}
 
 						if (uri === '/') {
 							if (!!targetRouteObj['/'] && !!targetRouteObj['/'][method]) {
-								targetFnc = targetRouteObj['/'][method];
+								targetFncObj = targetRouteObj['/'][method];
 							}
 						} else {
 							// normal routing
@@ -686,8 +708,6 @@ export class Badak {
 
 										if (routeKeyArr.includes('**') && !!targetRouteObj['**'][method]) {
 											targetRouteObj = targetRouteObj['**'];
-
-											withAuth = false;
 											break;
 										}
 									}
@@ -829,13 +849,13 @@ export class Badak {
 						}
 
 						if (!!targetRouteObj && !!targetRouteObj[method]) {
-							targetFnc = targetRouteObj[method];
+							targetFncObj = targetRouteObj[method];
 
 							break;
 						}
 					}
 
-					if (targetFnc === undefined) {
+					if (targetFncObj === undefined) {
 						throw new Error('no rule');
 					}
 
@@ -851,7 +871,12 @@ export class Badak {
 							break;
 					}
 
-					if (!!this._authFnc && withAuth) {
+					if (!!this._authFnc
+						&& (
+							targetFncObj instanceof Function ||
+							(!(targetFncObj as RouteFunctionObj).option || ((targetFncObj as RouteFunctionObj).option.auth !== false))
+						)
+					) {
 						// can be normal or async function
 						try {
 							await this._authFnc(req, res);
@@ -860,7 +885,10 @@ export class Badak {
 							throw new Error('auth failed');
 						}
 					}
-					const resObj : any = await targetFnc(param, req, res);
+
+					const resObj : any = targetFncObj instanceof Function ?
+						await targetFncObj(param, req, res) :
+						await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
 					if (!!resObj) {
 						// check result is json

@@ -1128,8 +1128,6 @@ describe('core', () => {
 
 			await app.listen(port);
 
-			// await request(app.getHttpServer()).get(spaRoot + '/index.html').expect(200);
-			// await request(app.getHttpServer()).get(spaRoot + '/style.css').expect(200);
 
 			await request(app.getHttpServer()).get(spaRoot)
 				.expect(200)
@@ -1165,8 +1163,6 @@ describe('core', () => {
 
 			await app.listen(port);
 
-			// await request(app.getHttpServer()).get(spaRoot + '/index.html').expect(200);
-			// await request(app.getHttpServer()).get(spaRoot + '/style.css').expect(200);
 
 			await request(app.getHttpServer()).get(spaRoot)
 				.expect(200)
@@ -1206,10 +1202,20 @@ describe('core', () => {
 
 			await app.listen(port);
 
-			// await request(app.getHttpServer()).get(spaRoot + '/index.html').expect(200);
-			// await request(app.getHttpServer()).get(spaRoot + '/style.css').expect(200);
-
 			await request(app.getHttpServer()).get(spaRoot)
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(res.text).to.be.eql(indexFileContents);
+				});
+
+			await request(app.getHttpServer()).get(spaRoot + 'index.html')
 				.expect(200)
 				.then((_res : any) : void => {
 					const res : Response = _res as Response;
@@ -1247,10 +1253,21 @@ describe('core', () => {
 
 			await app.listen(port);
 
-			// await request(app.getHttpServer()).get(spaRoot + '/index.html').expect(200);
-			// await request(app.getHttpServer()).get(spaRoot + '/style.css').expect(200);
 
 			await request(app.getHttpServer()).get(spaRoot)
+				.expect(200)
+				.then((_res : any) : void => {
+					const res : Response = _res as Response;
+
+					expect(res).to.be.ok;
+
+					const contentType : string = res.headers['content-type'];
+					expect(contentType).to.be.eql('text/html');
+
+					expect(res.text).to.be.eql(indexFileContents);
+				});
+
+			await request(app.getHttpServer()).get(spaRoot + '/index.html')
 				.expect(200)
 				.then((_res : any) : void => {
 					const res : Response = _res as Response;

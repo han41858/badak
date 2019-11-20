@@ -9,11 +9,20 @@ export interface RouteRule {
 	[uri : string] : RouteRule | RouteRuleSeed | Function; // function can be assigned after config('defaultMethod', [method_type])
 }
 
+export interface RouteOption {
+	auth : boolean;
+}
+
+export interface RouteFunctionObj {
+	fnc : RouteFunction;
+	option? : RouteOption;
+}
+
 export interface RouteRuleSeed {
-	GET? : RouteFunction;
-	POST? : RouteFunction;
-	PUT? : RouteFunction;
-	DELETE? : RouteFunction;
+	GET? : RouteFunctionObj;
+	POST? : RouteFunctionObj;
+	PUT? : RouteFunctionObj;
+	DELETE? : RouteFunctionObj;
 }
 
 export interface BadakOption {
