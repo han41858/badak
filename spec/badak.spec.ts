@@ -3026,165 +3026,180 @@ describe('core', () => {
 			// * : all uri fragment
 			// ab*cd : abcd, abxcd, abblahcd
 			describe('asterisk routing', () => {
-				it('**', async () => {
-					const testUri = '**';
-					let checkCount = 0;
+				let validUrls : string[] = [];
+				let invalidUrls : string[] = [];
+				let calledUri : string[] = [];
 
-					let testFncRunCount = 0;
+				beforeEach(() => {
+					validUrls = [];
+					invalidUrls = [];
+					calledUri = [];
+				});
 
-					const testFnc = (param) => {
+				afterEach(async () => {
+					await Promise.all(validUrls.map(async testUri => {
+						return request(app.getHttpServer())
+							.get(testUri)
+							.expect(200);
+					}));
+
+					validUrls.forEach(testUri => {
+						expect(calledUri).to.include(testUri);
+					});
+
+					await Promise.all(invalidUrls.map(async testUri => {
+						return request(app.getHttpServer())
+							.get(testUri)
+							.expect(404);
+					}));
+				});
+
+				describe('**', () => {
+					const testFnc = (param, req) => {
 						expect(param).to.be.ok;
 						expect(param).to.have.property('**');
 
-						testFncRunCount++;
+						calledUri.push(req.url);
 					};
 
-					await app.route({
-						[testUri] : {
-							'GET' : testFnc
-						}
+					[
+						'',
+						'/nested'
+					].forEach(prefix => {
+						it(prefix + '/**', async () => {
+							await app.route({
+								[prefix + '/**'] : {
+									'GET' : testFnc
+								}
+							});
+
+							await app.listen(port);
+
+							const routeRule : RouteRule = (app as any)._routeRule;
+							expect(routeRule).to.be.instanceof(Array);
+							expect(routeRule).to.be.lengthOf(1);
+
+							validUrls.push(
+								`${ prefix }/a`,
+								`${ prefix }/b`,
+								`${ prefix }/a/b/c/d/e/f/g`
+							);
+						});
 					});
-
-					const appRouteRule : RouteRule[] = (app as any)._routeRule;
-
-					expect(appRouteRule).to.be.instanceof(Array);
-					expect(appRouteRule).to.be.lengthOf(1);
-					expect(appRouteRule[0]).to.have.property('**');
-
-					await app.listen(port);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					await request(app.getHttpServer())
-						.get('/abcd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					await request(app.getHttpServer())
-						.get('/abbcd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					await request(app.getHttpServer())
-						.get('/abbecd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					await request(app.getHttpServer())
-						.get('/abbasdflkjsaecd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					// inner rule
-					await request(app.getHttpServer())
-						.get('/ab/cd/e')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
 				});
 
-				it('*', async () => {
-					const testUri = '*';
-					let checkCount = 0;
-
-					let testFncRunCount = 0;
-
-					const testFnc = (param) => {
+				describe('*', () => {
+					const testFnc = (param, req) => {
 						expect(param).to.be.ok;
 						expect(param).to.have.property('*');
 
-						testFncRunCount++;
+						calledUri.push(req.url);
 					};
 
-					await app.route({
-						[testUri] : {
-							'GET' : testFnc
-						}
+					describe('last frag', () => {
+						[
+							'',
+							'/nested'
+						].forEach((prefix, i) => {
+							it(prefix + '/*', async () => {
+								await app.route({
+									[prefix + '/*'] : {
+										'GET' : testFnc
+									}
+								});
+
+								await app.listen(port);
+
+								const routeRule : RouteRule = (app as any)._routeRule;
+								expect(routeRule).to.be.instanceof(Array);
+								expect(routeRule).to.be.lengthOf(1);
+
+								validUrls.push(
+									`${ prefix }/a`,
+									`${ prefix }/b`
+								);
+
+								invalidUrls.push(
+									`${ prefix }/a/c`
+								);
+							});
+						});
 					});
 
-					const appRouteRule : RouteRule[] = (app as any)._routeRule;
+					describe('in the middle', () => {
+						[
+							'',
+							'/nested'
+						].forEach(prefix => {
+							it(prefix + '/*/a', async () => {
+								await app.route({
+									[prefix + '/*/a'] : {
+										'GET' : testFnc
+									}
+								});
 
-					expect(appRouteRule).to.be.instanceof(Array);
-					expect(appRouteRule).to.be.lengthOf(1);
-					expect(appRouteRule[0]).to.have.property('*');
+								await app.listen(port);
 
-					await app.listen(port);
+								const routeRule : RouteRule = (app as any)._routeRule;
+								expect(routeRule).to.be.instanceof(Array);
+								expect(routeRule).to.be.lengthOf(1);
 
-					expect(testFncRunCount).to.be.eql(checkCount++);
+								validUrls.push(
+									`${ prefix }/a/a`,
+									`${ prefix }/b/a`
+								);
 
-					await request(app.getHttpServer())
-						.get('/abcd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					// TODO:
-					// // inner rule
-					// await request(app.getHttpServer())
-					// 	.get('/ab/cd/e')
-					// 	.expect(200);
-					//
-					// expect(testFncRunCount).to.be.eql(checkCount++);
+								invalidUrls.push(
+									`${ prefix }/a`
+								);
+							});
+						});
+					});
 				});
 
-				it('partial *', async () => {
-					const testUri = 'ab*cd';
-					let checkCount = 0;
+				describe('partial *', () => {
+					const testFrag = 'ab*cd';
 
-					let testFncRunCount = 0;
-					const testFnc = (param) => {
+					const testFnc = (param, req) => {
 						expect(param).to.be.ok;
 
-						const regExpKey : string = param[testUri].replace('*', '(\\w)*');
-						expect(param[testUri]).to.be.ok;
-						expect(new RegExp(regExpKey).test(param[testUri])).to.be.true;
+						const regExpKey : string = param[testFrag].replace('*', '(\\w)*');
+						expect(param[testFrag]).to.be.ok;
+						expect(new RegExp(regExpKey).test(param[testFrag])).to.be.true;
 
-						testFncRunCount++;
+						calledUri.push(req.url);
 					};
 
-					await app.route({
-						[testUri] : {
-							'GET' : testFnc
-						}
+					[
+						// '',
+						'/nested'
+					].forEach(prefix => {
+						it(prefix + '/ab*cd', async () => {
+							await app.route({
+								[`${ prefix }/${ testFrag }`] : {
+									'GET' : testFnc
+								}
+							});
+
+							await app.listen(port);
+
+							const routeRule : RouteRule = (app as any)._routeRule;
+							expect(routeRule).to.be.instanceof(Array);
+							expect(routeRule).to.be.lengthOf(1);
+
+							validUrls.push(
+								prefix + '/abcd',
+								prefix + '/abbcd',
+								prefix + '/abbecd',
+								prefix + '/abbasdflkjsaecd'
+							);
+
+							invalidUrls.push(
+								prefix + '/a',
+								prefix + '/bd'
+							);
+						});
 					});
-
-					const appRouteRule : RouteRule[] = (app as any)._routeRule;
-
-					expect(appRouteRule).to.be.instanceof(Array);
-					expect(appRouteRule).to.be.lengthOf(1);
-					expect(appRouteRule[0]).to.have.property(testUri);
-
-					await app.listen(port);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					await request(app.getHttpServer())
-						.get('/abcd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					await request(app.getHttpServer())
-						.get('/abbcd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					await request(app.getHttpServer())
-						.get('/abbecd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
-
-					await request(app.getHttpServer())
-						.get('/abbasdflkjsaecd')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(checkCount++);
 				});
 			});
 

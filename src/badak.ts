@@ -664,30 +664,10 @@ export class Badak {
 					for (let i = 0; i < routeRuleLength; i++) {
 						targetRouteObj = this._routeRule[i];
 
-						const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
-
-						// root deep link
-						if (!!this._spaRoot && this._spaRoot === '/' && !!routeRuleKeyArr.find(routeRuleKey => {
-							return routeRuleKey.includes('**');
-						})) {
-							// ** asterisk routing for root static SPA deep link
-							targetRouteObj = targetRouteObj['**'];
-
-							if (param === undefined) {
-								param = {};
-							}
-
-							param['**'] = '/';
-
-							if (!!targetRouteObj && !!targetRouteObj[method]) {
-								targetFncObj = targetRouteObj[method];
-								break;
-							}
-						}
-
 						if (uri === '/') {
 							if (!!targetRouteObj['/'] && !!targetRouteObj['/'][method]) {
 								targetFncObj = targetRouteObj['/'][method];
+								break;
 							}
 						} else {
 							// normal routing
@@ -697,26 +677,18 @@ export class Badak {
 							// find target function
 							// use 'for' instead of 'forEach' to break
 							for (let j = 0; j < uriArrLength; j++) {
+								const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
 								const uriFrag : string = uriArr[j];
 
+								// normal routing
 								if (targetRouteObj[uriFrag] !== undefined) {
 									targetRouteObj = targetRouteObj[uriFrag];
-
-									if (!!this._spaRoot) {
-										// for SPA deep link
-										const routeKeyArr : string[] = Object.keys(targetRouteObj);
-
-										if (routeKeyArr.includes('**') && !!targetRouteObj['**'][method]) {
-											targetRouteObj = targetRouteObj['**'];
-											break;
-										}
-									}
 
 									continue;
 								}
 
 								// colon routing
-								const colonParam : string = Object.keys(targetRouteObj).find(_uriFrag => _uriFrag.startsWith(':'));
+								const colonParam : string = routeRuleKeyArr.find(_uriFrag => _uriFrag.startsWith(':'));
 
 								if (colonParam !== undefined) {
 									targetRouteObj = targetRouteObj[colonParam];
@@ -791,12 +763,49 @@ export class Badak {
 									continue;
 								}
 
-								// asterisk routing
-								const asteriskKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-									return routeRuleKey.includes('*');
-								});
+								// partial asterisk routing
+								const targetAsteriskKey : string = routeRuleKeyArr
+									.filter(routeRuleKey => {
+										return /.\*./.test(routeRuleKey);
+									})
+									.find(asteriskKey => {
+										// replace '*' to '(.)*'
+										return new RegExp(
+											asteriskKey.replace('*', '(.)*')
+										).test(uriFrag);
+									});
 
-								if (asteriskKeyArr.includes('**')) {
+								if (targetAsteriskKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetAsteriskKey];
+
+									if (param === undefined) {
+										param = {};
+									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(targetAsteriskKey);
+									param[targetAsteriskKey] = uriFrag;
+
+									continue;
+								}
+
+								// * / ** asterisk routing include child route
+								const childRouteRuleKeyArr : string[] = Object.keys(targetRouteObj);
+
+								if (routeRuleKeyArr.includes('*') || childRouteRuleKeyArr.includes('*')) {
+									targetRouteObj = targetRouteObj['*'];
+
+									if (param === undefined) {
+										param = {};
+									}
+
+									param['*'] = uriFrag;
+
+									continue;
+								} else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
 									targetRouteObj = targetRouteObj['**'];
 
 									if (param === undefined) {
@@ -807,39 +816,6 @@ export class Badak {
 
 									// ignore after uri
 									break;
-								} else if (asteriskKeyArr.includes('*')) {
-									targetRouteObj = targetRouteObj['*'];
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									param['*'] = uriFrag;
-
-									// continue after uri
-									continue;
-								} else {
-									const targetAsteriskKey : string = asteriskKeyArr.find(asteriskKey => {
-										// replace '*' to '\\w*'
-										return new RegExp(asteriskKey.replace('*', '\\w*')).test(uriFrag);
-									});
-
-									if (targetAsteriskKey !== undefined) {
-										targetRouteObj = targetRouteObj[targetAsteriskKey];
-
-										if (param === undefined) {
-											param = {};
-										}
-
-										// if (param.matcher === undefined) {
-										// 	param.matcher = [];
-										// }
-
-										// param.matcher.push(targetAsteriskKey);
-										param[targetAsteriskKey] = uriFrag;
-
-										continue;
-									}
 								}
 
 								// not found
