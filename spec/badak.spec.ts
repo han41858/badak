@@ -462,15 +462,18 @@ describe('core', () => {
 
 						methods.forEach((testMethod, j) => {
 							it('test ' + testMethod, async () => {
-								const appRouteRule : RouteRule[] = (app as any)._routeRule;
+								const routeRules : RouteRule[] = (app as any)._routeRules;
 
-								expect(appRouteRule).to.be.ok;
-								expect(appRouteRule).to.be.instanceof(Array);
+								expect(routeRules).to.be.ok;
+								expect(routeRules).to.be.instanceof(Array);
+								expect(routeRules).to.be.lengthOf(1);
 
-								const targetRouteRule : RouteRule = appRouteRule[0];
+								expect(routeRules[0]).to.be.ok;
+								expect(routeRules[0]).to.be.instanceof(Object);
+								expect(routeRules[0]).to.have.property('/');
 
-								expect(targetRouteRule).to.have.property(testUriRefined);
-								expect(targetRouteRule[testUriRefined]).to.have.property(setMethod);
+								expect(routeRules[0]['/']).to.have.property(testUriRefined);
+								expect(routeRules[0]['/'][testUriRefined]).to.have.property(setMethod);
 
 								await getReqFnc(testMethod)
 									.expect(setMethod === testMethod ? 200 : 404);
@@ -1495,20 +1498,24 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = (app as any)._routeRule;
+				const routeRules = (app as any)._routeRules;
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				expect(routeRule).to.be.ok;
-				expect(routeRule).to.be.instanceof(Array);
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				const targetRule : RouteRuleSeed = routeRule.find(one => {
-					return one['users'] !== undefined;
-				});
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.have.property('users');
 
-				expect(targetRule['users']).to.be.ok;
-				expect(targetRule['users']).to.be.instanceof(Object);
-				expect(targetRule['users']).to.have.property('GET');
+				expect(routeRules[0]['/']['users']).to.be.ok;
+				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
-				const routeFnc = targetRule['users']['GET'];
+				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
 				expect(routeFnc).to.be.instanceof(Function);
 				expect(routeFnc).to.eql(testFnc);
@@ -1533,20 +1540,24 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = (app as any)._routeRule;
+				const routeRules = (app as any)._routeRules;
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				expect(routeRule).to.be.ok;
-				expect(routeRule).to.be.instanceof(Array);
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				const targetRule : RouteRuleSeed = routeRule.find(one => {
-					return one['users'] !== undefined;
-				});
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.have.property('users');
 
-				expect(targetRule['users']).to.be.ok;
-				expect(targetRule['users']).to.be.instanceof(Object);
-				expect(targetRule['users']).to.have.property('GET');
+				expect(routeRules[0]['/']['users']).to.be.ok;
+				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
-				const routeFnc = targetRule['users']['GET'];
+				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
 				expect(routeFnc).to.be.instanceof(Function);
 				expect(routeFnc).to.eql(testFnc);
@@ -1610,20 +1621,24 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = (app as any)._routeRule;
+				const routeRules : RouteRule = (app as any)._routeRules;
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				expect(routeRule).to.be.ok;
-				expect(routeRule).to.be.instanceof(Array);
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				const targetRule : RouteRuleSeed = routeRule.find(one => {
-					return one['users'] !== undefined;
-				});
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.have.property('users');
 
-				expect(targetRule['users']).to.be.ok;
-				expect(targetRule['users']).to.be.instanceof(Object);
-				expect(targetRule['users']).to.have.property('GET');
+				expect(routeRules[0]['/']['users']).to.be.ok;
+				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
-				const routeFnc = targetRule['users']['GET'];
+				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
 				expect(routeFnc).to.be.instanceof(Function);
 				expect(routeFnc).to.eql(testFnc);
@@ -1646,20 +1661,24 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = (app as any)._routeRule;
+				const routeRules : RouteRule = (app as any)._routeRules;
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				expect(routeRule).to.be.ok;
-				expect(routeRule).to.be.instanceof(Array);
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				const targetRule : RouteRuleSeed = routeRule.find(one => {
-					return one['users'] !== undefined;
-				});
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.have.property('users');
 
-				expect(targetRule['users']).to.be.ok;
-				expect(targetRule['users']).to.be.instanceof(Object);
-				expect(targetRule['users']).to.have.property('GET');
+				expect(routeRules[0]['/']['users']).to.be.ok;
+				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
-				const routeFnc = targetRule['users']['GET'];
+				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
 				expect(routeFnc).to.be.instanceof(Function);
 				expect(routeFnc).to.eql(testFnc);
@@ -1682,20 +1701,24 @@ describe('core', () => {
 					}
 				});
 
-				const routeRule = (app as any)._routeRule;
+				const routeRules : RouteRule = (app as any)._routeRules;
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				expect(routeRule).to.be.ok;
-				expect(routeRule).to.be.instanceof(Array);
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				const targetRule : RouteRuleSeed = routeRule.find(one => {
-					return one['users'] !== undefined;
-				});
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.have.property('users');
 
-				expect(targetRule['users']).to.be.ok;
-				expect(targetRule['users']).to.be.instanceof(Object);
-				expect(targetRule['users']).to.have.property('GET');
+				expect(routeRules[0]['/']['users']).to.be.ok;
+				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
-				const routeFnc = targetRule['users']['GET'];
+				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
 				expect(routeFnc).to.be.instanceof(Function);
 				expect(routeFnc).to.eql(testFnc);
@@ -1798,24 +1821,25 @@ describe('core', () => {
 					}
 				});
 
-				expect((app as any)._routeRule).to.be.ok;
-				expect((app as any)._routeRule).to.be.instanceof(Array);
-				expect((app as any)._routeRule).to.be.lengthOf(2);
+				const routeRules : RouteRule[] = (app as any)._routeRules;
 
-				const routeRuleA : RouteRuleSeed = (app as any)._routeRule[0];
-				const routeRuleB : RouteRuleSeed = (app as any)._routeRule[1];
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(2);
 
-				(app as any)._routeRule.forEach((rule, i) => {
-					expect(rule).to.have.property('users');
-					expect(rule['users']).to.be.instanceof(Object);
+				routeRules.forEach((rule, i) => {
+					expect(rule).to.have.property('/');
+
+					expect(rule['/']).to.have.property('users');
+					expect(rule['/']['users']).to.be.instanceof(Object);
 
 					switch (i) {
 						case 0:
-							expect(rule['users']).to.have.property('GET', fncA);
+							expect(rule['/']['users']).to.have.property('GET', fncA);
 							break;
 
 						case 1:
-							expect(rule['users']).to.have.property('POST', fncB);
+							expect(rule['/']['users']).to.have.property('POST', fncB);
 							break;
 					}
 				});
@@ -1841,24 +1865,28 @@ describe('core', () => {
 					}
 				});
 
-				const appRouteRule : RouteRule[] = (app as any)._routeRule;
+				const routeRules : RouteRule[] = (app as any)._routeRules;
 
-				expect(appRouteRule).to.be.ok;
-				expect(appRouteRule).to.be.instanceof(Array);
-				expect(appRouteRule).to.be.lengthOf(1);
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				const targetRouteRule : RouteRule = appRouteRule[0];
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				expect(targetRouteRule).to.have.property('users');
-				expect(targetRouteRule['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.ok;
+				;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.have.property('users');
 
-				expect(targetRouteRule['users']).to.have.property('a');
-				expect(targetRouteRule['users']['a']).to.be.instanceof(Object);
-				expect(targetRouteRule['users']['a']).to.have.property('GET', fncA);
+				expect(routeRules[0]['/']['users']).to.have.property('a');
+				expect(routeRules[0]['/']['users']['a']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']['a']).to.have.property('GET', fncA);
 
-				expect(targetRouteRule['users']).to.have.property('b');
-				expect(targetRouteRule['users']['b']).to.be.instanceof(Object);
-				expect(targetRouteRule['users']['b']).to.have.property('GET', fncB);
+				expect(routeRules[0]['/']['users']).to.have.property('b');
+				expect(routeRules[0]['/']['users']['b']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']['b']).to.have.property('GET', fncB);
 
 				await app.listen(port);
 
@@ -1895,21 +1923,26 @@ describe('core', () => {
 					}
 				});
 
-				const appRouteRule : RouteRule[] = (app as any)._routeRule;
+				const routeRules : RouteRule[] = (app as any)._routeRules;
 
-				expect(appRouteRule).to.be.ok;
-				expect(appRouteRule).to.be.instanceof(Array);
-				expect(appRouteRule).to.be.lengthOf(1);
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				const targetRouteRule : RouteRule = appRouteRule[0];
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				expect(targetRouteRule).to.have.property('users');
-				expect(targetRouteRule['users']).to.be.instanceof(Object);
-				expect(targetRouteRule['users']).to.have.property('GET', usersGetFnc);
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
 
-				expect(targetRouteRule).to.have.property('records');
-				expect(targetRouteRule['records']).to.be.instanceof(Object);
-				expect(targetRouteRule['records']).to.have.property('GET', recordsGetFnc);
+				expect(routeRules[0]['/']).to.have.property('users');
+				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.have.property('GET', usersGetFnc);
+
+				expect(routeRules[0]['/']).to.have.property('records');
+				expect(routeRules[0]['/']['records']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['records']).to.have.property('GET', recordsGetFnc);
 
 				await app.listen(port);
 
@@ -1953,25 +1986,31 @@ describe('core', () => {
 					}
 				});
 
-				const appRouteRule : RouteRule[] = (app as any)._routeRule;
+				const routeRules : RouteRule[] = (app as any)._routeRules;
 
-				expect(appRouteRule).to.be.ok;
-				expect(appRouteRule).to.be.instanceof(Array);
-				expect(appRouteRule).to.be.lengthOf(1);
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				const targetRouteRule : RouteRule = appRouteRule[0];
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				expect(targetRouteRule).to.have.property('root');
-				expect(targetRouteRule['root']).to.be.instanceof(Object);
-				expect(targetRouteRule['root']).to.have.property('GET', fnc1);
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.have.property('root');
 
-				expect(targetRouteRule['root']).to.have.property('branch1');
-				expect(targetRouteRule['root']['branch1']).to.be.instanceof(Object);
-				expect(targetRouteRule['root']['branch1']).to.have.property('GET', fnc2);
+				expect(routeRules[0]['/']['root']).to.be.ok;
+				expect(routeRules[0]['/']['root']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['root']).to.have.property('GET', fnc1);
 
-				expect(targetRouteRule['root']['branch1']).to.have.property('branch2');
-				expect(targetRouteRule['root']['branch1']['branch2']).to.be.instanceof(Object);
-				expect(targetRouteRule['root']['branch1']['branch2']).to.have.property('GET', fnc3);
+				expect(routeRules[0]['/']['root']).to.have.property('branch1');
+				expect(routeRules[0]['/']['root']['branch1']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['root']['branch1']).to.have.property('GET', fnc2);
+
+				expect(routeRules[0]['/']['root']['branch1']).to.have.property('branch2');
+				expect(routeRules[0]['/']['root']['branch1']['branch2']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['root']['branch1']['branch2']).to.have.property('GET', fnc3);
 
 				await app.listen(port);
 
@@ -2036,27 +2075,32 @@ describe('core', () => {
 					}
 				});
 
-				const appRouteRule : RouteRule[] = (app as any)._routeRule;
+				const routeRules : RouteRule[] = (app as any)._routeRules;
 
-				expect(appRouteRule).to.be.ok;
-				expect(appRouteRule).to.be.instanceof(Array);
-				expect(appRouteRule).to.be.lengthOf(1);
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				const targetRouteRule : RouteRule = appRouteRule[0];
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				expect(targetRouteRule).to.have.property('users');
-				expect(targetRouteRule['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
 
-				expect(targetRouteRule['users']).to.have.property('a');
-				expect(targetRouteRule['users']['a']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.have.property('users');
+				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
 
-				expect(targetRouteRule['users']['a']).to.have.property('b');
-				expect(targetRouteRule['users']['a']['b']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.have.property('a');
+				expect(routeRules[0]['/']['users']['a']).to.be.instanceof(Object);
 
-				expect(targetRouteRule['users']['a']['b']).to.have.property('c');
-				expect(targetRouteRule['users']['a']['b']['c']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']['a']).to.have.property('b');
+				expect(routeRules[0]['/']['users']['a']['b']).to.be.instanceof(Object);
 
-				expect(targetRouteRule['users']['a']['b']['c']).to.have.property('GET', testFnc);
+				expect(routeRules[0]['/']['users']['a']['b']).to.have.property('c');
+				expect(routeRules[0]['/']['users']['a']['b']['c']).to.be.instanceof(Object);
+
+				expect(routeRules[0]['/']['users']['a']['b']['c']).to.have.property('GET', testFnc);
 
 				await app.listen(port);
 
@@ -2119,15 +2163,20 @@ describe('core', () => {
 					}
 				});
 
-				const appRouteRule : RouteRule[] = (app as any)._routeRule;
+				const routeRules : RouteRule[] = (app as any)._routeRules;
 
-				expect(appRouteRule).to.be.ok;
-				expect(appRouteRule).to.be.instanceof(Array);
-				expect(appRouteRule).to.be.lengthOf(1);
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				const targetRouteRule : RouteRule = appRouteRule[0];
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				const userRule = targetRouteRule['users'];
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+
+				const userRule = routeRules[0]['/']['users'];
 				expect(userRule).to.be.ok;
 				expect(userRule).to.be.instanceof(Object);
 				expect(Object.keys(userRule)).to.includes('a');
@@ -2163,15 +2212,20 @@ describe('core', () => {
 
 				const uriArr = uri.split('/');
 
-				const appRouteRule : RouteRule[] = (app as any)._routeRule;
+				const routeRules : RouteRule[] = (app as any)._routeRules;
 
-				expect(appRouteRule).to.be.ok;
-				expect(appRouteRule).to.be.instanceof(Array);
-				expect(appRouteRule).to.be.lengthOf(1);
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.lengthOf(1);
 
-				const targetRouteRule : RouteRule = appRouteRule[0];
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.have.property('/');
 
-				let targetRuleObj : RouteRule | RouteRuleSeed = targetRouteRule;
+				expect(routeRules[0]['/']).to.be.ok;
+				expect(routeRules[0]['/']).to.be.instanceof(Object);
+
+				let targetRuleObj : RouteRule | RouteRuleSeed | Function = routeRules[0]['/'];
 
 				uriArr.forEach((uri, i, arr) => {
 					expect(Object.keys(targetRuleObj)).to.includes(uri);
@@ -2630,17 +2684,6 @@ describe('core', () => {
 							}
 						});
 
-						const appRouteRule : RouteRule[] = (app as any)._routeRule;
-						expect(appRouteRule).to.be.ok;
-
-						const targetRule : RouteRule = appRouteRule.find(one => {
-							return !!one[testUri];
-						});
-
-						expect(targetRule).to.be.ok;
-						expect(targetRule).to.have.property(testUri);
-						expect(targetRule[testUri]).to.have.property('GET', testFnc);
-
 						await app.listen(port);
 
 						await request(app.getHttpServer())
@@ -2719,7 +2762,7 @@ describe('core', () => {
 							}
 						});
 
-						const appRouteRule : RouteRule[] = (app as any)._routeRule;
+						const appRouteRule : RouteRule[] = (app as any)._routeRules;
 
 						expect(appRouteRule).to.be.lengthOf(1);
 
@@ -3075,9 +3118,9 @@ describe('core', () => {
 
 							await app.listen(port);
 
-							const routeRule : RouteRule = (app as any)._routeRule;
-							expect(routeRule).to.be.instanceof(Array);
-							expect(routeRule).to.be.lengthOf(1);
+							const routeRules : RouteRule = (app as any)._routeRules;
+							expect(routeRules).to.be.instanceof(Array);
+							expect(routeRules).to.be.lengthOf(1);
 
 							validUrls.push(
 								`${ prefix }/a`,
@@ -3110,9 +3153,9 @@ describe('core', () => {
 
 								await app.listen(port);
 
-								const routeRule : RouteRule = (app as any)._routeRule;
-								expect(routeRule).to.be.instanceof(Array);
-								expect(routeRule).to.be.lengthOf(1);
+								const routeRules : RouteRule = (app as any)._routeRules;
+								expect(routeRules).to.be.instanceof(Array);
+								expect(routeRules).to.be.lengthOf(1);
 
 								validUrls.push(
 									`${ prefix }/a`,
@@ -3140,9 +3183,9 @@ describe('core', () => {
 
 								await app.listen(port);
 
-								const routeRule : RouteRule = (app as any)._routeRule;
-								expect(routeRule).to.be.instanceof(Array);
-								expect(routeRule).to.be.lengthOf(1);
+								const routeRules : RouteRule = (app as any)._routeRules;
+								expect(routeRules).to.be.instanceof(Array);
+								expect(routeRules).to.be.lengthOf(1);
 
 								validUrls.push(
 									`${ prefix }/a/a`,
@@ -3183,9 +3226,9 @@ describe('core', () => {
 
 							await app.listen(port);
 
-							const routeRule : RouteRule = (app as any)._routeRule;
-							expect(routeRule).to.be.instanceof(Array);
-							expect(routeRule).to.be.lengthOf(1);
+							const routeRules : RouteRule = (app as any)._routeRules;
+							expect(routeRules).to.be.instanceof(Array);
+							expect(routeRules).to.be.lengthOf(1);
 
 							validUrls.push(
 								prefix + '/abcd',

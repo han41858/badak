@@ -44,7 +44,7 @@ export class Badak {
 	private _middlewaresBefore : MiddlewareFunction[] = [];
 	private _middlewaresAfter : MiddlewareFunction[] = [];
 
-	private _routeRule : RouteRule[] = [];
+	private _routeRules : RouteRule[] = [];
 
 	private _staticRules : StaticRule[] = [];
 	private _staticCache : StaticCache[] = [];
@@ -70,86 +70,103 @@ export class Badak {
 	}
 
 	// refine route rule, this function can be called recursively
-	private _refineRouteRule (rule : RouteRule | RouteRuleSeed) {
+	private _refineRouteRule (rule : RouteRule | RouteRuleSeed, isRoot : boolean = true) {
 		if (rule === undefined) {
 			throw new Error('no rule');
 		}
 
-		const keyArr = Object.keys(rule);
+		const keys = Object.keys(rule);
 
-		if (keyArr.length === 0) {
+		if (keys.length === 0) {
 			throw new Error('no rule in rule object');
 		}
+
+		// check validation
+		keys.forEach(uri => {
+			if (uri.includes('//')) {
+				throw new Error('invalid double slash');
+			}
+
+			let uriArr : string[];
+
+			if (uri === '/') {
+				uriArr = ['/'];
+			} else {
+				uriArr = uri
+					.split('/')
+					.filter(uriFrag => !!uriFrag);
+			}
+
+			if (uriArr.length === 0) {
+				throw new Error('empty rule');
+			}
+
+			uriArr.forEach(uriFrag => {
+				if (uriFrag.trim() !== uriFrag) {
+					throw new Error('uri include space');
+				}
+
+				if (uriFrag.trim() === '') {
+					throw new Error('empty uri frag');
+				}
+
+				if (uriFrag.includes(':') && !uriFrag.startsWith(':')) {
+					throw new Error('invalid colon route');
+				}
+
+				if (uriFrag.includes('?') && uriFrag.startsWith('?')) {
+					throw new Error('invalid question route');
+				}
+
+				if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
+					throw new Error('invalid plus route');
+				}
+			});
+		});
+
 
 		const refinedRuleObj : RouteRule = {};
 
 		// called recursively
-		keyArr.forEach(uri => {
-			// slash is permitted only '/', for others remove slash
-			if (uri === '/') {
-				refinedRuleObj['/'] = this._refineRouteRule(rule[uri]);
-			} else {
-				if (uri.includes('//')) {
-					throw new Error('invalid double slash');
-				}
+		keys.forEach(uri => {
+			// make array for uri abbreviation
+			const uriArr : string[] = [
+				isRoot ? '/' : '', // start from root
+				...uri.split('/')
+			]
+				.filter(uriFrag => uriFrag !== '');
 
-				// make array for uri abbreviation
-				const uriArr : string[] = uri.includes('/') ?
-					uri.split('/').filter(uriFrag => uriFrag !== '') :
-					[uri];
+			let targetObj : RouteRule | RouteRuleSeed = refinedRuleObj;
 
-				let targetObj : RouteRule | RouteRuleSeed = refinedRuleObj;
+			uriArr.forEach((uriFrag, i, arr) => {
+				if (Object.values(Method).includes(uriFrag)) {
+					const method : string = uriFrag; // re-assign for readability
 
-				uriArr.forEach((uriFrag, i, arr) => {
-					if (uriFrag.trim() !== uriFrag) {
-						throw new Error('uri include space');
-					}
+					targetObj[method] = rule[method];
+				} else {
+					if (i < arr.length - 1) {
+						// unzip abbreviation path
+						if (!targetObj[uriFrag]) {
+							targetObj[uriFrag] = {};
+						}
 
-					if (uriFrag.trim() === '') {
-						throw new Error('empty uri frag');
-					}
-
-					if (uriFrag.includes(':') && !uriFrag.startsWith(':')) {
-						throw new Error('invalid colon route');
-					}
-
-					if (uriFrag.includes('?') && uriFrag.startsWith('?')) {
-						throw new Error('invalid question route');
-					}
-
-					if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
-						throw new Error('invalid plus route');
-					}
-
-					if (Object.values(Method).includes(uriFrag)) {
-						const method : string = uriFrag; // re-assign for readability
-
-						targetObj[method] = rule[method];
+						targetObj = targetObj[uriFrag];
 					} else {
-						if (i < arr.length - 1) {
-							// unzip abbreviation path
-							if (!targetObj[uriFrag]) {
-								targetObj[uriFrag] = {};
-							}
-
-							targetObj = targetObj[uriFrag];
-						} else {
-							// last uri frag
-							if (typeof rule[uri] === 'object') {
-								targetObj[uriFrag] = this._refineRouteRule(rule[uri]);
-							} else if (typeof rule[uri] === 'function') {
-								if (!!this._config.defaultMethod) {
-									targetObj[uriFrag] = {
-										[this._config.defaultMethod] : rule[uri]
-									};
-								} else {
-									throw new Error('invalid rule or defaultMethod not set');
-								}
+						// last uri frag
+						if (typeof rule[uri] === 'object') {
+							targetObj[uriFrag] = this._refineRouteRule(rule[uri], false);
+						} else if (typeof rule[uri] === 'function') {
+							if (!!this._config.defaultMethod) {
+								targetObj[uriFrag] = {
+									[this._config.defaultMethod] : rule[uri]
+								};
+							} else {
+								throw new Error('invalid rule or defaultMethod not set');
 							}
 						}
 					}
-				});
-			}
+				}
+			});
 		});
 
 		return refinedRuleObj;
@@ -235,9 +252,9 @@ export class Badak {
 	private _assignRule (rule : RouteRule) : void {
 		const refinedRule : RouteRule = this._refineRouteRule(rule);
 
-		this._checkUriDuplication(this._routeRule, refinedRule);
+		this._checkUriDuplication(this._routeRules, refinedRule);
 
-		this._routeRule.push(refinedRule);
+		this._routeRules.push(refinedRule);
 	}
 
 	// auth
@@ -647,7 +664,7 @@ export class Badak {
 					const uri : string = req.url;
 
 					if (
-						(!this._routeRule || this._routeRule.length === 0)
+						(!this._routeRules || this._routeRules.length === 0)
 						&& this._staticRules === null
 					) {
 						// no rule assigned
@@ -657,171 +674,168 @@ export class Badak {
 					let targetFncObj : RouteFunction | RouteFunctionObj;
 					let param : any;
 
-					let routeRuleLength : number = this._routeRule.length;
+					let routeRuleLength : number = this._routeRules.length;
 
 					let targetRouteObj : RouteRule | RouteRuleSeed;
 
 					for (let i = 0; i < routeRuleLength; i++) {
-						targetRouteObj = this._routeRule[i];
+						targetRouteObj = this._routeRules[i];
 
-						if (uri === '/') {
-							if (!!targetRouteObj['/'] && !!targetRouteObj['/'][method]) {
-								targetFncObj = targetRouteObj['/'][method];
-								break;
-							}
-						} else {
+						// normal routing
+						const uriArr : string[] = [
+							'/', // start from root
+							...uri.split('/')
+						]
+							.filter(frag => frag !== '');
+						const uriArrLength : number = uriArr.length;
+
+						// find target function
+						// use 'for' instead of 'forEach' to break
+						for (let j = 0; j < uriArrLength; j++) {
+							const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
+							const uriFrag : string = uriArr[j];
+
 							// normal routing
-							const uriArr : string[] = uri.split('/').filter(frag => frag !== '');
-							const uriArrLength : number = uriArr.length;
+							if (targetRouteObj[uriFrag] !== undefined) {
+								targetRouteObj = targetRouteObj[uriFrag];
 
-							// find target function
-							// use 'for' instead of 'forEach' to break
-							for (let j = 0; j < uriArrLength; j++) {
-								const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
-								const uriFrag : string = uriArr[j];
+								continue;
+							}
 
-								// normal routing
-								if (targetRouteObj[uriFrag] !== undefined) {
-									targetRouteObj = targetRouteObj[uriFrag];
+							// colon routing
+							const colonParam : string = routeRuleKeyArr.find(_uriFrag => _uriFrag.startsWith(':'));
 
-									continue;
+							if (colonParam !== undefined) {
+								targetRouteObj = targetRouteObj[colonParam];
+
+								if (param === undefined) {
+									param = {};
 								}
 
-								// colon routing
-								const colonParam : string = routeRuleKeyArr.find(_uriFrag => _uriFrag.startsWith(':'));
+								// if (param.matcher === undefined) {
+								// 	param.matcher = [];
+								// }
 
-								if (colonParam !== undefined) {
-									targetRouteObj = targetRouteObj[colonParam];
+								// param.matcher.push(colonParam);
+								param[colonParam.replace(':', '')] = uriFrag;
 
-									if (param === undefined) {
-										param = {};
-									}
+								continue;
+							}
 
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
+							// question routing
+							const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+								return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+							});
 
-									// param.matcher.push(colonParam);
-									param[colonParam.replace(':', '')] = uriFrag;
+							const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+								const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+								const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+								const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
 
-									continue;
+								return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
+							});
+
+							if (targetQuestionKey !== undefined) {
+								targetRouteObj = targetRouteObj[targetQuestionKey];
+
+								if (param === undefined) {
+									param = {};
 								}
 
-								// question routing
-								const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-									return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+								// if (param.matcher === undefined) {
+								// 	param.matcher = [];
+								// }
+
+								// param.matcher.push(targetQuestionKey);
+								param[targetQuestionKey] = uriFrag;
+
+								continue;
+							}
+
+							// plus routing
+							const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+								return routeRuleKey.includes('+');
+							});
+
+							const targetPlusKey : string = plusKeyArr.find(plusKey => {
+								return new RegExp(plusKey).test(uriFrag);
+							});
+
+							if (targetPlusKey !== undefined) {
+								targetRouteObj = targetRouteObj[targetPlusKey];
+
+								if (param === undefined) {
+									param = {};
+								}
+
+								// if (param.matcher === undefined) {
+								// 	param.matcher = [];
+								// }
+
+								// param.matcher.push(targetPlusKey);
+								param[targetPlusKey] = uriFrag;
+
+								continue;
+							}
+
+							// partial asterisk routing
+							const targetAsteriskKey : string = routeRuleKeyArr
+								.filter(routeRuleKey => {
+									return /.\*./.test(routeRuleKey);
+								})
+								.find(asteriskKey => {
+									// replace '*' to '(.)*'
+									return new RegExp(
+										asteriskKey.replace('*', '(.)*')
+									).test(uriFrag);
 								});
 
-								const targetQuestionKey : string = questionKeyArr.find(questionKey => {
-									const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-									const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-									const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
+							if (targetAsteriskKey !== undefined) {
+								targetRouteObj = targetRouteObj[targetAsteriskKey];
 
-									return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
-								});
-
-								if (targetQuestionKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetQuestionKey];
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(targetQuestionKey);
-									param[targetQuestionKey] = uriFrag;
-
-									continue;
+								if (param === undefined) {
+									param = {};
 								}
 
-								// plus routing
-								const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-									return routeRuleKey.includes('+');
-								});
+								// if (param.matcher === undefined) {
+								// 	param.matcher = [];
+								// }
 
-								const targetPlusKey : string = plusKeyArr.find(plusKey => {
-									return new RegExp(plusKey).test(uriFrag);
-								});
+								// param.matcher.push(targetAsteriskKey);
+								param[targetAsteriskKey] = uriFrag;
 
-								if (targetPlusKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetPlusKey];
+								continue;
+							}
 
-									if (param === undefined) {
-										param = {};
-									}
+							// * / ** asterisk routing include child route
+							const childRouteRuleKeyArr : string[] = Object.keys(targetRouteObj);
 
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
+							if (routeRuleKeyArr.includes('*') || childRouteRuleKeyArr.includes('*')) {
+								targetRouteObj = targetRouteObj['*'];
 
-									// param.matcher.push(targetPlusKey);
-									param[targetPlusKey] = uriFrag;
-
-									continue;
+								if (param === undefined) {
+									param = {};
 								}
 
-								// partial asterisk routing
-								const targetAsteriskKey : string = routeRuleKeyArr
-									.filter(routeRuleKey => {
-										return /.\*./.test(routeRuleKey);
-									})
-									.find(asteriskKey => {
-										// replace '*' to '(.)*'
-										return new RegExp(
-											asteriskKey.replace('*', '(.)*')
-										).test(uriFrag);
-									});
+								param['*'] = uriFrag;
 
-								if (targetAsteriskKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetAsteriskKey];
+								continue;
+							} else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
+								targetRouteObj = targetRouteObj['**'];
 
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(targetAsteriskKey);
-									param[targetAsteriskKey] = uriFrag;
-
-									continue;
+								if (param === undefined) {
+									param = {};
 								}
 
-								// * / ** asterisk routing include child route
-								const childRouteRuleKeyArr : string[] = Object.keys(targetRouteObj);
+								param['**'] = uriFrag;
 
-								if (routeRuleKeyArr.includes('*') || childRouteRuleKeyArr.includes('*')) {
-									targetRouteObj = targetRouteObj['*'];
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									param['*'] = uriFrag;
-
-									continue;
-								} else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
-									targetRouteObj = targetRouteObj['**'];
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									param['**'] = uriFrag;
-
-									// ignore after uri
-									break;
-								}
-
-								// not found
-								targetRouteObj = null;
+								// ignore after uri
 								break;
 							}
+
+							// not found
+							targetRouteObj = null;
+							break;
 						}
 
 						if (!!targetRouteObj && !!targetRouteObj[method]) {
