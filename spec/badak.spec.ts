@@ -1131,7 +1131,6 @@ describe('core', () => {
 
 			await app.listen(port);
 
-
 			await request(app.getHttpServer()).get(spaRoot)
 				.expect(200)
 				.then((_res : any) : void => {
@@ -3071,26 +3070,26 @@ describe('core', () => {
 			describe('asterisk routing', () => {
 				let validUrls : string[] = [];
 				let invalidUrls : string[] = [];
-				let calledUri : string[] = [];
+				let calledUrls : string[] = [];
 
 				beforeEach(() => {
 					validUrls = [];
 					invalidUrls = [];
-					calledUri = [];
+					calledUrls = [];
 				});
 
 				afterEach(async () => {
-					await Promise.all(validUrls.map(async testUri => {
+					await Promise.all(validUrls.map(testUri => {
 						return request(app.getHttpServer())
 							.get(testUri)
 							.expect(200);
 					}));
 
 					validUrls.forEach(testUri => {
-						expect(calledUri).to.include(testUri);
+						expect(calledUrls).to.include(testUri);
 					});
 
-					await Promise.all(invalidUrls.map(async testUri => {
+					await Promise.all(invalidUrls.map(testUri => {
 						return request(app.getHttpServer())
 							.get(testUri)
 							.expect(404);
@@ -3102,7 +3101,7 @@ describe('core', () => {
 						expect(param).to.be.ok;
 						expect(param).to.have.property('**');
 
-						calledUri.push(req.url);
+						calledUrls.push(req.url);
 					};
 
 					[
@@ -3136,7 +3135,7 @@ describe('core', () => {
 						expect(param).to.be.ok;
 						expect(param).to.have.property('*');
 
-						calledUri.push(req.url);
+						calledUrls.push(req.url);
 					};
 
 					describe('last frag', () => {
@@ -3158,6 +3157,7 @@ describe('core', () => {
 								expect(routeRules).to.be.lengthOf(1);
 
 								validUrls.push(
+									`${ prefix }/`,
 									`${ prefix }/a`,
 									`${ prefix }/b`
 								);
@@ -3193,6 +3193,7 @@ describe('core', () => {
 								);
 
 								invalidUrls.push(
+									`${ prefix }`,
 									`${ prefix }/a`
 								);
 							});
@@ -3210,7 +3211,7 @@ describe('core', () => {
 						expect(param[testFrag]).to.be.ok;
 						expect(new RegExp(regExpKey).test(param[testFrag])).to.be.true;
 
-						calledUri.push(req.url);
+						calledUrls.push(req.url);
 					};
 
 					[

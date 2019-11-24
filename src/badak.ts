@@ -34,6 +34,11 @@ import { checkAbsolutePath, checkAbsoluteUri, convertDateStr, convertNumberStr, 
  * }
  */
 
+enum LoopControl {
+	Break,
+	Continue
+}
+
 export class Badak {
 	private _http : Server = null;
 
@@ -692,6 +697,8 @@ export class Badak {
 						// find target function
 						// use 'for' instead of 'forEach' to break
 						for (let j = 0; j < uriArrLength; j++) {
+							let loopControl : LoopControl;
+
 							const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
 							const uriFrag : string = uriArr[j];
 
@@ -699,118 +706,142 @@ export class Badak {
 							if (targetRouteObj[uriFrag] !== undefined) {
 								targetRouteObj = targetRouteObj[uriFrag];
 
-								continue;
+								loopControl = LoopControl.Continue;
 							}
 
-							// colon routing
-							const colonParam : string = routeRuleKeyArr.find(_uriFrag => _uriFrag.startsWith(':'));
+							if (!loopControl) {
+								// colon routing
+								const colonParam : string = routeRuleKeyArr.find(_uriFrag => _uriFrag.startsWith(':'));
 
-							if (colonParam !== undefined) {
-								targetRouteObj = targetRouteObj[colonParam];
+								if (colonParam !== undefined) {
+									targetRouteObj = targetRouteObj[colonParam];
 
-								if (param === undefined) {
-									param = {};
+									if (param === undefined) {
+										param = {};
+									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(colonParam);
+									param[colonParam.replace(':', '')] = uriFrag;
+
+									loopControl = LoopControl.Continue;
 								}
-
-								// if (param.matcher === undefined) {
-								// 	param.matcher = [];
-								// }
-
-								// param.matcher.push(colonParam);
-								param[colonParam.replace(':', '')] = uriFrag;
-
-								continue;
 							}
 
-							// question routing
-							const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-								return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
-							});
-
-							const targetQuestionKey : string = questionKeyArr.find(questionKey => {
-								const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-								const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-								const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
-
-								return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
-							});
-
-							if (targetQuestionKey !== undefined) {
-								targetRouteObj = targetRouteObj[targetQuestionKey];
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								// if (param.matcher === undefined) {
-								// 	param.matcher = [];
-								// }
-
-								// param.matcher.push(targetQuestionKey);
-								param[targetQuestionKey] = uriFrag;
-
-								continue;
-							}
-
-							// plus routing
-							const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-								return routeRuleKey.includes('+');
-							});
-
-							const targetPlusKey : string = plusKeyArr.find(plusKey => {
-								return new RegExp(plusKey).test(uriFrag);
-							});
-
-							if (targetPlusKey !== undefined) {
-								targetRouteObj = targetRouteObj[targetPlusKey];
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								// if (param.matcher === undefined) {
-								// 	param.matcher = [];
-								// }
-
-								// param.matcher.push(targetPlusKey);
-								param[targetPlusKey] = uriFrag;
-
-								continue;
-							}
-
-							// partial asterisk routing
-							const targetAsteriskKey : string = routeRuleKeyArr
-								.filter(routeRuleKey => {
-									return /.\*./.test(routeRuleKey);
-								})
-								.find(asteriskKey => {
-									// replace '*' to '(.)*'
-									return new RegExp(
-										asteriskKey.replace('*', '(.)*')
-									).test(uriFrag);
+							if (!loopControl) {
+								// question routing
+								const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+									return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
 								});
 
-							if (targetAsteriskKey !== undefined) {
-								targetRouteObj = targetRouteObj[targetAsteriskKey];
+								const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+									const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+									const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+									const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
 
-								if (param === undefined) {
-									param = {};
+									return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
+								});
+
+								if (targetQuestionKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetQuestionKey];
+
+									if (param === undefined) {
+										param = {};
+									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(targetQuestionKey);
+									param[targetQuestionKey] = uriFrag;
+
+									loopControl = LoopControl.Continue;
 								}
-
-								// if (param.matcher === undefined) {
-								// 	param.matcher = [];
-								// }
-
-								// param.matcher.push(targetAsteriskKey);
-								param[targetAsteriskKey] = uriFrag;
-
-								continue;
 							}
 
-							// * / ** asterisk routing include child route
+							if (!loopControl) {
+								// plus routing
+								const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+									return routeRuleKey.includes('+');
+								});
+
+								const targetPlusKey : string = plusKeyArr.find(plusKey => {
+									return new RegExp(plusKey).test(uriFrag);
+								});
+
+								if (targetPlusKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetPlusKey];
+
+									if (param === undefined) {
+										param = {};
+									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(targetPlusKey);
+									param[targetPlusKey] = uriFrag;
+
+									loopControl = LoopControl.Continue;
+								}
+							}
+
+							if (!loopControl) {
+								if (routeRuleKeyArr.includes('*')) {
+									targetRouteObj = targetRouteObj['*'];
+
+									if (param === undefined) {
+										param = {};
+									}
+
+									param['*'] = uriFrag;
+
+									loopControl = LoopControl.Continue;
+								}
+							}
+
+							if (!loopControl) {
+								// partial asterisk routing
+								const targetAsteriskKey : string = routeRuleKeyArr
+									.filter(routeRuleKey => {
+										return /.\*./.test(routeRuleKey);
+									})
+									.find(asteriskKey => {
+										// replace '*' to '(.)*'
+										return new RegExp(
+											asteriskKey.replace('*', '(.)*')
+										).test(uriFrag);
+									});
+
+								if (targetAsteriskKey !== undefined) {
+									targetRouteObj = targetRouteObj[targetAsteriskKey];
+
+									if (param === undefined) {
+										param = {};
+									}
+
+									// if (param.matcher === undefined) {
+									// 	param.matcher = [];
+									// }
+
+									// param.matcher.push(targetAsteriskKey);
+									param[targetAsteriskKey] = uriFrag;
+
+									loopControl = LoopControl.Continue;
+								}
+							}
+
+
+							// * / ** asterisk child routing
 							const childRouteRuleKeyArr : string[] = Object.keys(targetRouteObj);
 
-							if (routeRuleKeyArr.includes('*') || childRouteRuleKeyArr.includes('*')) {
+							if (j === uriArrLength - 1 // for urls like '/something/'
+								&& childRouteRuleKeyArr.includes('*')) {
 								targetRouteObj = targetRouteObj['*'];
 
 								if (param === undefined) {
@@ -819,7 +850,7 @@ export class Badak {
 
 								param['*'] = uriFrag;
 
-								continue;
+								loopControl = LoopControl.Break;
 							} else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
 								targetRouteObj = targetRouteObj['**'];
 
@@ -830,12 +861,18 @@ export class Badak {
 								param['**'] = uriFrag;
 
 								// ignore after uri
-								break;
+								loopControl = LoopControl.Break;
 							}
 
-							// not found
-							targetRouteObj = null;
-							break;
+							// use if/else instead of switch to break for loop
+							if (loopControl === LoopControl.Break) {
+								break;
+							} else if (loopControl === undefined) {
+								// not found
+								targetRouteObj = null;
+								break;
+							}
+							// loopControl === LoopControl.Continue : continue
 						}
 
 						if (!!targetRouteObj && !!targetRouteObj[method]) {
