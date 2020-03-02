@@ -169,6 +169,103 @@ describe('core', () => {
 						.expect(200);
 				});
 			});
+
+			describe('in array', () => {
+				describe('single value', () => {
+					const testFnc = (param) => {
+						expect(param).to.be.ok;
+						expect(param).to.be.instanceOf(Array);
+
+						expect(param[0]).to.be.a('number');
+						expect(param[0]).to.be.a('number');
+					};
+
+					it('application/json', async () => {
+						await app.route({
+							[testUrl] : {
+								POST : testFnc
+							}
+						});
+
+						await app.config('parseNumber', true);
+
+						await app.listen(port);
+
+						await request(app.getHttpServer())
+							.post(testUrl)
+							.send([num, float])
+							.expect(200); // 200 means no error while call testFnc()
+					});
+
+					// TODO: multipart/form-data
+					// TODO: application/x-www-form-urlencoded
+				});
+
+				describe('object', () => {
+					const testFnc = (param) => {
+						expect(param).to.be.ok;
+						expect(param).to.be.instanceOf(Array);
+
+						expect(param[0].num).to.be.a('number');
+						expect(param[0].float).to.be.a('number');
+					};
+
+					it('application/json', async () => {
+						await app.route({
+							[testUrl] : {
+								POST : testFnc
+							}
+						});
+
+						await app.config('parseNumber', true);
+
+						await app.listen(port);
+
+						await request(app.getHttpServer())
+							.post(testUrl)
+							.send([{
+								num : num,
+								float : float
+							}])
+							.expect(200); // 200 means no error while call testFnc()
+					});
+
+					// TODO: multipart/form-data
+					// TODO: application/x-www-form-urlencoded
+				});
+			});
+
+			describe('in object', () => {
+				const testFnc = (param) => {
+					expect(param).to.be.ok;
+
+					expect(param.num).to.be.a('number');
+					expect(param.float).to.be.a('number');
+				};
+
+				it('application/json', async () => {
+					await app.route({
+						[testUrl] : {
+							POST : testFnc
+						}
+					});
+
+					await app.config('parseNumber', true);
+
+					await app.listen(port);
+
+					await request(app.getHttpServer())
+						.post(testUrl)
+						.send({
+							num : num,
+							float : float
+						})
+						.expect(200); // 200 means no error while call testFnc()
+				});
+
+				// TODO: multipart/form-data
+				// TODO: application/x-www-form-urlencoded
+			});
 		});
 
 		describe('parseDate', () => {
