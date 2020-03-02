@@ -485,12 +485,15 @@ describe('core', () => {
 				describe('single value', () => {
 					const testFnc = (param) => {
 						expect(param).to.be.ok;
-						expect(param).to.be.instanceOf(Array);
+						expect(param).to.be.a('object');
 
-						expect(param[0]).to.be.instanceOf(Date);
+						expect(param.arr).to.be.instanceOf(Array);
+						param.arr.forEach(value => {
+							expect(value).to.be.instanceOf(Date);
+						});
 					};
 
-					it('application/json', async () => {
+					beforeEach(async () => {
 						await app.route({
 							[testUrl] : {
 								POST : testFnc
@@ -500,15 +503,31 @@ describe('core', () => {
 						await app.config('parseDate', true);
 
 						await app.listen(port);
+					});
 
+					it('application/json', async () => {
 						await request(app.getHttpServer())
 							.post(testUrl)
-							.send([dateStr])
+							.send({
+								arr : [dateStr]
+							})
 							.expect(200); // 200 means no error while call testFnc()
 					});
 
-					// TODO: multipart/form-data
-					// TODO: application/x-www-form-urlencoded
+					it('multipart/form-data', async () => {
+						await request(app.getHttpServer())
+							.post(testUrl)
+							.field('arr[]', dateStr)
+							.field('arr[]', dateStr)
+							.expect(200); // 200 means no error while call testFnc()
+					});
+
+					it('application/x-www-form-urlencoded', async () => {
+						await request(app.getHttpServer())
+							.post(testUrl)
+							.send(`arr[]=${ dateStr }&arr[]=${ dateStr }`)
+							.expect(200); // 200 means no error while call testFncStr()
+					});
 				});
 
 				describe('object', () => {
@@ -538,36 +557,9 @@ describe('core', () => {
 							.expect(200); // 200 means no error while call testFnc()
 					});
 
-					// TODO: multipart/form-data
-					// TODO: application/x-www-form-urlencoded
+					// not support : multipart/form-data
+					// not support : application/x-www-form-urlencoded
 				});
-			});
-
-			describe('in object', () => {
-				const testFnc = (param) => {
-					expect(param).to.be.ok;
-					expect(param.dateStr).to.be.instanceOf(Date);
-				};
-
-				it('application/json', async () => {
-					await app.route({
-						[testUrl] : {
-							POST : testFnc
-						}
-					});
-
-					await app.config('parseDate', true);
-
-					await app.listen(port);
-
-					await request(app.getHttpServer())
-						.post(testUrl)
-						.send({ dateStr })
-						.expect(200); // 200 means no error while call testFnc()
-				});
-
-				// TODO: multipart/form-data
-				// TODO: application/x-www-form-urlencoded
 			});
 		});
 
@@ -2198,7 +2190,6 @@ describe('core', () => {
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				;
 				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']).to.have.property('users');
 
