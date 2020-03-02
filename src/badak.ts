@@ -15,7 +15,7 @@ import {
 	StaticRule
 } from './interfaces';
 import { Method } from './constants';
-import { checkAbsolutePath, checkAbsoluteUri, convertDateStr, convertNumberStr, isExistFile, isFolder, loadFolder } from './util';
+import { checkAbsolutePath, checkAbsoluteUri, convertDateStr, convertNumberStr, isArray, isExistFile, isFolder, loadFolder } from './util';
 
 /**
  * rule format, reserved keyword is 4-methods in upper cases
@@ -415,19 +415,42 @@ export class Badak {
 		});
 	}
 
-	// parameter can be Object of string because request has string
-	private _paramConverter (param : Object) : Object {
-		Object.keys(param).forEach((key) => {
-			// only work for string param
-			if (typeof param[key] === 'string') {
-				if (this._config.parseNumber) {
-					param[key] = convertNumberStr(param[key]);
+	// parameter can be object of string because request has string
+	// only work for string param
+	private _paramConverter (param : object) : object {
+		if (isArray(param)) {
+			const paramAsArray : any[] = param as any[];
+
+			paramAsArray.forEach((value, i, arr) => {
+				if (typeof value === 'object') {
+					// call recursively
+					arr[i] = this._paramConverter(value);
+				} else if (typeof value === 'string') {
+					if (this._config.parseNumber) {
+						arr[i] = convertNumberStr(value);
+					}
+					if (this._config.parseDate) {
+						arr[i] = convertDateStr(value);
+					}
 				}
-				if (this._config.parseDate) {
-					param[key] = convertDateStr(param[key]);
+			});
+		} else {
+			Object.keys(param).forEach((key : string) => {
+				const childObj : any = param[key];
+
+				if (typeof childObj === 'object') {
+					// call recursively
+					param[key] = this._paramConverter(param[key]);
+				} else if (typeof param[key] === 'string') {
+					if (this._config.parseNumber) {
+						param[key] = convertNumberStr(param[key]);
+					}
+					if (this._config.parseDate) {
+						param[key] = convertDateStr(param[key]);
+					}
 				}
-			}
-		});
+			});
+		}
 
 		return param;
 	}

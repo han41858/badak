@@ -176,3 +176,5 @@ const loadFile = async (path : string) : Promise<Buffer> => {
 		});
 	});
 };
+
+export const isArray = (obj : any) : boolean => (obj.push !== undefined && obj.length !== undefined);

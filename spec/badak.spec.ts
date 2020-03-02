@@ -32,7 +32,7 @@ describe('core', () => {
 		expect(Badak).to.be.ok;
 
 		expect(app).to.be.ok;
-		expect(app).to.be.instanceof(Badak);
+		expect(app).to.be.instanceOf(Badak);
 	});
 
 	describe('config()', () => {
@@ -44,7 +44,7 @@ describe('core', () => {
 			await app.config('somethingNotDefinedKey', true)
 				.then(fail, (err) => {
 					expect(err).to.be.ok;
-					expect(err).to.be.instanceof(Error);
+					expect(err).to.be.instanceOf(Error);
 				});
 		});
 
@@ -56,7 +56,7 @@ describe('core', () => {
 					await app.config(key, undefined)
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -64,7 +64,7 @@ describe('core', () => {
 					await app.config(key, null)
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -72,7 +72,7 @@ describe('core', () => {
 					await app.config(key, 'hello')
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -80,7 +80,7 @@ describe('core', () => {
 					await app.config(key, 123)
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 			});
@@ -274,7 +274,7 @@ describe('core', () => {
 					expect(param.float).to.be.a('number'); // not string
 					expect(param.float).to.be.eql(float);
 
-					expect(param.date).to.be.instanceof(Date);
+					expect(param.date).to.be.instanceOf(Date);
 
 					expect(param.noDate).to.be.a('string');
 					expect(param.noDate).to.be.eql(noDateStr);
@@ -289,7 +289,7 @@ describe('core', () => {
 					expect(param.float).to.be.a('string');
 					expect(param.float).to.be.eql('' + float);
 
-					expect(param.date).to.be.instanceof(Date);
+					expect(param.date).to.be.instanceOf(Date);
 
 					expect(param.noDate).to.be.a('string');
 					expect(param.noDate).to.be.eql(noDateStr);
@@ -354,6 +354,95 @@ describe('core', () => {
 						.expect(200); // 200 means no error while call testFncStr()
 				});
 			});
+
+			describe('in array', () => {
+				describe('single value', () => {
+					const testFnc = (param) => {
+						expect(param).to.be.ok;
+						expect(param).to.be.instanceOf(Array);
+
+						expect(param[0]).to.be.instanceOf(Date);
+					};
+
+					it('application/json', async () => {
+						await app.route({
+							[testUrl] : {
+								POST : testFnc
+							}
+						});
+
+						await app.config('parseDate', true);
+
+						await app.listen(port);
+
+						await request(app.getHttpServer())
+							.post(testUrl)
+							.send([dateStr])
+							.expect(200); // 200 means no error while call testFnc()
+					});
+
+					// TODO: multipart/form-data
+					// TODO: application/x-www-form-urlencoded
+				});
+
+				describe('object', () => {
+					const testFnc = (param) => {
+						expect(param).to.be.ok;
+						expect(param).to.be.instanceOf(Array);
+
+						expect(param[0].value).to.be.instanceOf(Date);
+					};
+
+					it('application/json', async () => {
+						await app.route({
+							[testUrl] : {
+								POST : testFnc
+							}
+						});
+
+						await app.config('parseDate', true);
+
+						await app.listen(port);
+
+						await request(app.getHttpServer())
+							.post(testUrl)
+							.send([{
+								value : dateStr
+							}])
+							.expect(200); // 200 means no error while call testFnc()
+					});
+
+					// TODO: multipart/form-data
+					// TODO: application/x-www-form-urlencoded
+				});
+			});
+
+			describe('in object', () => {
+				const testFnc = (param) => {
+					expect(param).to.be.ok;
+					expect(param.dateStr).to.be.instanceOf(Date);
+				};
+
+				it('application/json', async () => {
+					await app.route({
+						[testUrl] : {
+							POST : testFnc
+						}
+					});
+
+					await app.config('parseDate', true);
+
+					await app.listen(port);
+
+					await request(app.getHttpServer())
+						.post(testUrl)
+						.send({ dateStr })
+						.expect(200); // 200 means no error while call testFnc()
+				});
+
+				// TODO: multipart/form-data
+				// TODO: application/x-www-form-urlencoded
+			});
 		});
 
 		describe('defaultMethod', () => {
@@ -412,19 +501,19 @@ describe('core', () => {
 					await app.config('defaultMethod', true)
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 
 					await app.config('defaultMethod', false)
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 
 					await app.config('defaultMethod', 123)
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -432,7 +521,7 @@ describe('core', () => {
 					await app.config('defaultMethod', 'something_method')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 			});
@@ -443,7 +532,7 @@ describe('core', () => {
 					})
 					.then(fail, err => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 
@@ -465,11 +554,11 @@ describe('core', () => {
 								const routeRules : RouteRule[] = (app as any)._routeRules;
 
 								expect(routeRules).to.be.ok;
-								expect(routeRules).to.be.instanceof(Array);
+								expect(routeRules).to.be.instanceOf(Array);
 								expect(routeRules).to.be.lengthOf(1);
 
 								expect(routeRules[0]).to.be.ok;
-								expect(routeRules[0]).to.be.instanceof(Object);
+								expect(routeRules[0]).to.be.instanceOf(Object);
 								expect(routeRules[0]).to.have.property('/');
 
 								expect(routeRules[0]['/']).to.have.property(testUriRefined);
@@ -497,7 +586,7 @@ describe('core', () => {
 					})
 					.then(fail, err => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 		});
@@ -513,7 +602,7 @@ describe('core', () => {
 				await app.listen(undefined)
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 
@@ -521,7 +610,7 @@ describe('core', () => {
 				await app.listen('3000' as any)
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 
@@ -532,7 +621,7 @@ describe('core', () => {
 					})
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 		});
@@ -552,7 +641,7 @@ describe('core', () => {
 				testFncCalled = true;
 
 				expect(param).to.be.ok;
-				expect(param).to.be.instanceof(Object);
+				expect(param).to.be.instanceOf(Object);
 
 				expect(param).to.have.property('firstName', firstName);
 				expect(param).to.have.property('lastName', lastName);
@@ -590,7 +679,7 @@ describe('core', () => {
 				expect(testFncCalled).to.be.true;
 
 				expect(res.body).to.be.ok;
-				expect(res.body).to.be.instanceof(Object);
+				expect(res.body).to.be.instanceOf(Object);
 				expect(res.body).to.have.property('firstName', firstName);
 				expect(res.body).to.have.property('lastName', lastName);
 			});
@@ -606,7 +695,7 @@ describe('core', () => {
 				expect(testFncCalled).to.be.true;
 
 				expect(res.body).to.be.ok;
-				expect(res.body).to.be.instanceof(Object);
+				expect(res.body).to.be.instanceOf(Object);
 				expect(res.body).to.have.property('firstName', firstName);
 				expect(res.body).to.have.property('lastName', lastName);
 			});
@@ -621,7 +710,7 @@ describe('core', () => {
 				expect(testFncCalled).to.be.true;
 
 				expect(res.body).to.be.ok;
-				expect(res.body).to.be.instanceof(Object);
+				expect(res.body).to.be.instanceOf(Object);
 				expect(res.body).to.have.property('firstName', firstName);
 				expect(res.body).to.have.property('lastName', lastName);
 			});
@@ -649,7 +738,7 @@ describe('core', () => {
 					await app.static(undefined, '.')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -657,7 +746,7 @@ describe('core', () => {
 					await app.static(null, '.')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -665,7 +754,7 @@ describe('core', () => {
 					await app.static('someUri', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -673,7 +762,7 @@ describe('core', () => {
 					await app.static('/some///thing', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 			});
@@ -683,7 +772,7 @@ describe('core', () => {
 					await app.static('/', undefined)
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -691,7 +780,7 @@ describe('core', () => {
 					await app.static('/', null)
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -699,7 +788,7 @@ describe('core', () => {
 					await app.static('/', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -707,7 +796,7 @@ describe('core', () => {
 					await app.static('/', path.join(__dirname, 'static', 'test.txt'))
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 			});
@@ -732,7 +821,7 @@ describe('core', () => {
 				return app.static('/static', folderPath)
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 		});
@@ -750,7 +839,7 @@ describe('core', () => {
 				const staticRules : StaticRule[] = (app as any)._staticRules;
 
 				expect(staticRules).to.be.ok;
-				expect(staticRules).to.be.instanceof(Array);
+				expect(staticRules).to.be.instanceOf(Array);
 
 				const targetRule : StaticRule = staticRules.find(rule => {
 					return rule.uri === keyUri;
@@ -789,7 +878,7 @@ describe('core', () => {
 								const staticCache : StaticCache[] = (app as any)._staticCache;
 
 								expect(staticCache).to.be.ok;
-								expect(staticCache).to.be.instanceof(Array);
+								expect(staticCache).to.be.instanceOf(Array);
 
 								const targetCache : StaticCache = staticCache.find(cache => {
 									return cache.uri === fullUri;
@@ -899,12 +988,12 @@ describe('core', () => {
 			// check static cache
 			const staticCache : StaticCache[] = (app as any)._staticCache;
 
-			expect(staticCache).to.be.instanceof(Array);
+			expect(staticCache).to.be.instanceOf(Array);
 			expect(staticCache.length).to.be.above(0);
 
 			const targetStaticCache : StaticCache = staticCache[0];
 
-			expect(targetStaticCache).to.be.instanceof(Object);
+			expect(targetStaticCache).to.be.instanceOf(Object);
 
 			expect(targetStaticCache).to.have.property('uri');
 			expect(targetStaticCache.uri).to.be.a('string');
@@ -936,7 +1025,7 @@ describe('core', () => {
 			// check static cache
 			const staticCache : StaticCache[] = (app as any)._staticCache;
 
-			expect(staticCache).to.be.instanceof(Array);
+			expect(staticCache).to.be.instanceOf(Array);
 			expect(staticCache.length).to.be.above(0);
 
 			await request(app.getHttpServer())
@@ -1042,7 +1131,7 @@ describe('core', () => {
 					await app.setSPARoot(undefined, '.')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1050,7 +1139,7 @@ describe('core', () => {
 					await app.setSPARoot(null, '.')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1058,7 +1147,7 @@ describe('core', () => {
 					await app.setSPARoot('someUri', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1066,7 +1155,7 @@ describe('core', () => {
 					await app.setSPARoot('/some///thing', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 			});
@@ -1076,7 +1165,7 @@ describe('core', () => {
 					await app.setSPARoot('/', undefined)
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1084,7 +1173,7 @@ describe('core', () => {
 					await app.setSPARoot('/', null)
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1092,7 +1181,7 @@ describe('core', () => {
 					await app.setSPARoot('/', 'something')
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1100,7 +1189,7 @@ describe('core', () => {
 					await app.setSPARoot('/', path.join(__dirname, 'static', 'test.txt'))
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 			});
@@ -1111,7 +1200,7 @@ describe('core', () => {
 				return app.setSPARoot('/public', folderPath)
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 
@@ -1119,7 +1208,7 @@ describe('core', () => {
 				return app.setSPARoot('/public', path.join(__dirname, 'static'))
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 		});
@@ -1318,7 +1407,7 @@ describe('core', () => {
 					return app.route(undefined)
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1331,7 +1420,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1344,7 +1433,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1357,7 +1446,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1370,7 +1459,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1383,7 +1472,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1393,7 +1482,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1406,7 +1495,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1422,7 +1511,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1469,7 +1558,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -1482,7 +1571,7 @@ describe('core', () => {
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 			});
@@ -1499,24 +1588,24 @@ describe('core', () => {
 
 				const routeRules = (app as any)._routeRules;
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']).to.have.property('users');
 
 				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
 				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceof(Function);
+				expect(routeFnc).to.be.instanceOf(Function);
 				expect(routeFnc).to.eql(testFnc);
 
 				await app.listen(port);
@@ -1541,24 +1630,24 @@ describe('core', () => {
 
 				const routeRules = (app as any)._routeRules;
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']).to.have.property('users');
 
 				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
 				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceof(Function);
+				expect(routeFnc).to.be.instanceOf(Function);
 				expect(routeFnc).to.eql(testFnc);
 
 				await app.listen(port);
@@ -1622,24 +1711,24 @@ describe('core', () => {
 
 				const routeRules : RouteRule = (app as any)._routeRules;
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']).to.have.property('users');
 
 				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
 				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceof(Function);
+				expect(routeFnc).to.be.instanceOf(Function);
 				expect(routeFnc).to.eql(testFnc);
 
 				await app.listen(port);
@@ -1662,24 +1751,24 @@ describe('core', () => {
 
 				const routeRules : RouteRule = (app as any)._routeRules;
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']).to.have.property('users');
 
 				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
 				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceof(Function);
+				expect(routeFnc).to.be.instanceOf(Function);
 				expect(routeFnc).to.eql(testFnc);
 
 				await app.listen(port);
@@ -1702,24 +1791,24 @@ describe('core', () => {
 
 				const routeRules : RouteRule = (app as any)._routeRules;
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']).to.have.property('users');
 
 				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['users']).to.have.property('GET');
 
 				const routeFnc = routeRules[0]['/']['users']['GET'];
 				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceof(Function);
+				expect(routeFnc).to.be.instanceOf(Function);
 				expect(routeFnc).to.eql(testFnc);
 
 				await app.listen(port);
@@ -1823,14 +1912,14 @@ describe('core', () => {
 				const routeRules : RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(2);
 
 				routeRules.forEach((rule, i) => {
 					expect(rule).to.have.property('/');
 
 					expect(rule['/']).to.have.property('users');
-					expect(rule['/']['users']).to.be.instanceof(Object);
+					expect(rule['/']['users']).to.be.instanceOf(Object);
 
 					switch (i) {
 						case 0:
@@ -1867,24 +1956,24 @@ describe('core', () => {
 				const routeRules : RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
 				;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']).to.have.property('users');
 
 				expect(routeRules[0]['/']['users']).to.have.property('a');
-				expect(routeRules[0]['/']['users']['a']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']['a']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['users']['a']).to.have.property('GET', fncA);
 
 				expect(routeRules[0]['/']['users']).to.have.property('b');
-				expect(routeRules[0]['/']['users']['b']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']['b']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['users']['b']).to.have.property('GET', fncB);
 
 				await app.listen(port);
@@ -1925,22 +2014,22 @@ describe('core', () => {
 				const routeRules : RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 
 				expect(routeRules[0]['/']).to.have.property('users');
-				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['users']).to.have.property('GET', usersGetFnc);
 
 				expect(routeRules[0]['/']).to.have.property('records');
-				expect(routeRules[0]['/']['records']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['records']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['records']).to.have.property('GET', recordsGetFnc);
 
 				await app.listen(port);
@@ -1988,27 +2077,27 @@ describe('core', () => {
 				const routeRules : RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']).to.have.property('root');
 
 				expect(routeRules[0]['/']['root']).to.be.ok;
-				expect(routeRules[0]['/']['root']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['root']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['root']).to.have.property('GET', fnc1);
 
 				expect(routeRules[0]['/']['root']).to.have.property('branch1');
-				expect(routeRules[0]['/']['root']['branch1']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['root']['branch1']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['root']['branch1']).to.have.property('GET', fnc2);
 
 				expect(routeRules[0]['/']['root']['branch1']).to.have.property('branch2');
-				expect(routeRules[0]['/']['root']['branch1']['branch2']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['root']['branch1']['branch2']).to.be.instanceOf(Object);
 				expect(routeRules[0]['/']['root']['branch1']['branch2']).to.have.property('GET', fnc3);
 
 				await app.listen(port);
@@ -2077,27 +2166,27 @@ describe('core', () => {
 				const routeRules : RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 
 				expect(routeRules[0]['/']).to.have.property('users');
-				expect(routeRules[0]['/']['users']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
 
 				expect(routeRules[0]['/']['users']).to.have.property('a');
-				expect(routeRules[0]['/']['users']['a']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']['a']).to.be.instanceOf(Object);
 
 				expect(routeRules[0]['/']['users']['a']).to.have.property('b');
-				expect(routeRules[0]['/']['users']['a']['b']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']['a']['b']).to.be.instanceOf(Object);
 
 				expect(routeRules[0]['/']['users']['a']['b']).to.have.property('c');
-				expect(routeRules[0]['/']['users']['a']['b']['c']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']['users']['a']['b']['c']).to.be.instanceOf(Object);
 
 				expect(routeRules[0]['/']['users']['a']['b']['c']).to.have.property('GET', testFnc);
 
@@ -2126,7 +2215,7 @@ describe('core', () => {
 						})
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -2138,7 +2227,7 @@ describe('core', () => {
 						})
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 
@@ -2150,7 +2239,7 @@ describe('core', () => {
 						})
 						.then(fail, (err) => {
 							expect(err).to.be.ok;
-							expect(err).to.be.instanceof(Error);
+							expect(err).to.be.instanceOf(Error);
 						});
 				});
 			});
@@ -2165,29 +2254,29 @@ describe('core', () => {
 				const routeRules : RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 
 				const userRule = routeRules[0]['/']['users'];
 				expect(userRule).to.be.ok;
-				expect(userRule).to.be.instanceof(Object);
+				expect(userRule).to.be.instanceOf(Object);
 				expect(Object.keys(userRule)).to.includes('a');
 
 				const secondDepthRule = userRule['a'];
 				expect(secondDepthRule).to.be.ok;
-				expect(secondDepthRule).to.be.instanceof(Object);
+				expect(secondDepthRule).to.be.instanceOf(Object);
 				expect(Object.keys(secondDepthRule)).to.includes('GET');
 
 				const secondDepthFnc = secondDepthRule['GET'];
 				expect(secondDepthFnc).to.be.ok;
-				expect(secondDepthFnc).to.be.instanceof(Function);
+				expect(secondDepthFnc).to.be.instanceOf(Function);
 				expect(secondDepthFnc).to.eql(testFnc);
 
 				await app.listen(port);
@@ -2214,15 +2303,15 @@ describe('core', () => {
 				const routeRules : RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceof(Array);
+				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
 				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceof(Object);
+				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
 				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceof(Object);
+				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 
 				let targetRuleObj : RouteRule | RouteRuleSeed | Function = routeRules[0]['/'];
 
@@ -2235,7 +2324,7 @@ describe('core', () => {
 						const targetFnc = targetRuleObj['GET'];
 
 						expect(targetFnc).to.be.ok;
-						expect(targetFnc).to.be.instanceof(Function);
+						expect(targetFnc).to.be.instanceOf(Function);
 						expect(targetFnc).to.eql(testFnc);
 					}
 				});
@@ -2256,7 +2345,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2269,7 +2358,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2288,7 +2377,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2305,7 +2394,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2325,7 +2414,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2349,7 +2438,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2369,7 +2458,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 				});
@@ -2380,7 +2469,7 @@ describe('core', () => {
 
 					const testFnc = async (param) => {
 						expect(param).to.be.ok;
-						expect(param).to.be.instanceof(Object);
+						expect(param).to.be.instanceOf(Object);
 
 						expect(param['id']).to.be.ok;
 						expect(param['id']).to.be.eql(testId);
@@ -2410,7 +2499,7 @@ describe('core', () => {
 
 					const testFnc = async (param) => {
 						expect(param).to.be.ok;
-						expect(param).to.be.instanceof(Object);
+						expect(param).to.be.instanceOf(Object);
 
 						expect(param['id']).to.be.ok;
 						expect(param['id']).to.be.eql(testId);
@@ -2449,7 +2538,7 @@ describe('core', () => {
 
 					const testFnc = async (param) => {
 						expect(param).to.be.ok;
-						expect(param).to.be.instanceof(Object);
+						expect(param).to.be.instanceOf(Object);
 
 						expect(param).to.have.property('firstName', firstName);
 						expect(param).to.have.property('lastName', lastName);
@@ -2517,7 +2606,7 @@ describe('core', () => {
 
 					const testFnc = async (param) => {
 						expect(param).to.be.ok;
-						expect(param).to.be.instanceof(Object);
+						expect(param).to.be.instanceOf(Object);
 						expect(param).to.have.property('firstName', firstName);
 						expect(param).to.have.property('lastName', lastName);
 
@@ -2559,7 +2648,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2579,7 +2668,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2602,7 +2691,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2618,7 +2707,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2642,7 +2731,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2658,7 +2747,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 				});
@@ -2894,7 +2983,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2914,7 +3003,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2934,7 +3023,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -2954,7 +3043,7 @@ describe('core', () => {
 							})
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 				});
@@ -3118,7 +3207,7 @@ describe('core', () => {
 							await app.listen(port);
 
 							const routeRules : RouteRule = (app as any)._routeRules;
-							expect(routeRules).to.be.instanceof(Array);
+							expect(routeRules).to.be.instanceOf(Array);
 							expect(routeRules).to.be.lengthOf(1);
 
 							validUrls.push(
@@ -3153,7 +3242,7 @@ describe('core', () => {
 								await app.listen(port);
 
 								const routeRules : RouteRule = (app as any)._routeRules;
-								expect(routeRules).to.be.instanceof(Array);
+								expect(routeRules).to.be.instanceOf(Array);
 								expect(routeRules).to.be.lengthOf(1);
 
 								validUrls.push(
@@ -3184,7 +3273,7 @@ describe('core', () => {
 								await app.listen(port);
 
 								const routeRules : RouteRule = (app as any)._routeRules;
-								expect(routeRules).to.be.instanceof(Array);
+								expect(routeRules).to.be.instanceOf(Array);
 								expect(routeRules).to.be.lengthOf(1);
 
 								validUrls.push(
@@ -3228,7 +3317,7 @@ describe('core', () => {
 							await app.listen(port);
 
 							const routeRules : RouteRule = (app as any)._routeRules;
-							expect(routeRules).to.be.instanceof(Array);
+							expect(routeRules).to.be.instanceOf(Array);
 							expect(routeRules).to.be.lengthOf(1);
 
 							validUrls.push(
@@ -3265,7 +3354,7 @@ describe('core', () => {
 						await app[method]()
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 
@@ -3273,7 +3362,7 @@ describe('core', () => {
 						await app[method]('/users')
 							.then(fail, err => {
 								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
+								expect(err).to.be.instanceOf(Error);
 							});
 					});
 				});
@@ -3319,9 +3408,9 @@ describe('core', () => {
 					expect(fncRun).to.be.true;
 
 					expect(res.body).to.be.ok;
-					expect(res.body).to.be.instanceof(Object);
+					expect(res.body).to.be.instanceOf(Object);
 					expect(res.body.data).to.be.ok;
-					expect(res.body.data).to.be.instanceof(Array);
+					expect(res.body.data).to.be.instanceOf(Array);
 					expect(res.body.data.length).to.be.eql(2);
 				});
 
@@ -3366,9 +3455,9 @@ describe('core', () => {
 					expect(fncRun).to.be.true;
 
 					expect(res.body).to.be.ok;
-					expect(res.body).to.be.instanceof(Object);
+					expect(res.body).to.be.instanceOf(Object);
 					expect(res.body.data).to.be.ok;
-					expect(res.body.data).to.be.instanceof(Array);
+					expect(res.body.data).to.be.instanceOf(Array);
 					expect(res.body.data.length).to.be.eql(2);
 				});
 
@@ -3413,9 +3502,9 @@ describe('core', () => {
 					expect(fncRun).to.be.true;
 
 					expect(res.body).to.be.ok;
-					expect(res.body).to.be.instanceof(Object);
+					expect(res.body).to.be.instanceOf(Object);
 					expect(res.body.data).to.be.ok;
-					expect(res.body.data).to.be.instanceof(Array);
+					expect(res.body.data).to.be.instanceOf(Array);
 					expect(res.body.data.length).to.be.eql(2);
 				});
 
@@ -3506,7 +3595,7 @@ describe('core', () => {
 				await app.stop()
 					.then(fail, (err) => {
 						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
+						expect(err).to.be.instanceOf(Error);
 					});
 			});
 		});
