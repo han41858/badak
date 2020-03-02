@@ -456,6 +456,7 @@ export class Badak {
 	}
 
 	// for POST, PUT
+	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
 	private async _paramParser (req : IncomingMessage) : Promise<any> {
 		return new Promise((resolve, reject) => {
 			const bodyBuffer : Buffer[] = [];
