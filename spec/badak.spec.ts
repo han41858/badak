@@ -172,15 +172,16 @@ describe('core', () => {
 
 			describe('in array', () => {
 				describe('single value', () => {
-					const testFnc = (param) => {
-						expect(param).to.be.ok;
-						expect(param).to.be.instanceOf(Array);
-
-						expect(param[0]).to.be.a('number');
-						expect(param[0]).to.be.a('number');
-					};
-
 					it('application/json', async () => {
+						const testFnc = (param) => {
+							expect(param).to.be.ok;
+							expect(param).to.be.instanceOf(Array);
+
+							param.every(value => {
+								expect(value).to.be.a('number');
+							});
+						};
+
 						await app.route({
 							[testUrl] : {
 								POST : testFnc
@@ -197,8 +198,68 @@ describe('core', () => {
 							.expect(200); // 200 means no error while call testFnc()
 					});
 
-					// TODO: multipart/form-data
-					// TODO: application/x-www-form-urlencoded
+					it('multipart/form-data', async () => {
+						const testFnc = (param) => {
+							expect(param).to.be.ok;
+
+							expect(param.num).to.be.instanceOf(Array);
+							param.num.every(value => {
+								expect(value).to.be.a('number');
+							});
+
+							param.float.every(value => {
+								expect(value).to.be.a('number');
+							});
+						};
+
+						await app.route({
+							[testUrl] : {
+								POST : testFnc
+							}
+						});
+
+						await app.config('parseNumber', true);
+
+						await app.listen(port);
+
+						await request(app.getHttpServer())
+							.post(testUrl)
+							.field('num[]', num)
+							.field('num[]', num * 2)
+							.field('float[]', float)
+							.field('float[]', float * 2)
+							.expect(200); // 200 means no error while call testFnc()
+					});
+
+					it('application/x-www-form-urlencoded', async () => {
+						const testFnc = (param) => {
+							expect(param).to.be.ok;
+
+							expect(param.num).to.be.instanceOf(Array);
+							param.num.every(value => {
+								expect(value).to.be.a('number');
+							});
+
+							param.float.every(value => {
+								expect(value).to.be.a('number');
+							});
+						};
+
+						await app.route({
+							[testUrl] : {
+								POST : testFnc
+							}
+						});
+
+						await app.config('parseNumber', true);
+
+						await app.listen(port);
+
+						await request(app.getHttpServer())
+							.post(testUrl)
+							.send(`num[]=${ num }&num[]=${ num * 2 }&float[]=${ float }&float[]=${ float * 2 }`)
+							.expect(200); // 200 means no error while call testFnc()
+					});
 				});
 
 				describe('object', () => {
@@ -685,6 +746,114 @@ describe('core', () => {
 						expect(err).to.be.ok;
 						expect(err).to.be.instanceOf(Error);
 					});
+			});
+		});
+	});
+
+	describe('_paramParser()', () => {
+		const testUrl : string = '/paramParser';
+
+		describe('single string', () => {
+			const str : string = 'string_value';
+			const testFnc = (param) => {
+				expect(param).to.be.ok;
+				expect(param).to.be.a('object');
+				expect(param.str).to.be.eql(str);
+			};
+
+			it('application/json', async () => {
+				await app.route({
+					[testUrl] : {
+						POST : testFnc
+					}
+				});
+
+				await app.listen(port);
+
+				await request(app.getHttpServer())
+					.post(testUrl)
+					.send({ str })
+					.expect(200); // 200 means no error while call testFnc()
+			});
+
+			it('multipart/form-data', async () => {
+				await app.route({
+					[testUrl] : {
+						POST : testFnc
+					}
+				});
+
+				await app.listen(port);
+
+				await request(app.getHttpServer())
+					.post(testUrl)
+					.field('str', str)
+					.expect(200); // 200 means no error while call testFnc()
+			});
+
+			it('application/x-www-form-urlencoded', async () => {
+				await app.route({
+					[testUrl] : {
+						POST : testFnc
+					}
+				});
+
+				await app.listen(port);
+
+				await request(app.getHttpServer())
+					.post(testUrl)
+					.send(`str=${ str }`)
+					.expect(200); // 200 means no error while call testFnc()
+			});
+		});
+
+		describe('array string', () => {
+			const strArr : string[] = ['str1', 'str2', 'str3'];
+
+			const testFnc = (param) => {
+				expect(param).to.be.ok;
+				expect(param).to.be.a('object');
+
+				expect(param.strArr).to.be.instanceOf(Array);
+				expect(param.strArr).to.be.lengthOf(strArr.length);
+
+				param.strArr.every((value, i) => {
+					expect(value).to.be.a('string');
+					expect(value).to.be.eql(strArr[i]);
+				});
+			};
+
+			beforeEach(async () => {
+				await app.route({
+					[testUrl] : {
+						POST : testFnc
+					}
+				});
+
+				await app.listen(port);
+			});
+
+			it('application/json', async () => {
+				await request(app.getHttpServer())
+					.post(testUrl)
+					.send({ strArr : strArr })
+					.expect(200); // 200 means no error while call testFnc()
+			});
+
+			it('multipart/form-data', async () => {
+				await request(app.getHttpServer())
+					.post(testUrl)
+					.field('strArr[]', strArr[0])
+					.field('strArr[]', strArr[1])
+					.field('strArr[]', strArr[2])
+					.expect(200); // 200 means no error while call testFnc()
+			});
+
+			it('application/x-www-form-urlencoded', async () => {
+				await request(app.getHttpServer())
+					.post(testUrl)
+					.send(`strArr[]=${ strArr[0] }&strArr[]=${ strArr[1] }&strArr[]=${ strArr[2] }`)
+					.expect(200); // 200 means no error while call testFnc()
 			});
 		});
 	});

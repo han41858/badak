@@ -508,7 +508,18 @@ export class Badak {
 							fieldArr.forEach(field => {
 								const [prefix, key, value] = field.split('"');
 
-								paramObj[key] = value;
+								if (key.endsWith('[]')) {
+									// array
+									const arrayName : string = key.replace(/\[\]$/g, '');
+
+									if (paramObj[arrayName] !== undefined) {
+										paramObj[arrayName].push(value);
+									} else {
+										paramObj[arrayName] = [value];
+									}
+								} else {
+									paramObj[key] = value;
+								}
 							});
 
 							break;
@@ -533,7 +544,18 @@ export class Badak {
 								fieldArr.forEach(field => {
 									const [key, value] = field.split('=');
 
-									paramObj[key] = value;
+									if (key.endsWith('[]')) {
+										// array
+										const arrayName : string = key.replace(/\[\]$/g, '');
+
+										if (paramObj[arrayName] !== undefined) {
+											paramObj[arrayName].push(value);
+										} else {
+											paramObj[arrayName] = [value];
+										}
+									} else {
+										paramObj[key] = value;
+									}
 								});
 							}
 
