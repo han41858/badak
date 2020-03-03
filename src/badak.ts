@@ -144,7 +144,7 @@ export class Badak {
 			let targetObj : RouteRule | RouteRuleSeed = refinedRuleObj;
 
 			uriArr.forEach((uriFrag, i, arr) => {
-				if (Object.values(Method).includes(uriFrag)) {
+				if (Object.values(Method).includes(uriFrag as Method)) {
 					const method : string = uriFrag; // re-assign for readability
 
 					targetObj[method] = rule[method];
