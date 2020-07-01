@@ -4,6 +4,7 @@ import { Server } from 'net';
 import * as node_path from 'path';
 
 import {
+	AnyObject,
 	BadakOption,
 	MiddlewareFunction,
 	RouteFunction,
@@ -40,10 +41,10 @@ enum LoopControl {
 }
 
 export class Badak {
-	private _http : Server = null;
+	private _http ! : Server;
 
 	// auth hook
-	private _authFnc : MiddlewareFunction = null;
+	private _authFnc : MiddlewareFunction | undefined;
 
 	// before & after hooks
 	private _middlewaresBefore : MiddlewareFunction[] = [];
@@ -54,13 +55,13 @@ export class Badak {
 	private _staticRules : StaticRule[] = [];
 	private _staticCache : StaticCache[] = [];
 
-	private _spaRoot : string;
+	private _spaRoot : string | undefined;
 
 	private _config : BadakOption = {
 		catchErrorLog : true,
 		preventError : true,
 
-		defaultMethod : null,
+		defaultMethod : undefined,
 
 		parseNumber : false,
 		parseDate : false
@@ -68,9 +69,11 @@ export class Badak {
 
 	constructor (option? : Partial<BadakOption>) {
 		if (!!option) {
-			Object.keys(option).forEach((key : Extract<keyof BadakOption, never>) => {
-				this._config[key] = option[key];
-			});
+			const configAsAnyObject : AnyObject = this._config;
+
+			for (let [key, value] of Object.entries(option)) {
+				configAsAnyObject[key] = value;
+			}
 		}
 	}
 
@@ -87,7 +90,7 @@ export class Badak {
 		}
 
 		// check validation
-		keys.forEach(uri => {
+		for (let [uri] of Object.entries(rule)) {
 			if (uri.includes('//')) {
 				throw new Error('invalid double slash');
 			}
@@ -127,13 +130,13 @@ export class Badak {
 					throw new Error('invalid plus route');
 				}
 			});
-		});
+		}
 
 
 		const refinedRuleObj : RouteRule = {};
 
 		// called recursively
-		keys.forEach(uri => {
+		for (let [uri, value] of Object.entries(rule)) {
 			// make array for uri abbreviation
 			const uriArr : string[] = [
 				isRoot ? '/' : '', // start from root
@@ -141,13 +144,13 @@ export class Badak {
 			]
 				.filter(uriFrag => uriFrag !== '');
 
-			let targetObj : RouteRule | RouteRuleSeed = refinedRuleObj;
+			let targetObj = refinedRuleObj;
 
-			uriArr.forEach((uriFrag, i, arr) => {
+			uriArr.forEach((uriFrag : string, i : number, arr : string[]) => {
 				if (Object.values(Method).includes(uriFrag as Method)) {
-					const method : string = uriFrag; // re-assign for readability
+					const method : Method = uriFrag as Method; // re-assign for readability
 
-					targetObj[method] = rule[method];
+					targetObj[method] = rule[method] as RouteRuleSeed;
 				} else {
 					if (i < arr.length - 1) {
 						// unzip abbreviation path
@@ -155,15 +158,21 @@ export class Badak {
 							targetObj[uriFrag] = {};
 						}
 
-						targetObj = targetObj[uriFrag];
+						targetObj = targetObj[uriFrag] as RouteRule;
 					} else {
 						// last uri frag
-						if (typeof rule[uri] === 'object') {
-							targetObj[uriFrag] = this._refineRouteRule(rule[uri], false);
-						} else if (typeof rule[uri] === 'function') {
+						const ruleAsAny : {
+							[key : string] : RouteRuleSeed | RouteFunction
+						} = rule as {
+							[key : string] : RouteRuleSeed | RouteFunction
+						};
+
+						if (typeof value === 'object') {
+							targetObj[uriFrag] = this._refineRouteRule(value, false);
+						} else if (typeof ruleAsAny[uri] === 'function') {
 							if (!!this._config.defaultMethod) {
 								targetObj[uriFrag] = {
-									[this._config.defaultMethod] : rule[uri]
+									[this._config.defaultMethod] : ruleAsAny[uri]
 								};
 							} else {
 								throw new Error('invalid rule or defaultMethod not set');
@@ -172,26 +181,24 @@ export class Badak {
 					}
 				}
 			});
-		});
+		}
 
 		return refinedRuleObj;
 	}
 
 	// call recursively
 	private getUriKeyArr (routeRule : RouteRule | RouteRuleSeed) : string[][] {
-		const allKeys : string[] = Object.keys(routeRule);
-
 		const result : string[][] = [];
 
-		allKeys.forEach((key) => {
-			if (typeof routeRule[key] === 'object') {
-				this.getUriKeyArr(routeRule[key]).forEach((one : string[]) => {
+		for (let [key, value] of Object.entries(routeRule)) {
+			if (typeof value === 'object') {
+				this.getUriKeyArr(value).forEach((one : string[]) => {
 					result.push([key, ...one]);
 				});
 			} else {
 				result.push([key]);
 			}
-		});
+		}
 
 		return result;
 	}
@@ -225,7 +232,7 @@ export class Badak {
 			if (questionRouteArr.length > 0) {
 				const targetUris : string[] = targetKeys.filter(uri => !questionRouteArr.includes(uri));
 
-				const matchingResult : string = questionRouteArr.find(regSrc => {
+				const matchingResult : string | undefined = questionRouteArr.find(regSrc => {
 					return targetUris.some(uri => new RegExp(regSrc).test(uri));
 				});
 
@@ -268,7 +275,7 @@ export class Badak {
 			throw  new Error('no auth function');
 		}
 
-		if (!(fnc instanceof Function)) {
+		if (typeof fnc !== 'function') {
 			throw new Error('auth param should be Function');
 		}
 
@@ -284,7 +291,7 @@ export class Badak {
 			throw new Error('middleware function should be passed');
 		}
 
-		if (!(middleware instanceof Function)) {
+		if (typeof middleware !== 'function') {
 			throw new Error('middleware should be function');
 		}
 
@@ -300,7 +307,7 @@ export class Badak {
 			throw new Error('middleware function should be passed');
 		}
 
-		if (!(middleware instanceof Function)) {
+		if (typeof middleware !== 'function') {
 			throw new Error('middleware should be function');
 		}
 
@@ -353,7 +360,7 @@ export class Badak {
 			throw new Error('no function');
 		}
 
-		if (!(fnc instanceof Function)) {
+		if (typeof fnc !== 'function') {
 			throw new Error('middleware should be Function');
 		}
 	}
@@ -417,7 +424,7 @@ export class Badak {
 
 	// parameter can be object of string because request has string
 	// only work for string param
-	private _paramConverter (param : object) : object {
+	private _paramConverter (param : AnyObject) : AnyObject {
 		if (isArray(param)) {
 			const paramAsArray : any[] = param as any[];
 
@@ -435,21 +442,19 @@ export class Badak {
 				}
 			});
 		} else {
-			Object.keys(param).forEach((key : string) => {
-				const childObj : any = param[key];
-
-				if (typeof childObj === 'object') {
+			for (let [key, value] of Object.entries(param)) {
+				if (typeof value === 'object') {
 					// call recursively
-					param[key] = this._paramConverter(param[key]);
-				} else if (typeof param[key] === 'string') {
+					param[key] = this._paramConverter(value);
+				} else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
-						param[key] = convertNumberStr(param[key]);
+						param[key] = convertNumberStr(value);
 					}
 					if (this._config.parseDate) {
-						param[key] = convertDateStr(param[key]);
+						param[key] = convertDateStr(value);
 					}
 				}
-			});
+			}
 		}
 
 		return param;
@@ -460,7 +465,7 @@ export class Badak {
 	private async _paramParser (req : IncomingMessage) : Promise<any> {
 		return new Promise((resolve, reject) => {
 			const bodyBuffer : Buffer[] = [];
-			let bodyStr : string = null;
+			let bodyStr : string | null = null;
 
 			req.on('data', (stream : Buffer) => {
 				bodyBuffer.push(stream);
@@ -471,7 +476,7 @@ export class Badak {
 			});
 
 			req.on('end', async () => {
-				let paramObj;
+				let paramObj : AnyObject | undefined = undefined;
 
 				const contentTypeInHeader : string = req.headers['content-type'] as string;
 
@@ -481,7 +486,7 @@ export class Badak {
 
 					bodyStr = Buffer.concat(bodyBuffer).toString();
 
-					let fieldArr : string[] = null;
+					let fieldArr : string[] | null = null;
 
 					switch (contentType) {
 						case 'multipart/form-data':
@@ -492,7 +497,7 @@ export class Badak {
 								throw new Error('invalid content-type');
 							}
 
-							fieldArr = bodyStr.split(boundaryStr)
+							bodyStr.split(boundaryStr)
 								.filter(one => {
 									return one.includes('Content-Disposition')
 										&& one.includes('form-data')
@@ -502,26 +507,27 @@ export class Badak {
 									return one
 										.replace(/\r\n--/, '') // multipart/form-data has redundant '--', remove it
 										.replace(/\r\n/g, ''); // trim '\r\n'
-								});
+								})
+								.forEach(field => {
+									const [prefix, key, value] = field.split('"');
 
-							paramObj = {};
-
-							fieldArr.forEach(field => {
-								const [prefix, key, value] = field.split('"');
-
-								if (key.endsWith('[]')) {
-									// array
-									const arrayName : string = key.replace(/\[\]$/g, '');
-
-									if (paramObj[arrayName] !== undefined) {
-										paramObj[arrayName].push(value);
-									} else {
-										paramObj[arrayName] = [value];
+									if (!paramObj) {
+										paramObj = {} as AnyObject;
 									}
-								} else {
-									paramObj[key] = value;
-								}
-							});
+
+									if (key.endsWith('[]')) {
+										// array
+										const arrayName : string = key.replace(/\[\]$/g, '');
+
+										if (paramObj[arrayName] !== undefined) {
+											paramObj[arrayName].push(value);
+										} else {
+											paramObj[arrayName] = [value];
+										}
+									} else {
+										paramObj[key] = value;
+									}
+								});
 
 							break;
 
@@ -538,26 +544,28 @@ export class Badak {
 
 						case 'application/x-www-form-urlencoded':
 							if (!!bodyStr) {
-								paramObj = {};
+								bodyStr
+									.split('&')
+									.forEach(field => {
+										const [key, value] = field.split('=');
 
-								fieldArr = bodyStr.split('&');
-
-								fieldArr.forEach(field => {
-									const [key, value] = field.split('=');
-
-									if (key.endsWith('[]')) {
-										// array
-										const arrayName : string = key.replace(/\[\]$/g, '');
-
-										if (paramObj[arrayName] !== undefined) {
-											paramObj[arrayName].push(value);
-										} else {
-											paramObj[arrayName] = [value];
+										if (!paramObj) {
+											paramObj = {} as AnyObject;
 										}
-									} else {
-										paramObj[key] = value;
-									}
-								});
+
+										if (key.endsWith('[]')) {
+											// array
+											const arrayName : string = key.replace(/\[\]$/g, '');
+
+											if (paramObj[arrayName] !== undefined) {
+												paramObj[arrayName].push(value);
+											} else {
+												paramObj[arrayName] = [value];
+											}
+										} else {
+											paramObj[key] = value;
+										}
+									});
 							}
 
 							// no payload, but ok
@@ -629,10 +637,6 @@ export class Badak {
 			throw new Error('port should be passed');
 		}
 
-		if (typeof port !== 'number') {
-			throw new Error('port should be number type');
-		}
-
 		if (this.isRunning()) {
 			throw new Error('server is running already');
 		}
@@ -643,8 +647,8 @@ export class Badak {
 				return loadFolder(staticRule.uri, staticRule.path);
 			}));
 
-			allCache.forEach(oneCacheSet => {
-				oneCacheSet.forEach(oneCache => {
+			allCache.forEach((oneCacheSet : StaticCache[]) => {
+				oneCacheSet.forEach((oneCache : StaticCache) => {
 					this._staticCache.push(oneCache);
 
 					this.get(oneCache.uri, async (param, req, res) => {
@@ -661,24 +665,27 @@ export class Badak {
 				const spaPathPrefix : string = (this._spaRoot.endsWith('/') ? this._spaRoot : this._spaRoot + '/');
 				const spaRoutingUrl : string = spaPathPrefix + '**';
 
-				this.get(spaRoutingUrl, async (param, req : IncomingMessage, res : ServerResponse) => {
+				await this.get(spaRoutingUrl, async (param, req : IncomingMessage, res : ServerResponse) => {
 					// find index.html in static cache & return
 					const indexHtmlUrl : string = spaPathPrefix + 'index.html';
 
-					const targetCache : StaticCache = this._staticCache.find(cache => {
+					const targetCache : StaticCache | undefined = this._staticCache.find(cache => {
 						return cache.uri === indexHtmlUrl;
 					});
 
-					const resFileObj : {
-						mime : string;
-						fileData : any;
-					} = {
-						mime : targetCache.mime,
-						fileData : targetCache.fileData
-					};
+					if (!!targetCache) {
+						const resFileObj : {
+							mime : string;
+							fileData : any;
+						} = {
+							mime : targetCache.mime,
+							fileData : targetCache.fileData
+						};
 
-					res.setHeader('Content-Type', resFileObj.mime);
-					res.write(resFileObj.fileData);
+						res.setHeader('Content-Type', resFileObj.mime);
+						res.write(resFileObj.fileData);
+					}
+
 					res.end();
 				}, {
 					auth : false
@@ -712,7 +719,7 @@ export class Badak {
 					}
 
 					const method : string = req.method.toUpperCase();
-					const uri : string = req.url;
+					const uri : string = req.url as string;
 
 					if (
 						(!this._routeRules || this._routeRules.length === 0)
@@ -722,13 +729,15 @@ export class Badak {
 						throw new Error('no rule');
 					}
 
-					let targetFncObj : RouteFunction | RouteFunctionObj;
+					let targetFncObj : RouteFunction | RouteFunctionObj | undefined;
 					let param : any;
+
 
 					let routeRuleLength : number = this._routeRules.length;
 
-					let targetRouteObj : RouteRule | RouteRuleSeed;
+					let targetRouteObj : RouteRule;
 
+					// don't use for-in/for-of here, targetRouteObj is not flat flow
 					for (let i = 0; i < routeRuleLength; i++) {
 						targetRouteObj = this._routeRules[i];
 
@@ -743,24 +752,24 @@ export class Badak {
 						// find target function
 						// use 'for' instead of 'forEach' to break
 						for (let j = 0; j < uriArrLength; j++) {
-							let loopControl : LoopControl;
+							let loopControl : LoopControl | undefined;
 
 							const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
 							const uriFrag : string = uriArr[j];
 
 							// normal routing
 							if (targetRouteObj[uriFrag] !== undefined) {
-								targetRouteObj = targetRouteObj[uriFrag];
+								targetRouteObj = targetRouteObj[uriFrag] as RouteRule;
 
 								loopControl = LoopControl.Continue;
 							}
 
 							if (!loopControl) {
 								// colon routing
-								const colonParam : string = routeRuleKeyArr.find(_uriFrag => _uriFrag.startsWith(':'));
+								const colonParam : string | undefined = routeRuleKeyArr.find(_uriFrag => _uriFrag.startsWith(':'));
 
 								if (colonParam !== undefined) {
-									targetRouteObj = targetRouteObj[colonParam];
+									targetRouteObj = targetRouteObj[colonParam] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -783,7 +792,7 @@ export class Badak {
 									return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
 								});
 
-								const targetQuestionKey : string = questionKeyArr.find(questionKey => {
+								const targetQuestionKey : string | undefined = questionKeyArr.find(questionKey => {
 									const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
 									const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
 									const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
@@ -792,7 +801,7 @@ export class Badak {
 								});
 
 								if (targetQuestionKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetQuestionKey];
+									targetRouteObj = targetRouteObj[targetQuestionKey] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -815,12 +824,12 @@ export class Badak {
 									return routeRuleKey.includes('+');
 								});
 
-								const targetPlusKey : string = plusKeyArr.find(plusKey => {
+								const targetPlusKey : string | undefined = plusKeyArr.find(plusKey => {
 									return new RegExp(plusKey).test(uriFrag);
 								});
 
 								if (targetPlusKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetPlusKey];
+									targetRouteObj = targetRouteObj[targetPlusKey] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -839,7 +848,7 @@ export class Badak {
 
 							if (!loopControl) {
 								if (routeRuleKeyArr.includes('*')) {
-									targetRouteObj = targetRouteObj['*'];
+									targetRouteObj = targetRouteObj['*'] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -853,7 +862,7 @@ export class Badak {
 
 							if (!loopControl) {
 								// partial asterisk routing
-								const targetAsteriskKey : string = routeRuleKeyArr
+								const targetAsteriskKey : string | undefined = routeRuleKeyArr
 									.filter(routeRuleKey => {
 										return /.\*./.test(routeRuleKey);
 									})
@@ -865,7 +874,7 @@ export class Badak {
 									});
 
 								if (targetAsteriskKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetAsteriskKey];
+									targetRouteObj = targetRouteObj[targetAsteriskKey] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -888,7 +897,7 @@ export class Badak {
 
 							if (j === uriArrLength - 1 // for urls like '/something/'
 								&& childRouteRuleKeyArr.includes('*')) {
-								targetRouteObj = targetRouteObj['*'];
+								targetRouteObj = targetRouteObj['*'] as RouteRule;
 
 								if (param === undefined) {
 									param = {};
@@ -898,7 +907,7 @@ export class Badak {
 
 								loopControl = LoopControl.Break;
 							} else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
-								targetRouteObj = targetRouteObj['**'];
+								targetRouteObj = targetRouteObj['**'] as RouteRule;
 
 								if (param === undefined) {
 									param = {};
@@ -906,7 +915,7 @@ export class Badak {
 
 								param['**'] = uriFrag;
 
-								// ignore after uri
+								// ignore after uriFrag
 								loopControl = LoopControl.Break;
 							}
 
@@ -915,14 +924,14 @@ export class Badak {
 								break;
 							} else if (loopControl === undefined) {
 								// not found
-								targetRouteObj = null;
+								(targetRouteObj as any) = null;
 								break;
 							}
 							// loopControl === LoopControl.Continue : continue
 						}
 
 						if (!!targetRouteObj && !!targetRouteObj[method]) {
-							targetFncObj = targetRouteObj[method];
+							targetFncObj = targetRouteObj[method] as RouteFunctionObj;
 
 							break;
 						}
@@ -944,11 +953,8 @@ export class Badak {
 							break;
 					}
 
-					if (!!this._authFnc
-						&& (
-							targetFncObj instanceof Function ||
-							(!(targetFncObj as RouteFunctionObj).option || ((targetFncObj as RouteFunctionObj).option.auth !== false))
-						)
+					if (!!this._authFnc && typeof this._authFnc === 'function'
+						&& (targetFncObj as RouteFunctionObj)?.option?.auth !== false
 					) {
 						// can be normal or async function
 						try {
@@ -1036,7 +1042,7 @@ export class Badak {
 								break;
 						}
 
-						if (this._config.preventError === false) {
+						if (!this._config.preventError) {
 							throw err;
 						}
 					})
@@ -1066,7 +1072,7 @@ export class Badak {
 	}
 
 	isRunning () : boolean {
-		return this._http !== null;
+		return this._http !== undefined;
 	}
 
 	getHttpServer () : Server {
@@ -1078,13 +1084,13 @@ export class Badak {
 	}
 
 	async stop () : Promise<any> {
-		if (this._http === null) {
+		if (this._http === undefined) {
 			throw new Error('server is not running, call listen() before stop()');
 		}
 
 		return new Promise((resolve) => {
 			this._http.close(() => {
-				this._http = null;
+				delete this._http;
 
 				resolve();
 			});

@@ -832,14 +832,6 @@ describe('core', () => {
 					});
 			});
 
-			it('port param - string', async () => {
-				await app.listen('3000' as any)
-					.then(fail, (err) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
-			});
-
 			it('run twice', async () => {
 				await app.listen(port)
 					.then(() => {

@@ -78,7 +78,7 @@ export const isExistFile = async (path : string) : Promise<boolean> => {
 
 export const isFolder = async (path : string) : Promise<boolean> => {
 	return new Promise<boolean>((resolve, reject) => {
-		fs.stat(path, (err : Error, stats : Stats) => {
+		fs.stat(path, (err : Error | null, stats : Stats) => {
 			if (!err) {
 				resolve(stats.isDirectory());
 			} else {
@@ -91,7 +91,7 @@ export const isFolder = async (path : string) : Promise<boolean> => {
 
 export const loadFolder = async (uri : string, path : string) : Promise<StaticCache[]> => {
 	const foldersAndFiles : string[] = await new Promise<string[]>(async (resolve, reject) => {
-		fs.readdir(path, (err : Error, _foldersAndFiles : string[]) => {
+		fs.readdir(path, (err : Error | null, _foldersAndFiles : string[]) => {
 			if (!err) {
 				resolve(_foldersAndFiles);
 			} else {
@@ -116,31 +116,33 @@ export const loadFolder = async (uri : string, path : string) : Promise<StaticCa
 			cacheSet = await loadFolder(uriSanitized, fullPath);
 
 		} else {
-			const matchArr : RegExpMatchArray = fullPath.match(/(\.[\w\d]+)?\.[\w\d]+$/);
+			const matchArr : RegExpMatchArray | null = fullPath.match(/(\.[\w\d]+)?\.[\w\d]+$/);
 
 			let mime : string = 'application/octet-stream'; // default
 
 			if (!!matchArr) {
 				const extension : string = matchArr[0];
 
-				const mimeMap = {
-					['.bmp'] : 'image/bmp',
-					['.css'] : 'text/css',
-					['.gif'] : 'image/gif',
-					['.htm'] : 'text/html',
-					['.html'] : 'text/html',
-					['.jpeg'] : 'image/jpeg',
-					['.jpg'] : 'image/jpeg',
-					['.js'] : 'text/javascript',
-					['.json'] : 'application/json',
-					['.pdf'] : 'application/pdf',
-					['.png'] : 'image/png',
-					['.txt'] : 'text/plain',
-					['.text'] : 'text/plain',
-					['.tif'] : 'image/tiff',
-					['.tiff'] : 'image/tiff',
-					['.xls'] : 'application/vnd.ms-excel',
-					['.xlsx'] : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+				const mimeMap : {
+					[key : string] : string;
+				} = {
+					'.bmp' : 'image/bmp',
+					'.css' : 'text/css',
+					'.gif' : 'image/gif',
+					'.htm' : 'text/html',
+					'.html' : 'text/html',
+					'.jpeg' : 'image/jpeg',
+					'.jpg' : 'image/jpeg',
+					'.js' : 'text/javascript',
+					'.json' : 'application/json',
+					'.pdf' : 'application/pdf',
+					'.png' : 'image/png',
+					'.txt' : 'text/plain',
+					'.text' : 'text/plain',
+					'.tif' : 'image/tiff',
+					'.tiff' : 'image/tiff',
+					'.xls' : 'application/vnd.ms-excel',
+					'.xlsx' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 				};
 
 				if (!!mimeMap[extension]) {
@@ -167,7 +169,7 @@ export const loadFolder = async (uri : string, path : string) : Promise<StaticCa
 
 const loadFile = async (path : string) : Promise<Buffer> => {
 	return new Promise<Buffer>((resolve, reject) => {
-		fs.readFile(path, (err : Error, data : Buffer) => {
+		fs.readFile(path, (err : Error | null, data : Buffer) => {
 			if (!err) {
 				resolve(data);
 			} else {

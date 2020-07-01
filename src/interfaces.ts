@@ -2,11 +2,15 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { Method } from './constants';
 
-export type RouteFunction = (param : Object, req : IncomingMessage, res : ServerResponse) => any;
+export type RouteFunction = (param : any, req : IncomingMessage, res : ServerResponse) => any;
 export type MiddlewareFunction = (req : IncomingMessage, res : ServerResponse, responseBody? : string) => void;
 
+export interface AnyObject {
+	[key : string] : any;
+}
+
 export interface RouteRule {
-	[uri : string] : RouteRule | RouteRuleSeed | Function; // function can be assigned after config('defaultMethod', [method_type])
+	[uri : string] : RouteRule | RouteRuleSeed | RouteFunction; // function can be assigned after config('defaultMethod', [method_type])
 }
 
 export interface RouteOption {
@@ -29,7 +33,7 @@ export interface BadakOption {
 	catchErrorLog : boolean; // default true, if false, badak will not show error catching log
 	preventError : boolean; // default true, if false, badak pass error to node
 
-	defaultMethod : Method; // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
+	defaultMethod : Method | undefined; // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
 	/**
 	 * before rule :
 	 * {

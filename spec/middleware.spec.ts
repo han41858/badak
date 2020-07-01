@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import * as request from 'supertest';
 
 import { Badak } from '../src/badak';
-import { MiddlewareFunction } from '../src/interfaces';
+import { MiddlewareFunction, RouteFunction } from '../src/interfaces';
 
 const fail = async () => {
 	throw new Error('this should be not execute');
@@ -112,7 +112,7 @@ describe('middleware', () => {
 			describe(`common - ${ fncName }`, () => {
 				it('defined', () => {
 					expect(app[fncName]).to.be.ok;
-					expect(app[fncName]).to.be.instanceof(Function);
+					expect(typeof app[fncName]).to.be.eql('function');
 				});
 
 				describe('error', () => {
@@ -274,7 +274,7 @@ describe('middleware', () => {
 					expect(res).to.be.ok;
 				};
 
-				const routeFnc : Function = async (param) => {
+				const routeFnc : RouteFunction = async (param) => {
 					expect(param).to.be.ok;
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified
