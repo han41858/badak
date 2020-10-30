@@ -16,7 +16,7 @@ import {
 	StaticRule
 } from './interfaces';
 import { Method } from './constants';
-import { checkAbsolutePath, checkAbsoluteUri, convertDateStr, convertNumberStr, isArray, isExistFile, isFolder, loadFolder } from './util';
+import { checkAbsolutePath, checkAbsoluteUri, convertDateStr, convertNumberStr, isExistFile, isFolder, loadFolder } from './util';
 
 /**
  * rule format, reserved keyword is 4-methods in upper cases
@@ -425,7 +425,7 @@ export class Badak {
 	// parameter can be object of string because request has string
 	// only work for string param
 	private _paramConverter (param : AnyObject) : AnyObject {
-		if (isArray(param)) {
+		if (Array.isArray(param)) {
 			const paramAsArray : any[] = param as any[];
 
 			paramAsArray.forEach((value, i, arr) => {
