@@ -26,7 +26,7 @@ export const convertDateStr = (param : string) : string | Date => {
 		/^(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}(.(\d){3})?Z$/, // combined date and time in UTC : '2018-06-20T21:22:09Z', '2018-06-20T22:00:30.296Z'
 		/^(\d){8}T(\d){6}Z$/, // combined date and time in UTC : '20180620T212209Z'
 		/^(\d){4}-W(\d){2}$/, // week : '2018-W25'
-		/^(\d){4}-W(\d){2}-(\d){1}$/, // date with week number : '2018-W25-3'
+		/^(\d){4}-W(\d){2}-(\d)$/, // date with week number : '2018-W25-3'
 		/^--(\d){2}-(\d){2}$/, // date without year : '--06-20'
 		/^(\d){4}-(\d){3}$/ // ordinal dates : '2018-171'
 	];

@@ -41,7 +41,7 @@ enum LoopControl {
 }
 
 export class Badak {
-	private _http ! : Server;
+	private _http : Server | undefined;
 
 	// auth hook
 	private _authFnc : MiddlewareFunction | undefined;
@@ -460,8 +460,8 @@ export class Badak {
 
 	// for POST, PUT
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req : IncomingMessage) : Promise<AnyObject> {
-		return new Promise<AnyObject>((resolve, reject) => {
+	private async _paramParser (req : IncomingMessage) : Promise<AnyObject | void> {
+		return new Promise<AnyObject | void>((resolve, reject) => {
 			const bodyBuffer : Buffer[] = [];
 			let bodyStr : string | undefined = undefined;
 
@@ -729,7 +729,7 @@ export class Badak {
 					}
 
 					let targetFncObj : RouteFunction | RouteFunctionObj | undefined;
-					let param : AnyObject | undefined;
+					let param : AnyObject | void;
 
 
 					const routeRuleLength : number = this._routeRules.length;
@@ -943,11 +943,11 @@ export class Badak {
 					switch (method) {
 						case Method.PUT:
 						case Method.POST:
-							if (param === undefined) {
-								param = await this._paramParser(req);
-							} else {
+							if (param) {
 								// TODO: overwrite? uri param & param object
 								param = Object.assign(param, await this._paramParser(req));
+							} else {
+								param = await this._paramParser(req);
 							}
 							break;
 					}
@@ -1074,7 +1074,7 @@ export class Badak {
 		return this._http !== undefined;
 	}
 
-	getHttpServer () : Server {
+	getHttpServer () : Server | undefined {
 		if (!this.isRunning()) {
 			throw new Error('server is not started');
 		}
@@ -1088,7 +1088,7 @@ export class Badak {
 		}
 
 		return new Promise<void>((resolve) => {
-			this._http.close(() => {
+			this._http?.close(() => {
 				delete this._http;
 
 				resolve();
