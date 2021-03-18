@@ -274,7 +274,7 @@ describe('middleware', () => {
 					expect(res).to.be.ok;
 				};
 
-				const routeFnc : RouteFunction = async (param) => {
+				const routeFnc : RouteFunction = async (param : object) => {
 					expect(param).to.be.ok;
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified

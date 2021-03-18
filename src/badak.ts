@@ -68,17 +68,15 @@ export class Badak {
 	};
 
 	constructor (option? : Partial<BadakOption>) {
-		if (!!option) {
-			const configAsAnyObject : AnyObject = this._config;
-
-			for (let [key, value] of Object.entries(option)) {
-				configAsAnyObject[key] = value;
+		if (option) {
+			for (const [key, value] of Object.entries(option)) {
+				this._config[key] = value;
 			}
 		}
 	}
 
 	// refine route rule, this function can be called recursively
-	private _refineRouteRule (rule : RouteRule | RouteRuleSeed, isRoot : boolean = true) {
+	private _refineRouteRule (rule : RouteRule | RouteRuleSeed, isRoot = true) {
 		if (rule === undefined) {
 			throw new Error('no rule');
 		}
@@ -90,7 +88,7 @@ export class Badak {
 		}
 
 		// check validation
-		for (let [uri] of Object.entries(rule)) {
+		for (const [uri] of Object.entries(rule)) {
 			if (uri.includes('//')) {
 				throw new Error('invalid double slash');
 			}
@@ -136,7 +134,7 @@ export class Badak {
 		const refinedRuleObj : RouteRule = {};
 
 		// called recursively
-		for (let [uri, value] of Object.entries(rule)) {
+		for (const [uri, value] of Object.entries(rule)) {
 			// make array for uri abbreviation
 			const uriArr : string[] = [
 				isRoot ? '/' : '', // start from root
@@ -170,7 +168,7 @@ export class Badak {
 						if (typeof value === 'object') {
 							targetObj[uriFrag] = this._refineRouteRule(value, false);
 						} else if (typeof ruleAsAny[uri] === 'function') {
-							if (!!this._config.defaultMethod) {
+							if (this._config.defaultMethod) {
 								targetObj[uriFrag] = {
 									[this._config.defaultMethod] : ruleAsAny[uri]
 								};
@@ -190,7 +188,7 @@ export class Badak {
 	private getUriKeyArr (routeRule : RouteRule | RouteRuleSeed) : string[][] {
 		const result : string[][] = [];
 
-		for (let [key, value] of Object.entries(routeRule)) {
+		for (const [key, value] of Object.entries(routeRule)) {
 			if (typeof value === 'object') {
 				this.getUriKeyArr(value).forEach((one : string[]) => {
 					result.push([key, ...one]);
@@ -314,7 +312,7 @@ export class Badak {
 		this._middlewaresAfter.push(middleware);
 	}
 
-	async config (key : string, value : any) : Promise<void> {
+	async config (key : string, value : unknown) : Promise<void> {
 		if (Object.keys(this._config).includes(key)) {
 			switch (key) {
 				// boolean keys
@@ -426,12 +424,12 @@ export class Badak {
 	// only work for string param
 	private _paramConverter (param : AnyObject) : AnyObject {
 		if (Array.isArray(param)) {
-			const paramAsArray : any[] = param as any[];
+			const paramAsArray : unknown[] = param as unknown[];
 
 			paramAsArray.forEach((value, i, arr) => {
 				if (typeof value === 'object') {
 					// call recursively
-					arr[i] = this._paramConverter(value);
+					arr[i] = this._paramConverter(value as AnyObject);
 				} else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
 						arr[i] = convertNumberStr(value);
@@ -442,10 +440,10 @@ export class Badak {
 				}
 			});
 		} else {
-			for (let [key, value] of Object.entries(param)) {
+			for (const [key, value] of Object.entries(param)) {
 				if (typeof value === 'object') {
 					// call recursively
-					param[key] = this._paramConverter(value);
+					param[key] = this._paramConverter(value as AnyObject);
 				} else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
 						param[key] = convertNumberStr(value);
@@ -462,10 +460,10 @@ export class Badak {
 
 	// for POST, PUT
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req : IncomingMessage) : Promise<any> {
-		return new Promise((resolve, reject) => {
+	private async _paramParser (req : IncomingMessage) : Promise<AnyObject> {
+		return new Promise<AnyObject>((resolve, reject) => {
 			const bodyBuffer : Buffer[] = [];
-			let bodyStr : string | null = null;
+			let bodyStr : string | undefined = undefined;
 
 			req.on('data', (stream : Buffer) => {
 				bodyBuffer.push(stream);
@@ -476,20 +474,19 @@ export class Badak {
 			});
 
 			req.on('end', async () => {
-				let paramObj : AnyObject | undefined = undefined;
+				let param : AnyObject | undefined = undefined;
 
 				const contentTypeInHeader : string = req.headers['content-type'] as string;
 
-				if (!!contentTypeInHeader) {
+				if (contentTypeInHeader) {
 					const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
 					const contentType = contentTypeStrArr[0].trim();
 
 					bodyStr = Buffer.concat(bodyBuffer).toString();
 
-					let fieldArr : string[] | null = null;
 
 					switch (contentType) {
-						case 'multipart/form-data':
+						case 'multipart/form-data': {
 							const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
 							const boundaryStr : string = boundaryStrArr[1].trim();
 
@@ -509,32 +506,34 @@ export class Badak {
 										.replace(/\r\n/g, ''); // trim '\r\n'
 								})
 								.forEach(field => {
-									const [prefix, key, value] = field.split('"');
+									// prefix, key, value
+									const [, key, value] = field.split('"');
 
-									if (!paramObj) {
-										paramObj = {} as AnyObject;
+									if (!param) {
+										param = {} as AnyObject;
 									}
 
 									if (key.endsWith('[]')) {
 										// array
 										const arrayName : string = key.replace(/\[\]$/g, '');
 
-										if (paramObj[arrayName] !== undefined) {
-											paramObj[arrayName].push(value);
+										if (param[arrayName]) {
+											(param[arrayName] as Array<unknown>).push(value);
 										} else {
-											paramObj[arrayName] = [value];
+											param[arrayName] = [value];
 										}
 									} else {
-										paramObj[key] = value;
+										param[key] = value;
 									}
 								});
 
 							break;
+						}
 
 						case 'application/json':
-							if (!!bodyStr) {
+							if (bodyStr) {
 								try {
-									paramObj = JSON.parse(bodyStr);
+									param = JSON.parse(bodyStr);
 								} catch (e) {
 									throw new Error('parsing parameter failed');
 								}
@@ -543,27 +542,27 @@ export class Badak {
 							break;
 
 						case 'application/x-www-form-urlencoded':
-							if (!!bodyStr) {
+							if (bodyStr) {
 								bodyStr
 									.split('&')
 									.forEach(field => {
 										const [key, value] = field.split('=');
 
-										if (!paramObj) {
-											paramObj = {} as AnyObject;
+										if (!param) {
+											param = {} as AnyObject;
 										}
 
 										if (key.endsWith('[]')) {
 											// array
 											const arrayName : string = key.replace(/\[\]$/g, '');
 
-											if (paramObj[arrayName] !== undefined) {
-												paramObj[arrayName].push(value);
+											if (param[arrayName] !== undefined) {
+												(param[arrayName] as Array<unknown>).push(value);
 											} else {
-												paramObj[arrayName] = [value];
+												param[arrayName] = [value];
 											}
 										} else {
-											paramObj[key] = value;
+											param[key] = value;
 										}
 									});
 							}
@@ -572,11 +571,11 @@ export class Badak {
 							break;
 					}
 
-					if (!!paramObj) {
-						paramObj = this._paramConverter(paramObj);
+					if (param) {
+						param = this._paramConverter(param);
 					}
 
-					resolve(paramObj);
+					resolve(param);
 				} else {
 					// no content-type, but ok
 					resolve();
@@ -661,7 +660,7 @@ export class Badak {
 				});
 			});
 
-			if (!!this._spaRoot) {
+			if (this._spaRoot) {
 				const spaPathPrefix : string = (this._spaRoot.endsWith('/') ? this._spaRoot : this._spaRoot + '/');
 				const spaRoutingUrl : string = spaPathPrefix + '**';
 
@@ -673,10 +672,10 @@ export class Badak {
 						return cache.uri === indexHtmlUrl;
 					});
 
-					if (!!targetCache) {
+					if (targetCache) {
 						const resFileObj : {
 							mime : string;
-							fileData : any;
+							fileData : Buffer;
 						} = {
 							mime : targetCache.mime,
 							fileData : targetCache.fileData
@@ -696,7 +695,7 @@ export class Badak {
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject) => {
 			this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
-				let responseBody : string;
+				let responseBody : unknown;
 
 				// new Promise loop to catch error
 				(async () => {
@@ -730,12 +729,12 @@ export class Badak {
 					}
 
 					let targetFncObj : RouteFunction | RouteFunctionObj | undefined;
-					let param : any;
+					let param : AnyObject | undefined;
 
 
-					let routeRuleLength : number = this._routeRules.length;
+					const routeRuleLength : number = this._routeRules.length;
 
-					let targetRouteObj : RouteRule;
+					let targetRouteObj : RouteRule | undefined;
 
 					// don't use for-in/for-of here, targetRouteObj is not flat flow
 					for (let i = 0; i < routeRuleLength; i++) {
@@ -924,13 +923,13 @@ export class Badak {
 								break;
 							} else if (loopControl === undefined) {
 								// not found
-								(targetRouteObj as any) = null;
+								targetRouteObj = undefined;
 								break;
 							}
 							// loopControl === LoopControl.Continue : continue
 						}
 
-						if (!!targetRouteObj && !!targetRouteObj[method]) {
+						if (targetRouteObj && targetRouteObj[method]) {
 							targetFncObj = targetRouteObj[method] as RouteFunctionObj;
 
 							break;
@@ -965,11 +964,11 @@ export class Badak {
 						}
 					}
 
-					const resObj : any = targetFncObj instanceof Function ?
+					const resObj : unknown = targetFncObj instanceof Function ?
 						await targetFncObj(param, req, res) :
 						await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
-					if (!!resObj) {
+					if (resObj) {
 						// check result is json
 						if (typeof resObj === 'object') {
 							try {
@@ -995,7 +994,7 @@ export class Badak {
 						res.end();
 					}
 				})()
-					.catch(async (err : any) => {
+					.catch(async (err : Error | AnyObject) => {
 						if (this._config.catchErrorLog) {
 							console.error('badak catch error : %o', err);
 						}
@@ -1023,11 +1022,11 @@ export class Badak {
 							default:
 								res.statusCode = 500; // Internal Server Error
 
-								if (!!err) {
+								if (err) {
 									if (err instanceof Error) {
 										responseBody = err.message;
 										res.setHeader('Content-Type', 'text/plain');
-									} else if (err instanceof Object) {
+									} else if (typeof err === 'object') {
 										responseBody = JSON.stringify(err);
 										res.setHeader('Content-Type', 'application/json');
 									} else {
@@ -1083,12 +1082,12 @@ export class Badak {
 		return this._http;
 	}
 
-	async stop () : Promise<any> {
+	async stop () : Promise<void> {
 		if (this._http === undefined) {
 			throw new Error('server is not running, call listen() before stop()');
 		}
 
-		return new Promise((resolve) => {
+		return new Promise<void>((resolve) => {
 			this._http.close(() => {
 				delete this._http;
 

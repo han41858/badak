@@ -8,20 +8,16 @@ import * as node_path from 'path';
 import { StaticCache } from './interfaces';
 
 
-export const convertNumberStr = (param : any) : any => {
-	let result : any = param;
-
-	if (!isNaN(+param)) {
-		result = +param;
-	}
-
-	return result;
+export const convertNumberStr = (param : string) : string | number => {
+	return !isNaN(+param)
+		? +param
+		: param;
 };
 
 // convert if date string
 // if not date string, return itself
-export const convertDateStr = (param : any) : any => {
-	let result : any = param;
+export const convertDateStr = (param : string) : string | Date => {
+	let result : string | Date = param;
 
 	// only work for ISO 8601 date format
 	const dateExps : RegExp[] = [
@@ -65,7 +61,7 @@ export const checkAbsolutePath = async (path : string) : Promise<void> => {
 };
 
 export const isExistFile = async (path : string) : Promise<boolean> => {
-	return new Promise<boolean>((resolve, reject) => {
+	return new Promise<boolean>((resolve) => {
 		fs.access(path, (err) => {
 			if (!err) {
 				resolve(true);
@@ -90,7 +86,7 @@ export const isFolder = async (path : string) : Promise<boolean> => {
 
 
 export const loadFolder = async (uri : string, path : string) : Promise<StaticCache[]> => {
-	const foldersAndFiles : string[] = await new Promise<string[]>(async (resolve, reject) => {
+	const foldersAndFiles : string[] = await new Promise<string[]>((resolve, reject) => {
 		fs.readdir(path, (err : Error | null, _foldersAndFiles : string[]) => {
 			if (!err) {
 				resolve(_foldersAndFiles);
@@ -118,9 +114,9 @@ export const loadFolder = async (uri : string, path : string) : Promise<StaticCa
 		} else {
 			const matchArr : RegExpMatchArray | null = fullPath.match(/(\.[\w\d]+)?\.[\w\d]+$/);
 
-			let mime : string = 'application/octet-stream'; // default
+			let mime = 'application/octet-stream'; // default
 
-			if (!!matchArr) {
+			if (matchArr) {
 				const extension : string = matchArr[0];
 
 				const mimeMap : {
@@ -145,7 +141,7 @@ export const loadFolder = async (uri : string, path : string) : Promise<StaticCa
 					'.xlsx' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 				};
 
-				if (!!mimeMap[extension]) {
+				if (mimeMap[extension]) {
 					mime = mimeMap[extension];
 				}
 			}
@@ -160,7 +156,7 @@ export const loadFolder = async (uri : string, path : string) : Promise<StaticCa
 		return cacheSet;
 	}));
 
-	allFileData.forEach((oneFileData, i) => {
+	allFileData.forEach((oneFileData) => {
 		cache.push(...oneFileData);
 	});
 
