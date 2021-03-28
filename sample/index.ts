@@ -6,7 +6,7 @@ const getUserList = async () => {
 	};
 };
 
-const addUser = async (param) => {
+const addUser = async (param : unknown) => {
 	console.log('addUser()', param);
 
 	return {
@@ -15,7 +15,7 @@ const addUser = async (param) => {
 };
 
 const port = 9000;
-const app = new Badak;
+const app : Badak = new Badak();
 
 (async () => {
 	await app.route({
