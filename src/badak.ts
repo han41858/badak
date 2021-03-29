@@ -427,7 +427,10 @@ export class Badak {
 			const paramAsArray : unknown[] = param as unknown[];
 
 			paramAsArray.forEach((value, i, arr) => {
-				if (typeof value === 'object') {
+				if (!value) {
+					// null, undefined
+					arr[i] = value;
+				} else if (typeof value === 'object') {
 					// call recursively
 					arr[i] = this._paramConverter(value as AnyObject);
 				} else if (typeof value === 'string') {
@@ -441,7 +444,10 @@ export class Badak {
 			});
 		} else {
 			for (const [key, value] of Object.entries(param)) {
-				if (typeof value === 'object') {
+				if (!value) {
+					// null, undefined
+					param[key] = value;
+				} else if (typeof value === 'object') {
 					// call recursively
 					param[key] = this._paramConverter(value as AnyObject);
 				} else if (typeof value === 'string') {

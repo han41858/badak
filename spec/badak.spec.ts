@@ -816,6 +816,84 @@ describe('core', () => {
 					.expect(200); // 200 means no error while call testFnc()
 			});
 		});
+
+		// undefined converted to null while sending request
+		describe('array contains undefined', () => {
+			const strArr : (string | undefined)[] = ['str1', 'str2', undefined];
+
+			const testFnc = (param) => {
+				expect(param).to.be.ok;
+				expect(param).to.be.a('object');
+
+				expect(param.strArr).to.be.instanceOf(Array);
+				expect(param.strArr).to.be.lengthOf(strArr.length);
+
+				param.strArr.forEach((str : string | undefined, i : number) => {
+					if (strArr[i]) {
+						expect(str).to.be.eql(strArr[i]);
+					} else {
+						expect(str).to.be.eql(null); // not undefined
+					}
+				});
+			};
+
+			beforeEach(async () => {
+				await app.route({
+					[testUrl] : {
+						POST : testFnc
+					}
+				});
+
+				await app.listen(port);
+			});
+
+			it('application/json', async () => {
+				await request(app.getHttpServer())
+					.post(testUrl)
+					.send({ strArr : strArr })
+					.expect(200); // 200 means no error while call testFnc()
+			});
+
+			// no multipart/form-data
+			// no application/x-www-form-urlencoded
+		});
+
+		describe('array contains null', () => {
+			const strArr : (string | null)[] = ['str1', 'str2', null];
+
+			const testFnc = (param) => {
+				expect(param).to.be.ok;
+				expect(param).to.be.a('object');
+
+				expect(param.strArr).to.be.instanceOf(Array);
+				expect(param.strArr).to.be.lengthOf(strArr.length);
+
+				param.strArr.forEach((str : string | null, i : number) => {
+					expect(str).to.be.eql(strArr[i]);
+					expect(typeof str).to.be.eql(typeof strArr[i]);
+				});
+			};
+
+			beforeEach(async () => {
+				await app.route({
+					[testUrl] : {
+						POST : testFnc
+					}
+				});
+
+				await app.listen(port);
+			});
+
+			it('application/json', async () => {
+				await request(app.getHttpServer())
+					.post(testUrl)
+					.send({ strArr : strArr })
+					.expect(200); // 200 means no error while call testFnc()
+			});
+
+			// no multipart/form-data
+			// no application/x-www-form-urlencoded
+		});
 	});
 
 	describe('listen()', () => {
