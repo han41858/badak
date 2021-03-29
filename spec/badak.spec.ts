@@ -670,7 +670,7 @@ describe('core', () => {
 							await app.listen(port);
 						});
 
-						methods.forEach((testMethod, j) => {
+						methods.forEach((testMethod : Method) => {
 							it('test ' + testMethod, async () => {
 								const routeRules : RouteRule[] = (app as any)._routeRules;
 
@@ -3529,7 +3529,7 @@ describe('core', () => {
 						[
 							'',
 							'/nested'
-						].forEach((prefix, i) => {
+						].forEach((prefix : string) => {
 							it(prefix + '/*', async () => {
 								await app.route({
 									[prefix + '/*'] : {

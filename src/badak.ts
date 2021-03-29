@@ -523,7 +523,7 @@ export class Badak {
 
 									if (key.endsWith('[]')) {
 										// array
-										const arrayName : string = key.replace(/\[\]$/g, '');
+										const arrayName : string = key.replace(/\[]$/g, '');
 
 										if (param[arrayName]) {
 											(param[arrayName] as Array<unknown>).push(value);
@@ -562,7 +562,7 @@ export class Badak {
 
 										if (key.endsWith('[]')) {
 											// array
-											const arrayName : string = key.replace(/\[\]$/g, '');
+											const arrayName : string = key.replace(/\[]$/g, '');
 
 											if (param[arrayName] !== undefined) {
 												(param[arrayName] as Array<unknown>).push(value);
@@ -610,7 +610,7 @@ export class Badak {
 			throw new Error(`target should be a folder : ${ path }`);
 		}
 
-		this._static(uri, path);
+		await this._static(uri, path);
 	}
 
 	async route (rule : RouteRule) : Promise<void> {

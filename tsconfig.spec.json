@@ -1,18 +1,18 @@
 {
-  "compilerOptions": {
-    "module": "commonjs",
-    "target": "es6",
-    "sourceMap": true,
-    "outDir": "./build",
-    "declaration": true,
-    "declarationDir": "build",
-    "lib": [
-      "es2018",
-      "dom"
-    ]
-  },
-  "exclude": [
-    "node_modules",
-    "sample"
-  ]
+	"compilerOptions": {
+		"module": "commonjs",
+		"target": "es6",
+		"sourceMap": true,
+		"outDir": "./build",
+		"declaration": true,
+		"declarationDir": "build",
+		"lib": [
+			"es2018",
+			"dom"
+		]
+	},
+	"exclude": [
+		"node_modules",
+		"sample"
+	]
 }
