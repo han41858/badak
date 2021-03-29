@@ -1,13 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import 'mocha';
+import { afterEach, before, beforeEach } from 'mocha';
 
 import { expect } from 'chai';
 import * as request from 'supertest';
 
 import { Badak } from '../src/badak';
 import { RouteRule, RouteRuleSeed, StaticCache, StaticRule } from '../src/interfaces';
+import { Method } from '../src/constants';
 
 const fail = async () => {
 	throw new Error('this should be not execute');
@@ -25,7 +26,9 @@ describe('core', () => {
 	});
 
 	afterEach(() => {
-		return app.isRunning() ? app.stop() : Promise.resolve();
+		return app.isRunning()
+			? app.stop()
+			: Promise.resolve();
 	});
 
 	it('creating instance', () => {
@@ -177,7 +180,7 @@ describe('core', () => {
 							expect(param).to.be.ok;
 							expect(param).to.be.instanceOf(Array);
 
-							param.every(value => {
+							param.forEach(value => {
 								expect(value).to.be.a('number');
 							});
 						};
@@ -203,11 +206,11 @@ describe('core', () => {
 							expect(param).to.be.ok;
 
 							expect(param.num).to.be.instanceOf(Array);
-							param.num.every(value => {
+							param.num.forEach(value => {
 								expect(value).to.be.a('number');
 							});
 
-							param.float.every(value => {
+							param.float.forEach(value => {
 								expect(value).to.be.a('number');
 							});
 						};
@@ -236,11 +239,11 @@ describe('core', () => {
 							expect(param).to.be.ok;
 
 							expect(param.num).to.be.instanceOf(Array);
-							param.num.every(value => {
+							param.num.forEach(value => {
 								expect(value).to.be.a('number');
 							});
 
-							param.float.every(value => {
+							param.float.forEach(value => {
 								expect(value).to.be.a('number');
 							});
 						};
@@ -567,7 +570,7 @@ describe('core', () => {
 			const testUri : string = '/defaultMethod';
 			const testUriRefined : string = testUri.replace('/', '');
 
-			const methods : string[] = ['GET', 'POST', 'PUT', 'DELETE'];
+			const methods : Method[] = [Method.GET, Method.POST, Method.PUT, Method.DELETE];
 
 			const echoFnc = (param) => {
 				return param;
@@ -655,7 +658,7 @@ describe('core', () => {
 			});
 
 			describe('after set', () => {
-				methods.forEach((setMethod, i) => {
+				methods.forEach((setMethod : Method) => {
 					describe('set ' + setMethod, () => {
 						beforeEach(async () => {
 							await app.config('defaultMethod', setMethod);
@@ -777,7 +780,7 @@ describe('core', () => {
 				expect(param.strArr).to.be.instanceOf(Array);
 				expect(param.strArr).to.be.lengthOf(strArr.length);
 
-				param.strArr.every((value, i) => {
+				param.strArr.forEach((value, i) => {
 					expect(value).to.be.a('string');
 					expect(value).to.be.eql(strArr[i]);
 				});
@@ -1257,7 +1260,7 @@ describe('core', () => {
 				});
 
 				await Promise.all(
-					testObj.map(async ([uri, fullUri] : [string, string]) => {
+					testObj.map(async ([uri] : [string, string]) => {
 						await app.static(uri, folderPath);
 
 						checkBefore(uri);
@@ -1267,7 +1270,7 @@ describe('core', () => {
 				await app.listen(port);
 
 				await Promise.all(
-					testObj.map(async ([uri, fullUri] : [string, string]) => {
+					testObj.map(async ([, fullUri] : [string, string]) => {
 						await checkAfter(fullUri);
 					})
 				);
@@ -3697,7 +3700,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res = await requestFnc.expect(200);
+					const res = await requestFnc?.expect(200);
 
 					expect(res).to.be.ok;
 					expect(fncRun).to.be.true;
@@ -3843,7 +3846,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res1 = await requestFnc1.expect(200);
+					const res1 = await requestFnc1?.expect(200);
 
 					expect(res1).to.be.ok;
 					expect(fnc1RunFlag).to.be.true;
@@ -3870,7 +3873,7 @@ describe('core', () => {
 							break;
 					}
 
-					const res2 = await requestFnc2.expect(200);
+					const res2 = await requestFnc2?.expect(200);
 
 					expect(res2).to.be.ok;
 					expect(fnc1RunFlag).to.be.true;

@@ -211,7 +211,9 @@ export class Badak {
 		allUriKeys.push(...this.getUriKeyArr(newRouteRule));
 
 		const maxDepthLength : number = allUriKeys.reduce((maxLength : number, cur : string[]) => {
-			return maxLength > cur.length ? maxLength : cur.length;
+			return maxLength > cur.length
+				? maxLength
+				: cur.length;
 		}, 0);
 
 		for (let i = 0; i < maxDepthLength; i++) {
@@ -667,7 +669,9 @@ export class Badak {
 			});
 
 			if (this._spaRoot) {
-				const spaPathPrefix : string = (this._spaRoot.endsWith('/') ? this._spaRoot : this._spaRoot + '/');
+				const spaPathPrefix : string = this._spaRoot.endsWith('/')
+					? this._spaRoot
+					: this._spaRoot + '/';
 				const spaRoutingUrl : string = spaPathPrefix + '**';
 
 				await this.get(spaRoutingUrl, async (param, req : IncomingMessage, res : ServerResponse) => {
@@ -958,7 +962,8 @@ export class Badak {
 							break;
 					}
 
-					if (!!this._authFnc && typeof this._authFnc === 'function'
+					if (this._authFnc
+						&& typeof this._authFnc === 'function'
 						&& (targetFncObj as RouteFunctionObj)?.option?.auth !== false
 					) {
 						// can be normal or async function
@@ -970,9 +975,10 @@ export class Badak {
 						}
 					}
 
-					const resObj : unknown = targetFncObj instanceof Function ?
-						await targetFncObj(param, req, res) :
-						await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
+
+					const resObj : unknown = typeof targetFncObj === 'function'
+						? await targetFncObj(param, req, res)
+						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
 					if (resObj) {
 						// check result is json
