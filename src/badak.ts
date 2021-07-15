@@ -41,33 +41,33 @@ enum LoopControl {
 }
 
 export class Badak {
-	private _http : Server | undefined;
+	private _http: Server | undefined;
 
 	// auth hook
-	private _authFnc : MiddlewareFunction | undefined;
+	private _authFnc: MiddlewareFunction | undefined;
 
 	// before & after hooks
-	private _middlewaresBefore : MiddlewareFunction[] = [];
-	private _middlewaresAfter : MiddlewareFunction[] = [];
+	private _middlewaresBefore: MiddlewareFunction[] = [];
+	private _middlewaresAfter: MiddlewareFunction[] = [];
 
-	private _routeRules : RouteRule[] = [];
+	private _routeRules: RouteRule[] = [];
 
-	private _staticRules : StaticRule[] = [];
-	private _staticCache : StaticCache[] = [];
+	private _staticRules: StaticRule[] = [];
+	private _staticCache: StaticCache[] = [];
 
-	private _spaRoot : string | undefined;
+	private _spaRoot: string | undefined;
 
-	private _config : BadakOption = {
-		catchErrorLog : true,
-		preventError : true,
+	private _config: BadakOption = {
+		catchErrorLog: true,
+		preventError: true,
 
-		defaultMethod : undefined,
+		defaultMethod: undefined,
 
-		parseNumber : false,
-		parseDate : false
+		parseNumber: false,
+		parseDate: false
 	};
 
-	constructor (option? : Partial<BadakOption>) {
+	constructor (option?: Partial<BadakOption>) {
 		if (option) {
 			for (const [key, value] of Object.entries(option)) {
 				this._config[key] = value;
@@ -76,12 +76,12 @@ export class Badak {
 	}
 
 	// refine route rule, this function can be called recursively
-	private _refineRouteRule (rule : RouteRule | RouteRuleSeed, isRoot = true) {
+	private _refineRouteRule (rule: RouteRule | RouteRuleSeed, isRoot: boolean = true): RouteRule {
 		if (rule === undefined) {
 			throw new Error('no rule');
 		}
 
-		const keys = Object.keys(rule);
+		const keys: string[] = Object.keys(rule);
 
 		if (keys.length === 0) {
 			throw new Error('no rule in rule object');
@@ -93,21 +93,22 @@ export class Badak {
 				throw new Error('invalid double slash');
 			}
 
-			let uriArr : string[];
+			let uriArr: string[];
 
 			if (uri === '/') {
 				uriArr = ['/'];
-			} else {
+			}
+			else {
 				uriArr = uri
 					.split('/')
-					.filter(uriFrag => !!uriFrag);
+					.filter((uriFrag: string): uriFrag is string => !!uriFrag);
 			}
 
 			if (uriArr.length === 0) {
 				throw new Error('empty rule');
 			}
 
-			uriArr.forEach(uriFrag => {
+			uriArr.forEach((uriFrag: string): void => {
 				if (uriFrag.trim() !== uriFrag) {
 					throw new Error('uri include space');
 				}
@@ -131,25 +132,26 @@ export class Badak {
 		}
 
 
-		const refinedRuleObj : RouteRule = {};
+		const refinedRuleObj: RouteRule = {};
 
 		// called recursively
 		for (const [uri, value] of Object.entries(rule)) {
 			// make array for uri abbreviation
-			const uriArr : string[] = [
+			const uriArr: string[] = [
 				isRoot ? '/' : '', // start from root
 				...uri.split('/')
 			]
-				.filter(uriFrag => uriFrag !== '');
+				.filter((uriFrag: string): boolean => uriFrag !== '');
 
-			let targetObj = refinedRuleObj;
+			let targetObj: RouteRule = refinedRuleObj;
 
-			uriArr.forEach((uriFrag : string, i : number, arr : string[]) => {
+			uriArr.forEach((uriFrag: string, i: number, arr: string[]): void => {
 				if (Object.values(Method).includes(uriFrag as Method)) {
-					const method : Method = uriFrag as Method; // re-assign for readability
+					const method: Method = uriFrag as Method; // re-assign for readability
 
 					targetObj[method] = rule[method] as RouteRuleSeed;
-				} else {
+				}
+				else {
 					if (i < arr.length - 1) {
 						// unzip abbreviation path
 						if (!targetObj[uriFrag]) {
@@ -157,22 +159,25 @@ export class Badak {
 						}
 
 						targetObj = targetObj[uriFrag] as RouteRule;
-					} else {
+					}
+					else {
 						// last uri frag
-						const ruleAsAny : {
-							[key : string] : RouteRuleSeed | RouteFunction
+						const ruleAsAny: {
+							[key: string]: RouteRuleSeed | RouteFunction
 						} = rule as {
-							[key : string] : RouteRuleSeed | RouteFunction
+							[key: string]: RouteRuleSeed | RouteFunction
 						};
 
 						if (typeof value === 'object') {
 							targetObj[uriFrag] = this._refineRouteRule(value, false);
-						} else if (typeof ruleAsAny[uri] === 'function') {
+						}
+						else if (typeof ruleAsAny[uri] === 'function') {
 							if (this._config.defaultMethod) {
 								targetObj[uriFrag] = {
-									[this._config.defaultMethod] : ruleAsAny[uri]
+									[this._config.defaultMethod]: ruleAsAny[uri]
 								};
-							} else {
+							}
+							else {
 								throw new Error('invalid rule or defaultMethod not set');
 							}
 						}
@@ -185,15 +190,16 @@ export class Badak {
 	}
 
 	// call recursively
-	private getUriKeyArr (routeRule : RouteRule | RouteRuleSeed) : string[][] {
-		const result : string[][] = [];
+	private getUriKeyArr (routeRule: RouteRule | RouteRuleSeed): string[][] {
+		const result: string[][] = [];
 
 		for (const [key, value] of Object.entries(routeRule)) {
 			if (typeof value === 'object') {
-				this.getUriKeyArr(value).forEach((one : string[]) => {
+				this.getUriKeyArr(value).forEach((one: string[]): void => {
 					result.push([key, ...one]);
 				});
-			} else {
+			}
+			else {
 				result.push([key]);
 			}
 		}
@@ -201,39 +207,39 @@ export class Badak {
 		return result;
 	}
 
-	private _checkUriDuplication (currentRouteRule : RouteRule[], newRouteRule : RouteRule) : void {
-		const allUriKeys : string[][] = [];
+	private _checkUriDuplication (currentRouteRule: RouteRule[], newRouteRule: RouteRule): void {
+		const allUriKeys: string[][] = [];
 
-		currentRouteRule.forEach(oneRouteRule => {
+		currentRouteRule.forEach((oneRouteRule: RouteRule): void => {
 			allUriKeys.push(...this.getUriKeyArr(oneRouteRule));
 		});
 
 		allUriKeys.push(...this.getUriKeyArr(newRouteRule));
 
-		const maxDepthLength : number = allUriKeys.reduce((maxLength : number, cur : string[]) => {
+		const maxDepthLength: number = allUriKeys.reduce((maxLength: number, cur: string[]): number => {
 			return maxLength > cur.length
 				? maxLength
 				: cur.length;
 		}, 0);
 
 		for (let i = 0; i < maxDepthLength; i++) {
-			const targetKeys : string[] = allUriKeys
-				.map(oneTree => oneTree[i])
-				.filter(frag => !!frag); // for different depth
+			const targetKeys: string[] = allUriKeys
+				.map((oneTree: string[]): string => oneTree[i])
+				.filter((frag: string): frag is string => !!frag); // for different depth
 
 			// colon routing
-			const colonRouteArr : string[] = targetKeys.filter(uri => uri.startsWith(':'));
+			const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
 			if (colonRouteArr.length > 1) {
 				throw new Error('duplicated colon routing');
 			}
 
 			// question routing
-			const questionRouteArr : string[] = targetKeys.filter(uri => uri.includes('?'));
+			const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('?'));
 			if (questionRouteArr.length > 0) {
-				const targetUris : string[] = targetKeys.filter(uri => !questionRouteArr.includes(uri));
+				const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
 
-				const matchingResult : string | undefined = questionRouteArr.find(regSrc => {
-					return targetUris.some(uri => new RegExp(regSrc).test(uri));
+				const matchingResult: string | undefined = questionRouteArr.find((regSrc: string): boolean => {
+					return targetUris.some((uri: string): boolean => new RegExp(regSrc).test(uri));
 				});
 
 				if (matchingResult !== undefined) {
@@ -242,16 +248,17 @@ export class Badak {
 			}
 
 			// plus routing
-			const plusRouteArr : string[] = targetKeys.filter(uri => uri.includes('+'));
+			const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('+'));
 			if (plusRouteArr.length > 0) {
-				const plusUrisSanitized : string[] = [...targetKeys]; // start with all keys
-				plusRouteArr.forEach(uri => {
-					const plusIncluded : string = uri.replace('+', '');
-					const plusExcluded : string = uri.replace(/.\+/, '');
+				const plusUrisSanitized: string[] = [...targetKeys]; // start with all keys
+				plusRouteArr.forEach((uri: string): void => {
+					const plusIncluded: string = uri.replace('+', '');
+					const plusExcluded: string = uri.replace(/.\+/, '');
 
 					if (plusUrisSanitized.includes(plusIncluded) || plusUrisSanitized.includes(plusExcluded)) {
 						throw new Error('duplicated plus routing');
-					} else {
+					}
+					else {
 						plusUrisSanitized.push(plusIncluded, plusExcluded);
 					}
 				});
@@ -261,8 +268,8 @@ export class Badak {
 		}
 	}
 
-	private _assignRule (rule : RouteRule) : void {
-		const refinedRule : RouteRule = this._refineRouteRule(rule);
+	private _assignRule (rule: RouteRule): void {
+		const refinedRule: RouteRule = this._refineRouteRule(rule);
 
 		this._checkUriDuplication(this._routeRules, refinedRule);
 
@@ -270,7 +277,7 @@ export class Badak {
 	}
 
 	// auth
-	async auth (fnc : MiddlewareFunction) : Promise<void> {
+	async auth (fnc: MiddlewareFunction): Promise<void> {
 		if (fnc === undefined) {
 			throw  new Error('no auth function');
 		}
@@ -282,7 +289,7 @@ export class Badak {
 		this._authFnc = fnc;
 	}
 
-	async before (middleware : MiddlewareFunction) : Promise<void> {
+	async before (middleware: MiddlewareFunction): Promise<void> {
 		if (this.isRunning()) {
 			throw new Error('server is started already, this function should be called before listen()');
 		}
@@ -298,7 +305,7 @@ export class Badak {
 		this._middlewaresBefore.push(middleware);
 	}
 
-	async after (middleware : MiddlewareFunction) : Promise<void> {
+	async after (middleware: MiddlewareFunction): Promise<void> {
 		if (this.isRunning()) {
 			throw new Error('server is started already, this function should be called before listen()');
 		}
@@ -314,7 +321,7 @@ export class Badak {
 		this._middlewaresAfter.push(middleware);
 	}
 
-	async config (key : string, value : unknown) : Promise<void> {
+	async config (key: string, value: unknown): Promise<void> {
 		if (Object.keys(this._config).includes(key)) {
 			switch (key) {
 				// boolean keys
@@ -333,25 +340,27 @@ export class Badak {
 							throw new Error('invalid method parameter');
 						}
 
-						if (!Object.values(Method).some((method : string) => {
+						if (!Object.values(Method).some((method: string): boolean => {
 							return value.toUpperCase() === method;
 						})) {
 							throw new Error('not defined method');
 						}
 
 						this._config.defaultMethod = value.toUpperCase() as Method;
-					} else {
+					}
+					else {
 						// null is clearing
 						delete this._config[key];
 					}
 					break;
 			}
-		} else {
+		}
+		else {
 			throw new Error('not defined option');
 		}
 	}
 
-	private _routeAbbrValidator (address : string, fnc : RouteFunction) : void {
+	private _routeAbbrValidator (address: string, fnc: RouteFunction): void {
 		if (address === undefined) {
 			throw new Error('no address');
 		}
@@ -366,57 +375,57 @@ export class Badak {
 	}
 
 	// route abbreviation
-	async get (address : string, fnc : RouteFunction, option? : RouteOption) : Promise<void> {
+	async get (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
 		this._assignRule({
-			[address] : {
-				[Method.GET] : {
-					fnc : fnc,
-					option : option
+			[address]: {
+				[Method.GET]: {
+					fnc: fnc,
+					option: option
 				}
 			}
 		});
 	}
 
-	async post (address : string, fnc : RouteFunction, option? : RouteOption) : Promise<void> {
+	async post (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
 		this._assignRule({
-			[address] : {
-				[Method.POST] : {
-					fnc : fnc,
-					option : option
+			[address]: {
+				[Method.POST]: {
+					fnc: fnc,
+					option: option
 				}
 			}
 		});
 	}
 
-	async put (address : string, fnc : RouteFunction, option? : RouteOption) : Promise<void> {
+	async put (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
 		this._assignRule({
-			[address] : {
-				[Method.PUT] : {
-					fnc : fnc,
-					option : option
+			[address]: {
+				[Method.PUT]: {
+					fnc: fnc,
+					option: option
 				}
 			}
 		});
 	}
 
-	async delete (address : string, fnc : RouteFunction, option? : RouteOption) : Promise<void> {
+	async delete (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
 		this._assignRule({
-			[address] : {
-				[Method.DELETE] : {
-					fnc : fnc,
-					option : option
+			[address]: {
+				[Method.DELETE]: {
+					fnc: fnc,
+					option: option
 				}
 			}
 		});
@@ -424,18 +433,20 @@ export class Badak {
 
 	// parameter can be object of string because request has string
 	// only work for string param
-	private _paramConverter (param : AnyObject) : AnyObject {
+	private _paramConverter (param: AnyObject): AnyObject {
 		if (Array.isArray(param)) {
-			const paramAsArray : unknown[] = param as unknown[];
+			const paramAsArray: unknown[] = param as unknown[];
 
-			paramAsArray.forEach((value, i, arr) => {
+			paramAsArray.forEach((value: unknown, i: number, arr: unknown[]): void => {
 				if (!value) {
 					// null, undefined
 					arr[i] = value;
-				} else if (typeof value === 'object') {
+				}
+				else if (typeof value === 'object') {
 					// call recursively
 					arr[i] = this._paramConverter(value as AnyObject);
-				} else if (typeof value === 'string') {
+				}
+				else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
 						arr[i] = convertNumberStr(value);
 					}
@@ -444,15 +455,18 @@ export class Badak {
 					}
 				}
 			});
-		} else {
+		}
+		else {
 			for (const [key, value] of Object.entries(param)) {
 				if (!value) {
 					// null, undefined
 					param[key] = value;
-				} else if (typeof value === 'object') {
+				}
+				else if (typeof value === 'object') {
 					// call recursively
 					param[key] = this._paramConverter(value as AnyObject);
-				} else if (typeof value === 'string') {
+				}
+				else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
 						param[key] = convertNumberStr(value);
 					}
@@ -468,26 +482,26 @@ export class Badak {
 
 	// for POST, PUT
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req : IncomingMessage) : Promise<AnyObject | void> {
-		return new Promise<AnyObject | void>((resolve, reject) => {
-			const bodyBuffer : Buffer[] = [];
-			let bodyStr : string | undefined = undefined;
+	private async _paramParser (req: IncomingMessage): Promise<AnyObject | void> {
+		return new Promise<AnyObject | void>((resolve, reject): void => {
+			const bodyBuffer: Buffer[] = [];
+			let bodyStr: string | undefined;
 
-			req.on('data', (stream : Buffer) => {
+			req.on('data', (stream: Buffer): void => {
 				bodyBuffer.push(stream);
 			});
 
-			req.on('error', (err) => {
+			req.on('error', (err: Error): void => {
 				reject(err);
 			});
 
-			req.on('end', async () => {
-				let param : AnyObject | undefined = undefined;
+			req.on('end', async (): Promise<void> => {
+				let param: AnyObject | undefined;
 
-				const contentTypeInHeader : string = req.headers['content-type'] as string;
+				const contentTypeInHeader: string = req.headers['content-type'] as string;
 
 				if (contentTypeInHeader) {
-					const contentTypeStrArr : string[] = contentTypeInHeader.split(';');
+					const contentTypeStrArr: string[] = contentTypeInHeader.split(';');
 					const contentType = contentTypeStrArr[0].trim();
 
 					bodyStr = Buffer.concat(bodyBuffer).toString();
@@ -495,25 +509,25 @@ export class Badak {
 
 					switch (contentType) {
 						case 'multipart/form-data': {
-							const boundaryStrArr : string[] = contentTypeStrArr[1].split('=');
-							const boundaryStr : string = boundaryStrArr[1].trim();
+							const boundaryStrArr: string[] = contentTypeStrArr[1].split('=');
+							const boundaryStr: string = boundaryStrArr[1].trim();
 
 							if (!boundaryStr) {
 								throw new Error('invalid content-type');
 							}
 
 							bodyStr.split(boundaryStr)
-								.filter(one => {
+								.filter((one: string): boolean => {
 									return one.includes('Content-Disposition')
 										&& one.includes('form-data')
 										&& one.includes('name=');
 								})
-								.map(one => {
+								.map((one: string): string => {
 									return one
 										.replace(/\r\n--/, '') // multipart/form-data has redundant '--', remove it
 										.replace(/\r\n/g, ''); // trim '\r\n'
 								})
-								.forEach(field => {
+								.forEach((field: string): void => {
 									// prefix, key, value
 									const [, key, value] = field.split('"');
 
@@ -523,14 +537,16 @@ export class Badak {
 
 									if (key.endsWith('[]')) {
 										// array
-										const arrayName : string = key.replace(/\[]$/g, '');
+										const arrayName: string = key.replace(/\[]$/g, '');
 
 										if (param[arrayName]) {
 											(param[arrayName] as Array<unknown>).push(value);
-										} else {
+										}
+										else {
 											param[arrayName] = [value];
 										}
-									} else {
+									}
+									else {
 										param[key] = value;
 									}
 								});
@@ -542,7 +558,8 @@ export class Badak {
 							if (bodyStr) {
 								try {
 									param = JSON.parse(bodyStr);
-								} catch (e) {
+								}
+								catch (e) {
 									throw new Error('parsing parameter failed');
 								}
 							}
@@ -553,7 +570,7 @@ export class Badak {
 							if (bodyStr) {
 								bodyStr
 									.split('&')
-									.forEach(field => {
+									.forEach((field: string): void => {
 										const [key, value] = field.split('=');
 
 										if (!param) {
@@ -562,14 +579,16 @@ export class Badak {
 
 										if (key.endsWith('[]')) {
 											// array
-											const arrayName : string = key.replace(/\[]$/g, '');
+											const arrayName: string = key.replace(/\[]$/g, '');
 
 											if (param[arrayName] !== undefined) {
 												(param[arrayName] as Array<unknown>).push(value);
-											} else {
+											}
+											else {
 												param[arrayName] = [value];
 											}
-										} else {
+										}
+										else {
 											param[key] = value;
 										}
 									});
@@ -584,7 +603,8 @@ export class Badak {
 					}
 
 					resolve(param);
-				} else {
+				}
+				else {
 					// no content-type, but ok
 					resolve();
 				}
@@ -592,16 +612,17 @@ export class Badak {
 		});
 	}
 
-	private async _static (uri : string, path : string) : Promise<void> {
+	private async _static (uri: string, path: string): Promise<void> {
 		// not assign to route rule
 		if (!this._staticRules) {
 			this._staticRules = [{ uri, path }];
-		} else {
+		}
+		else {
 			this._staticRules.push({ uri, path });
 		}
 	}
 
-	async static (uri : string, path : string) : Promise<void> {
+	async static (uri: string, path: string): Promise<void> {
 		await checkAbsoluteUri(uri);
 
 		await checkAbsolutePath(path);
@@ -613,12 +634,12 @@ export class Badak {
 		await this._static(uri, path);
 	}
 
-	async route (rule : RouteRule) : Promise<void> {
+	async route (rule: RouteRule): Promise<void> {
 		this._assignRule(rule);
 	}
 
 	// add folder to static & add route rule for Single Page Application
-	async setSPARoot (uri : string, path : string) : Promise<void> {
+	async setSPARoot (uri: string, path: string): Promise<void> {
 		await checkAbsoluteUri(uri);
 
 		await checkAbsolutePath(path);
@@ -628,7 +649,7 @@ export class Badak {
 		}
 
 		// check index.file exists
-		const indexExists : boolean = await isExistFile(node_path.join(path, 'index.html'));
+		const indexExists: boolean = await isExistFile(node_path.join(path, 'index.html'));
 
 		if (!indexExists) {
 			throw new Error(`index.html not exists in : ${ path }`);
@@ -639,7 +660,7 @@ export class Badak {
 		this._spaRoot = uri;
 	}
 
-	async listen (port : number) : Promise<void> {
+	async listen (port: number): Promise<void> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
 		}
@@ -650,45 +671,47 @@ export class Badak {
 
 		// load static files
 		if (!!this._staticRules && this._staticRules.length > 0) {
-			const allCache : StaticCache[][] = await Promise.all<StaticCache[]>(this._staticRules.map(async (staticRule : StaticRule) : Promise<StaticCache[]> => {
-				return loadFolder(staticRule.uri, staticRule.path);
-			}));
+			const allCache: StaticCache[][] = await Promise.all<StaticCache[]>(
+				this._staticRules.map(async (staticRule: StaticRule): Promise<StaticCache[]> => {
+					return loadFolder(staticRule.uri, staticRule.path);
+				})
+			);
 
-			allCache.forEach((oneCacheSet : StaticCache[]) => {
-				oneCacheSet.forEach((oneCache : StaticCache) => {
+			allCache.forEach((oneCacheSet: StaticCache[]): void => {
+				oneCacheSet.forEach((oneCache: StaticCache): void => {
 					this._staticCache.push(oneCache);
 
-					this.get(oneCache.uri, async (param, req, res) => {
+					this.get(oneCache.uri, async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
 						res.setHeader('Content-Type', oneCache.mime);
 						res.write(oneCache.fileData);
 						res.end();
 					}, {
-						auth : false
+						auth: false
 					});
 				});
 			});
 
 			if (this._spaRoot) {
-				const spaPathPrefix : string = this._spaRoot.endsWith('/')
+				const spaPathPrefix: string = this._spaRoot.endsWith('/')
 					? this._spaRoot
 					: this._spaRoot + '/';
-				const spaRoutingUrl : string = spaPathPrefix + '**';
+				const spaRoutingUrl: string = spaPathPrefix + '**';
 
-				await this.get(spaRoutingUrl, async (param, req : IncomingMessage, res : ServerResponse) => {
+				await this.get(spaRoutingUrl, async (param, req: IncomingMessage, res: ServerResponse): Promise<void> => {
 					// find index.html in static cache & return
-					const indexHtmlUrl : string = spaPathPrefix + 'index.html';
+					const indexHtmlUrl: string = spaPathPrefix + 'index.html';
 
-					const targetCache : StaticCache | undefined = this._staticCache.find(cache => {
+					const targetCache: StaticCache | undefined = this._staticCache.find((cache: StaticCache): boolean => {
 						return cache.uri === indexHtmlUrl;
 					});
 
 					if (targetCache) {
-						const resFileObj : {
-							mime : string;
-							fileData : Buffer;
+						const resFileObj: {
+							mime: string;
+							fileData: Buffer;
 						} = {
-							mime : targetCache.mime,
-							fileData : targetCache.fileData
+							mime: targetCache.mime,
+							fileData: targetCache.fileData
 						};
 
 						res.setHeader('Content-Type', resFileObj.mime);
@@ -697,26 +720,27 @@ export class Badak {
 
 					res.end();
 				}, {
-					auth : false
+					auth: false
 				});
 			}
 		}
 
 		// use new Promise for http.listen() callback
-		await new Promise<void>((resolve, reject) => {
-			this._http = http.createServer((req : IncomingMessage, res : ServerResponse) => {
-				let responseBody : unknown;
+		await new Promise<void>((resolve, reject): void => {
+			this._http = http.createServer((req: IncomingMessage, res: ServerResponse): void => {
+				let responseBody: unknown;
 
 				// new Promise loop to catch error
-				(async () => {
+				(async (): Promise<void> => {
 					// run before middleware functions in parallel
 					// before functions can't modify parameters
 					// use try {} to run route function
 					try {
-						await Promise.all(this._middlewaresBefore.map((middlewareFnc : MiddlewareFunction) => {
+						await Promise.all(this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): void => {
 							return middlewareFnc(req, res);
 						}));
-					} catch (err) {
+					}
+					catch (err) {
 						// catch middleware exception
 						if (this._config.catchErrorLog) {
 							console.error('badak before() middleware failed :', err);
@@ -727,8 +751,8 @@ export class Badak {
 						throw new Error('no method');
 					}
 
-					const method : string = req.method.toUpperCase();
-					const uri : string = req.url as string;
+					const method: string = req.method.toUpperCase();
+					const uri: string = req.url as string;
 
 					if (
 						(!this._routeRules || this._routeRules.length === 0)
@@ -738,33 +762,33 @@ export class Badak {
 						throw new Error('no rule');
 					}
 
-					let targetFncObj : RouteFunction | RouteFunctionObj | undefined;
-					let param : AnyObject | void;
+					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
+					let param: AnyObject | void;
 
 
-					const routeRuleLength : number = this._routeRules.length;
+					const routeRuleLength: number = this._routeRules.length;
 
-					let targetRouteObj : RouteRule | undefined;
+					let targetRouteObj: RouteRule | undefined;
 
 					// don't use for-in/for-of here, targetRouteObj is not flat flow
 					for (let i = 0; i < routeRuleLength; i++) {
 						targetRouteObj = this._routeRules[i];
 
 						// normal routing
-						const uriArr : string[] = [
+						const uriArr: string[] = [
 							'/', // start from root
 							...uri.split('/')
 						]
-							.filter(frag => frag !== '');
-						const uriArrLength : number = uriArr.length;
+							.filter((frag: string): boolean => frag !== '');
+						const uriArrLength: number = uriArr.length;
 
 						// find target function
 						// use 'for' instead of 'forEach' to break
 						for (let j = 0; j < uriArrLength; j++) {
-							let loopControl : LoopControl | undefined;
+							let loopControl: LoopControl | undefined;
 
-							const routeRuleKeyArr : string[] = Object.keys(targetRouteObj);
-							const uriFrag : string = uriArr[j];
+							const routeRuleKeyArr: string[] = Object.keys(targetRouteObj);
+							const uriFrag: string = uriArr[j];
 
 							// normal routing
 							if (targetRouteObj[uriFrag] !== undefined) {
@@ -775,7 +799,9 @@ export class Badak {
 
 							if (!loopControl) {
 								// colon routing
-								const colonParam : string | undefined = routeRuleKeyArr.find(_uriFrag => _uriFrag.startsWith(':'));
+								const colonParam: string | undefined = routeRuleKeyArr.find((_uriFrag: string): boolean => {
+									return _uriFrag.startsWith(':');
+								});
 
 								if (colonParam !== undefined) {
 									targetRouteObj = targetRouteObj[colonParam] as RouteRule;
@@ -797,14 +823,18 @@ export class Badak {
 
 							if (!loopControl) {
 								// question routing
-								const questionKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
-									return routeRuleKey.includes('?') && routeRuleKey.indexOf('?') !== 0;
+								const questionKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
+									return routeRuleKey.includes('?')
+										&& routeRuleKey.indexOf('?') !== 0;
 								});
 
-								const targetQuestionKey : string | undefined = questionKeyArr.find(questionKey => {
-									const optionalCharacter : string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-									const mandatoryKey : string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-									const restKey : string = questionKey.substr(questionKey.indexOf(optionalCharacter + '?') + optionalCharacter.length + 1);
+								const targetQuestionKey: string | undefined = questionKeyArr.find((questionKey: string): boolean => {
+									const optionalCharacter: string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
+									const mandatoryKey: string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
+									const restKey: string = questionKey.substr(
+										questionKey.indexOf(optionalCharacter + '?')
+										+ optionalCharacter.length + 1
+									);
 
 									return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
 								});
@@ -829,11 +859,11 @@ export class Badak {
 
 							if (!loopControl) {
 								// plus routing
-								const plusKeyArr : string[] = routeRuleKeyArr.filter(routeRuleKey => {
+								const plusKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
 									return routeRuleKey.includes('+');
 								});
 
-								const targetPlusKey : string | undefined = plusKeyArr.find(plusKey => {
+								const targetPlusKey: string | undefined = plusKeyArr.find((plusKey: string): boolean => {
 									return new RegExp(plusKey).test(uriFrag);
 								});
 
@@ -871,11 +901,11 @@ export class Badak {
 
 							if (!loopControl) {
 								// partial asterisk routing
-								const targetAsteriskKey : string | undefined = routeRuleKeyArr
-									.filter(routeRuleKey => {
+								const targetAsteriskKey: string | undefined = routeRuleKeyArr
+									.filter((routeRuleKey: string): boolean => {
 										return /.\*./.test(routeRuleKey);
 									})
-									.find(asteriskKey => {
+									.find((asteriskKey: string): boolean => {
 										// replace '*' to '(.)*'
 										return new RegExp(
 											asteriskKey.replace('*', '(.)*')
@@ -902,7 +932,7 @@ export class Badak {
 
 
 							// * / ** asterisk child routing
-							const childRouteRuleKeyArr : string[] = Object.keys(targetRouteObj);
+							const childRouteRuleKeyArr: string[] = Object.keys(targetRouteObj);
 
 							if (j === uriArrLength - 1 // for urls like '/something/'
 								&& childRouteRuleKeyArr.includes('*')) {
@@ -915,7 +945,8 @@ export class Badak {
 								param['*'] = uriFrag;
 
 								loopControl = LoopControl.Break;
-							} else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
+							}
+							else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
 								targetRouteObj = targetRouteObj['**'] as RouteRule;
 
 								if (param === undefined) {
@@ -931,7 +962,8 @@ export class Badak {
 							// use if/else instead of switch to break for loop
 							if (loopControl === LoopControl.Break) {
 								break;
-							} else if (loopControl === undefined) {
+							}
+							else if (loopControl === undefined) {
 								// not found
 								targetRouteObj = undefined;
 								break;
@@ -956,7 +988,8 @@ export class Badak {
 							if (param) {
 								// TODO: overwrite? uri param & param object
 								param = Object.assign(param, await this._paramParser(req));
-							} else {
+							}
+							else {
 								param = await this._paramParser(req);
 							}
 							break;
@@ -969,14 +1002,15 @@ export class Badak {
 						// can be normal or async function
 						try {
 							await this._authFnc(req, res);
-						} catch (e) {
+						}
+						catch (e) {
 							// create new error instance
 							throw new Error('auth failed');
 						}
 					}
 
 
-					const resObj : unknown = typeof targetFncObj === 'function'
+					const resObj: unknown = typeof targetFncObj === 'function'
 						? await targetFncObj(param, req, res)
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
@@ -989,24 +1023,27 @@ export class Badak {
 
 								res.setHeader('Content-Type', 'application/json');
 								res.end(responseBody);
-							} catch (err) {
+							}
+							catch (err) {
 								// no json
 								responseBody = resObj;
 
 								res.setHeader('Content-Type', 'text/plain');
 								res.end(responseBody);
 							}
-						} else {
+						}
+						else {
 							responseBody = resObj;
 
 							res.setHeader('Content-Type', 'text/plain');
 							res.end(responseBody);
 						}
-					} else {
+					}
+					else {
 						res.end();
 					}
 				})()
-					.catch(async (err : Error | AnyObject) => {
+					.catch(async (err: Error | AnyObject): Promise<void> => {
 						if (this._config.catchErrorLog) {
 							console.error('badak catch error : %o', err);
 						}
@@ -1038,16 +1075,19 @@ export class Badak {
 									if (err instanceof Error) {
 										responseBody = err.message;
 										res.setHeader('Content-Type', 'text/plain');
-									} else if (typeof err === 'object') {
+									}
+									else if (typeof err === 'object') {
 										responseBody = JSON.stringify(err);
 										res.setHeader('Content-Type', 'application/json');
-									} else {
+									}
+									else {
 										responseBody = err;
 										res.setHeader('Content-Type', 'text/plain');
 									}
 
 									res.end(responseBody);
-								} else {
+								}
+								else {
 									res.end();
 								}
 								break;
@@ -1057,13 +1097,14 @@ export class Badak {
 							throw err;
 						}
 					})
-					.then(async () => {
+					.then(async (): Promise<void> => {
 						// run after middleware functions
 						try {
-							await Promise.all(this._middlewaresAfter.map((middlewareFnc : MiddlewareFunction) => {
+							await Promise.all(this._middlewaresAfter.map((middlewareFnc: MiddlewareFunction): void => {
 								return middlewareFnc(req, res, responseBody);
 							}));
-						} catch (err) {
+						}
+						catch (err) {
 							// catch middleware exception
 							if (this._config.catchErrorLog) {
 								console.error('badak after() middleware failed :', err);
@@ -1072,21 +1113,21 @@ export class Badak {
 					});
 			});
 
-			this._http.on('error', (err : Error) => {
+			this._http.on('error', (err: Error): void => {
 				reject(err);
 			});
 
-			this._http.listen(port, () => {
+			this._http.listen(port, (): void => {
 				resolve();
 			});
 		});
 	}
 
-	isRunning () : boolean {
+	isRunning (): boolean {
 		return this._http !== undefined;
 	}
 
-	getHttpServer () : Server | undefined {
+	getHttpServer (): Server | undefined {
 		if (!this.isRunning()) {
 			throw new Error('server is not started');
 		}
@@ -1094,13 +1135,13 @@ export class Badak {
 		return this._http;
 	}
 
-	async stop () : Promise<void> {
+	async stop (): Promise<void> {
 		if (this._http === undefined) {
 			throw new Error('server is not running, call listen() before stop()');
 		}
 
-		return new Promise<void>((resolve) => {
-			this._http?.close(() => {
+		return new Promise<void>((resolve): void => {
+			this._http?.close((): void => {
 				delete this._http;
 
 				resolve();

@@ -15,11 +15,13 @@ const cp = (src, dest) => {
 			if (stats.isDirectory()) {
 				// call recursively
 				cp(`${src}/${fileOrDir}`, `${dest}/${fileOrDir}`);
-			} else {
+			}
+			else {
 				copyFileSync(`${src}/${fileOrDir}`, `${dest}/${fileOrDir}`);
 			}
 		});
-	} else {
+	}
+	else {
 		throw new Error(`no src path: ${src}`);
 	}
 };

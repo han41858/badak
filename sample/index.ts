@@ -2,26 +2,26 @@ import { Badak } from '../src/badak';
 
 const getUserList = async () => {
 	return {
-		list : ['han', 'kim', 'lee']
+		list: ['han', 'kim', 'lee']
 	};
 };
 
-const addUser = async (param : unknown) => {
+const addUser = async (param: unknown) => {
 	console.log('addUser()', param);
 
 	return {
-		result : 'ok'
+		result: 'ok'
 	};
 };
 
 const port = 9000;
-const app : Badak = new Badak();
+const app: Badak = new Badak();
 
 (async () => {
 	await app.route({
-		'users' : {
-			'GET' : getUserList,
-			'POST' : addUser
+		'users': {
+			'GET': getUserList,
+			'POST': addUser
 		}
 	});
 

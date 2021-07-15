@@ -2,38 +2,38 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { Method } from './constants';
 
-export type RouteFunction = (param : unknown, req : IncomingMessage, res : ServerResponse) => unknown;
-export type MiddlewareFunction = (req : IncomingMessage, res : ServerResponse, responseBody? : unknown) => void;
+export type RouteFunction = (param: unknown, req: IncomingMessage, res: ServerResponse) => unknown;
+export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, responseBody?: unknown) => void;
 
 export interface AnyObject {
-	[key : string] : unknown;
+	[key: string]: unknown;
 }
 
 export interface RouteRule {
-	[uri : string] : RouteRule | RouteRuleSeed | RouteFunction; // function can be assigned after config('defaultMethod', [method_type])
+	[uri: string]: RouteRule | RouteRuleSeed | RouteFunction; // function can be assigned after config('defaultMethod', [method_type])
 }
 
 export interface RouteOption {
-	auth : boolean;
+	auth: boolean;
 }
 
 export interface RouteFunctionObj {
-	fnc : RouteFunction;
-	option? : RouteOption;
+	fnc: RouteFunction;
+	option?: RouteOption;
 }
 
 export interface RouteRuleSeed {
-	GET? : RouteFunctionObj;
-	POST? : RouteFunctionObj;
-	PUT? : RouteFunctionObj;
-	DELETE? : RouteFunctionObj;
+	GET?: RouteFunctionObj;
+	POST?: RouteFunctionObj;
+	PUT?: RouteFunctionObj;
+	DELETE?: RouteFunctionObj;
 }
 
 export interface BadakOption extends AnyObject {
-	catchErrorLog : boolean; // default true, if false, badak will not show error catching log
-	preventError : boolean; // default true, if false, badak pass error to node
+	catchErrorLog: boolean; // default true, if false, badak will not show error catching log
+	preventError: boolean; // default true, if false, badak pass error to node
 
-	defaultMethod : Method | undefined; // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
+	defaultMethod: Method | undefined; // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
 	/**
 	 * before rule :
 	 * {
@@ -48,17 +48,17 @@ export interface BadakOption extends AnyObject {
 	 * }
 	 */
 
-	parseNumber : boolean; // default false, if true, convert number string to Number
-	parseDate : boolean; // default false, if true, convert date string to Date object
+	parseNumber: boolean; // default false, if true, convert number string to Number
+	parseDate: boolean; // default false, if true, convert date string to Date object
 }
 
 export interface StaticRule {
-	uri : string;
-	path : string;
+	uri: string;
+	path: string;
 }
 
 export interface StaticCache {
-	uri : string;
-	mime : string;
-	fileData : Buffer;
+	uri: string;
+	mime: string;
+	fileData: Buffer;
 }

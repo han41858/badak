@@ -16,20 +16,66 @@
 		"@typescript-eslint"
 	],
 	"rules": {
-		"indent": [
-			"error",
+		"indent": "off",
+		"@typescript-eslint/indent": [
+			"warn",
 			"tab",
 			{
-				"SwitchCase": 1
+				"SwitchCase": 1,
+				"ignoreComments": true,
+				"ignoredNodes": [
+					"CallExpression *"
+				]
 			}
 		],
+		"linebreak-style": [
+			"warn",
+			"windows"
+		],
+		"arrow-parens": "warn",
 		"quotes": [
-			"error",
+			"warn",
 			"single"
 		],
 		"semi": [
-			"error",
+			"warn",
 			"always"
-		]
+		],
+		"no-shadow": "off",
+		"@typescript-eslint/no-shadow": "warn",
+		"no-trailing-spaces": "warn",
+		"no-var": "warn",
+		"prefer-const": "warn",
+		"space-before-function-paren": "warn",
+		"brace-style": [
+			"warn",
+			"stroustrup"
+		],
+		"key-spacing": [
+			"warn",
+			{
+				"beforeColon": false,
+				"afterColon": true
+			}
+		],
+		"@typescript-eslint/type-annotation-spacing": [
+			"warn",
+			{
+				"before": false,
+				"after": true,
+				"overrides": {
+					"arrow": {
+						"before": true,
+						"after": true
+					}
+				}
+			}
+		],
+		"@typescript-eslint/explicit-function-return-type": "warn",
+		"@typescript-eslint/no-inferrable-types": "off",
+		"@typescript-eslint/no-non-null-assertion": "warn",
+		"@typescript-eslint/no-empty-function": "warn",
+		"@typescript-eslint/no-unused-vars": "warn",
+		"@typescript-eslint/explicit-module-boundary-types": "warn"
 	}
 }

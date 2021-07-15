@@ -13,11 +13,11 @@ const fail = async () => {
 const port = 65030;
 
 describe('middleware', () => {
-	let app : Badak = null;
+	let app: Badak = null;
 
 	beforeEach(() => {
 		app = new Badak({
-			catchErrorLog : false
+			catchErrorLog: false
 		});
 	});
 
@@ -68,8 +68,8 @@ describe('middleware', () => {
 					await app.auth(authFnc);
 
 					await app.route({
-						'/test' : {
-							'GET' : () => {
+						'/test': {
+							'GET': () => {
 								// dummy function
 							}
 						}
@@ -87,8 +87,8 @@ describe('middleware', () => {
 					await app.auth(authFnc);
 
 					await app.route({
-						'/test' : {
-							'GET' : () => {
+						'/test': {
+							'GET': () => {
 								// dummy function
 							}
 						}
@@ -105,8 +105,8 @@ describe('middleware', () => {
 	});
 
 	describe('before() & after()', () => {
-		const targetFncNames : string[] = ['before', 'after'];
-		const targetArrNames : string[] = ['_middlewaresBefore', '_middlewaresAfter'];
+		const targetFncNames: string[] = ['before', 'after'];
+		const targetArrNames: string[] = ['_middlewaresBefore', '_middlewaresAfter'];
 
 		targetFncNames.forEach((fncName, i) => {
 			describe(`common - ${ fncName }`, () => {
@@ -163,23 +163,23 @@ describe('middleware', () => {
 
 				describe('assign', () => {
 					it('normal function', async () => {
-						const beforeArrLength : number = app[targetArrNames[i]].length;
+						const beforeArrLength: number = app[targetArrNames[i]].length;
 
 						await app[fncName](() => {
 						});
 
-						const afterArrLength : number = app[targetArrNames[i]].length;
+						const afterArrLength: number = app[targetArrNames[i]].length;
 
 						expect(afterArrLength).to.be.eql(beforeArrLength + 1);
 					});
 
 					it('async function', async () => {
-						const beforeArrLength : number = app[targetArrNames[i]].length;
+						const beforeArrLength: number = app[targetArrNames[i]].length;
 
 						await app[fncName](async () => {
 						});
 
-						const afterArrLength : number = app[targetArrNames[i]].length;
+						const afterArrLength: number = app[targetArrNames[i]].length;
 
 						expect(afterArrLength).to.be.eql(beforeArrLength + 1);
 					});
@@ -188,9 +188,9 @@ describe('middleware', () => {
 		});
 
 		describe('run test', () => {
-			let beforeFncRunFlag : boolean = false;
-			let routeFncRunFlag : boolean = false;
-			let afterFncRunFlag : boolean = false;
+			let beforeFncRunFlag: boolean = false;
+			let routeFncRunFlag: boolean = false;
+			let afterFncRunFlag: boolean = false;
 
 			beforeEach(async () => {
 				beforeFncRunFlag = false;
@@ -199,11 +199,11 @@ describe('middleware', () => {
 			});
 
 			it('normal functions', async () => {
-				const beforeFnc : MiddlewareFunction = () => {
+				const beforeFnc: MiddlewareFunction = () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : MiddlewareFunction = () => {
+				const afterFnc: MiddlewareFunction = () => {
 					afterFncRunFlag = true;
 				};
 
@@ -211,8 +211,8 @@ describe('middleware', () => {
 				await app.after(afterFnc);
 
 				await app.route({
-					test : {
-						GET : () => {
+					test: {
+						GET: () => {
 							routeFncRunFlag = true;
 						}
 					}
@@ -234,11 +234,11 @@ describe('middleware', () => {
 			});
 
 			it('async functions', async () => {
-				const beforeFnc : MiddlewareFunction = async () => {
+				const beforeFnc: MiddlewareFunction = async () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : MiddlewareFunction = async () => {
+				const afterFnc: MiddlewareFunction = async () => {
 					afterFncRunFlag = true;
 				};
 
@@ -246,8 +246,8 @@ describe('middleware', () => {
 				await app.after(afterFnc);
 
 				await app.route({
-					test : {
-						GET : async () => {
+					test: {
+						GET: async () => {
 							routeFncRunFlag = true;
 						}
 					}
@@ -269,12 +269,12 @@ describe('middleware', () => {
 			});
 
 			it('with param', async () => {
-				const beforeFnc : MiddlewareFunction = async (req, res) => {
+				const beforeFnc: MiddlewareFunction = async (req, res) => {
 					expect(req).to.be.ok;
 					expect(res).to.be.ok;
 				};
 
-				const routeFnc : RouteFunction = async (param : object) => {
+				const routeFnc: RouteFunction = async (param: object) => {
 					expect(param).to.be.ok;
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified
@@ -286,7 +286,7 @@ describe('middleware', () => {
 					return newParam;
 				};
 
-				const afterFnc : MiddlewareFunction = async (req, res) => {
+				const afterFnc: MiddlewareFunction = async (req, res) => {
 					expect(req).to.be.ok;
 					expect(res).to.be.ok;
 				};
@@ -295,8 +295,8 @@ describe('middleware', () => {
 				await app.after(afterFnc);
 
 				await app.route({
-					test : {
-						POST : routeFnc
+					test: {
+						POST: routeFnc
 					}
 				});
 
@@ -306,17 +306,17 @@ describe('middleware', () => {
 					.post('/test')
 					// send initial object
 					.send({
-						initial : true
+						initial: true
 					})
 					.expect(200);
 			});
 
 			it('with internal failed response', async () => {
-				const beforeFnc : MiddlewareFunction = () => {
+				const beforeFnc: MiddlewareFunction = () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : MiddlewareFunction = () => {
+				const afterFnc: MiddlewareFunction = () => {
 					afterFncRunFlag = true;
 				};
 
@@ -339,11 +339,11 @@ describe('middleware', () => {
 			});
 
 			it('with function failed response', async () => {
-				const beforeFnc : MiddlewareFunction = () => {
+				const beforeFnc: MiddlewareFunction = () => {
 					beforeFncRunFlag = true;
 				};
 
-				const afterFnc : MiddlewareFunction = (req, res, responseBody) => {
+				const afterFnc: MiddlewareFunction = (req, res, responseBody) => {
 					afterFncRunFlag = true;
 
 					expect(responseBody).to.be.a('string');
@@ -354,8 +354,8 @@ describe('middleware', () => {
 				await app.after(afterFnc);
 
 				await app.route({
-					test : {
-						GET : () => {
+					test: {
+						GET: () => {
 							routeFncRunFlag = true;
 							throw new Error('dev error');
 						}
@@ -383,8 +383,8 @@ describe('middleware', () => {
 				});
 
 				await app.route({
-					test : {
-						GET : () => {
+					test: {
+						GET: () => {
 						}
 					}
 				});

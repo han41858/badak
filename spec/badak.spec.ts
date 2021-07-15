@@ -17,11 +17,11 @@ const fail = async () => {
 const port = 65030;
 
 describe('core', () => {
-	let app : Badak = null;
+	let app: Badak = null;
 
 	beforeEach(() => {
 		app = new Badak({
-			catchErrorLog : false
+			catchErrorLog: false
 		});
 	});
 
@@ -52,7 +52,7 @@ describe('core', () => {
 		});
 
 		describe('invalid value', () => {
-			const booleanKeys : string[] = ['parseNumber', 'parseDate'];
+			const booleanKeys: string[] = ['parseNumber', 'parseDate'];
 
 			booleanKeys.forEach(key => {
 				it(key + ' - undefined', async () => {
@@ -92,10 +92,10 @@ describe('core', () => {
 		describe('parseNumber', () => {
 			// no application/json, it can parse already
 
-			const testUrl : string = '/parseNumber';
+			const testUrl: string = '/parseNumber';
 
-			const num : number = 123;
-			const float : number = 123.45;
+			const num: number = 123;
+			const float: number = 123.45;
 
 			const testFncStr = (param) => {
 				expect(param).to.be.ok;
@@ -120,8 +120,8 @@ describe('core', () => {
 			describe('default - false', () => {
 				beforeEach(async () => {
 					await app.route({
-						[testUrl] : {
-							POST : testFncStr
+						[testUrl]: {
+							POST: testFncStr
 						}
 					});
 
@@ -147,8 +147,8 @@ describe('core', () => {
 			describe('true', () => {
 				beforeEach(async () => {
 					await app.route({
-						[testUrl] : {
-							POST : testFncNum
+						[testUrl]: {
+							POST: testFncNum
 						}
 					});
 
@@ -186,8 +186,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUrl] : {
-								POST : testFnc
+							[testUrl]: {
+								POST: testFnc
 							}
 						});
 
@@ -216,8 +216,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUrl] : {
-								POST : testFnc
+							[testUrl]: {
+								POST: testFnc
 							}
 						});
 
@@ -249,8 +249,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUrl] : {
-								POST : testFnc
+							[testUrl]: {
+								POST: testFnc
 							}
 						});
 
@@ -276,8 +276,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUrl] : {
-								POST : testFnc
+							[testUrl]: {
+								POST: testFnc
 							}
 						});
 
@@ -288,8 +288,8 @@ describe('core', () => {
 						await request(app.getHttpServer())
 							.post(testUrl)
 							.send([{
-								num : num,
-								float : float
+								num: num,
+								float: float
 							}])
 							.expect(200); // 200 means no error while call testFnc()
 					});
@@ -301,12 +301,12 @@ describe('core', () => {
 		});
 
 		describe('parseDate', () => {
-			const testUrl : string = '/parseDate';
+			const testUrl: string = '/parseDate';
 
-			const num : number = 135; // should not parse
-			const float : number = 246.89; // should not parse
-			const dateStr : string = (new Date).toISOString();
-			const noDateStr : string = 'noDateString';
+			const num: number = 135; // should not parse
+			const float: number = 246.89; // should not parse
+			const dateStr: string = (new Date).toISOString();
+			const noDateStr: string = 'noDateString';
 
 			describe('default - false', () => {
 				const testFncJson = (param) => {
@@ -341,8 +341,8 @@ describe('core', () => {
 
 				it('application/json', async () => {
 					await app.route({
-						[testUrl] : {
-							POST : testFncJson
+						[testUrl]: {
+							POST: testFncJson
 						}
 					});
 
@@ -351,18 +351,18 @@ describe('core', () => {
 					await request(app.getHttpServer())
 						.post(testUrl)
 						.send({
-							num : num,
-							float : float,
-							date : dateStr,
-							noDate : noDateStr
+							num: num,
+							float: float,
+							date: dateStr,
+							noDate: noDateStr
 						})
 						.expect(200); // 200 means no error while call testFncStr()
 				});
 
 				it('multipart/form-data', async () => {
 					await app.route({
-						[testUrl] : {
-							POST : testFncStr
+						[testUrl]: {
+							POST: testFncStr
 						}
 					});
 
@@ -379,8 +379,8 @@ describe('core', () => {
 
 				it('application/x-www-form-urlencoded', async () => {
 					await app.route({
-						[testUrl] : {
-							POST : testFncStr
+						[testUrl]: {
+							POST: testFncStr
 						}
 					});
 
@@ -426,8 +426,8 @@ describe('core', () => {
 
 				it('application/json', async () => {
 					await app.route({
-						[testUrl] : {
-							POST : testFncJson
+						[testUrl]: {
+							POST: testFncJson
 						}
 					});
 
@@ -438,18 +438,18 @@ describe('core', () => {
 					await request(app.getHttpServer())
 						.post(testUrl)
 						.send({
-							num : num,
-							float : float,
-							date : dateStr,
-							noDate : noDateStr
+							num: num,
+							float: float,
+							date: dateStr,
+							noDate: noDateStr
 						})
 						.expect(200); // 200 means no error while call testFncStr()
 				});
 
 				it('multipart/form-data', async () => {
 					await app.route({
-						[testUrl] : {
-							POST : testFncStr
+						[testUrl]: {
+							POST: testFncStr
 						}
 					});
 
@@ -468,8 +468,8 @@ describe('core', () => {
 
 				it('application/x-www-form-urlencoded', async () => {
 					await app.route({
-						[testUrl] : {
-							POST : testFncStr
+						[testUrl]: {
+							POST: testFncStr
 						}
 					});
 
@@ -498,8 +498,8 @@ describe('core', () => {
 
 					beforeEach(async () => {
 						await app.route({
-							[testUrl] : {
-								POST : testFnc
+							[testUrl]: {
+								POST: testFnc
 							}
 						});
 
@@ -512,7 +512,7 @@ describe('core', () => {
 						await request(app.getHttpServer())
 							.post(testUrl)
 							.send({
-								arr : [dateStr]
+								arr: [dateStr]
 							})
 							.expect(200); // 200 means no error while call testFnc()
 					});
@@ -543,8 +543,8 @@ describe('core', () => {
 
 					it('application/json', async () => {
 						await app.route({
-							[testUrl] : {
-								POST : testFnc
+							[testUrl]: {
+								POST: testFnc
 							}
 						});
 
@@ -555,7 +555,7 @@ describe('core', () => {
 						await request(app.getHttpServer())
 							.post(testUrl)
 							.send([{
-								value : dateStr
+								value: dateStr
 							}])
 							.expect(200); // 200 means no error while call testFnc()
 					});
@@ -567,16 +567,16 @@ describe('core', () => {
 		});
 
 		describe('defaultMethod', () => {
-			const testUri : string = '/defaultMethod';
-			const testUriRefined : string = testUri.replace('/', '');
+			const testUri: string = '/defaultMethod';
+			const testUriRefined: string = testUri.replace('/', '');
 
-			const methods : Method[] = [Method.GET, Method.POST, Method.PUT, Method.DELETE];
+			const methods: Method[] = [Method.GET, Method.POST, Method.PUT, Method.DELETE];
 
 			const echoFnc = (param) => {
 				return param;
 			};
 
-			const getReqFnc = (method : string) => {
+			const getReqFnc = (method: string) => {
 				const requestObj = request(app.getHttpServer());
 
 				let requestFnc = null;
@@ -649,7 +649,7 @@ describe('core', () => {
 
 			it('default - can\'t set', async () => {
 				await app.route({
-						[testUri] : echoFnc
+						[testUri]: echoFnc
 					})
 					.then(fail, err => {
 						expect(err).to.be.ok;
@@ -658,21 +658,21 @@ describe('core', () => {
 			});
 
 			describe('after set', () => {
-				methods.forEach((setMethod : Method) => {
+				methods.forEach((setMethod: Method) => {
 					describe('set ' + setMethod, () => {
 						beforeEach(async () => {
 							await app.config('defaultMethod', setMethod);
 
 							await app.route({
-								[testUri] : echoFnc
+								[testUri]: echoFnc
 							});
 
 							await app.listen(port);
 						});
 
-						methods.forEach((testMethod : Method) => {
+						methods.forEach((testMethod: Method) => {
 							it('test ' + testMethod, async () => {
-								const routeRules : RouteRule[] = (app as any)._routeRules;
+								const routeRules: RouteRule[] = (app as any)._routeRules;
 
 								expect(routeRules).to.be.ok;
 								expect(routeRules).to.be.instanceOf(Array);
@@ -697,13 +697,13 @@ describe('core', () => {
 				await app.config('defaultMethod', 'GET');
 
 				await app.route({
-					[testUri] : echoFnc
+					[testUri]: echoFnc
 				});
 
 				await app.config('defaultMethod', null);
 
 				await app.route({
-						[testUri] : echoFnc
+						[testUri]: echoFnc
 					})
 					.then(fail, err => {
 						expect(err).to.be.ok;
@@ -714,10 +714,10 @@ describe('core', () => {
 	});
 
 	describe('_paramParser()', () => {
-		const testUrl : string = '/paramParser';
+		const testUrl: string = '/paramParser';
 
 		describe('single string', () => {
-			const str : string = 'string_value';
+			const str: string = 'string_value';
 			const testFnc = (param) => {
 				expect(param).to.be.ok;
 				expect(param).to.be.a('object');
@@ -726,8 +726,8 @@ describe('core', () => {
 
 			it('application/json', async () => {
 				await app.route({
-					[testUrl] : {
-						POST : testFnc
+					[testUrl]: {
+						POST: testFnc
 					}
 				});
 
@@ -741,8 +741,8 @@ describe('core', () => {
 
 			it('multipart/form-data', async () => {
 				await app.route({
-					[testUrl] : {
-						POST : testFnc
+					[testUrl]: {
+						POST: testFnc
 					}
 				});
 
@@ -756,8 +756,8 @@ describe('core', () => {
 
 			it('application/x-www-form-urlencoded', async () => {
 				await app.route({
-					[testUrl] : {
-						POST : testFnc
+					[testUrl]: {
+						POST: testFnc
 					}
 				});
 
@@ -771,7 +771,7 @@ describe('core', () => {
 		});
 
 		describe('array string', () => {
-			const strArr : string[] = ['str1', 'str2', 'str3'];
+			const strArr: string[] = ['str1', 'str2', 'str3'];
 
 			const testFnc = (param) => {
 				expect(param).to.be.ok;
@@ -788,8 +788,8 @@ describe('core', () => {
 
 			beforeEach(async () => {
 				await app.route({
-					[testUrl] : {
-						POST : testFnc
+					[testUrl]: {
+						POST: testFnc
 					}
 				});
 
@@ -799,7 +799,7 @@ describe('core', () => {
 			it('application/json', async () => {
 				await request(app.getHttpServer())
 					.post(testUrl)
-					.send({ strArr : strArr })
+					.send({ strArr: strArr })
 					.expect(200); // 200 means no error while call testFnc()
 			});
 
@@ -822,7 +822,7 @@ describe('core', () => {
 
 		// undefined converted to null while sending request
 		describe('array contains undefined', () => {
-			const strArr : (string | undefined)[] = ['str1', 'str2', undefined];
+			const strArr: (string | undefined)[] = ['str1', 'str2', undefined];
 
 			const testFnc = (param) => {
 				expect(param).to.be.ok;
@@ -831,10 +831,11 @@ describe('core', () => {
 				expect(param.strArr).to.be.instanceOf(Array);
 				expect(param.strArr).to.be.lengthOf(strArr.length);
 
-				param.strArr.forEach((str : string | undefined, i : number) => {
+				param.strArr.forEach((str: string | undefined, i: number) => {
 					if (strArr[i]) {
 						expect(str).to.be.eql(strArr[i]);
-					} else {
+					}
+					else {
 						expect(str).to.be.eql(null); // not undefined
 					}
 				});
@@ -842,8 +843,8 @@ describe('core', () => {
 
 			beforeEach(async () => {
 				await app.route({
-					[testUrl] : {
-						POST : testFnc
+					[testUrl]: {
+						POST: testFnc
 					}
 				});
 
@@ -853,7 +854,7 @@ describe('core', () => {
 			it('application/json', async () => {
 				await request(app.getHttpServer())
 					.post(testUrl)
-					.send({ strArr : strArr })
+					.send({ strArr: strArr })
 					.expect(200); // 200 means no error while call testFnc()
 			});
 
@@ -862,7 +863,7 @@ describe('core', () => {
 		});
 
 		describe('array contains null', () => {
-			const strArr : (string | null)[] = ['str1', 'str2', null];
+			const strArr: (string | null)[] = ['str1', 'str2', null];
 
 			const testFnc = (param) => {
 				expect(param).to.be.ok;
@@ -871,7 +872,7 @@ describe('core', () => {
 				expect(param.strArr).to.be.instanceOf(Array);
 				expect(param.strArr).to.be.lengthOf(strArr.length);
 
-				param.strArr.forEach((str : string | null, i : number) => {
+				param.strArr.forEach((str: string | null, i: number) => {
 					expect(str).to.be.eql(strArr[i]);
 					expect(typeof str).to.be.eql(typeof strArr[i]);
 				});
@@ -879,8 +880,8 @@ describe('core', () => {
 
 			beforeEach(async () => {
 				await app.route({
-					[testUrl] : {
-						POST : testFnc
+					[testUrl]: {
+						POST: testFnc
 					}
 				});
 
@@ -890,7 +891,7 @@ describe('core', () => {
 			it('application/json', async () => {
 				await request(app.getHttpServer())
 					.post(testUrl)
-					.send({ strArr : strArr })
+					.send({ strArr: strArr })
 					.expect(200); // 200 means no error while call testFnc()
 			});
 
@@ -930,7 +931,7 @@ describe('core', () => {
 		});
 
 		describe('POST request with form body', () => {
-			const testUri : string = '/users';
+			const testUri: string = '/users';
 
 			const firstName = 'Janghyun';
 			const lastName = 'Han';
@@ -953,8 +954,8 @@ describe('core', () => {
 				testFncCalled = false;
 
 				await app.route({
-					[testUri] : {
-						POST : testFnc
+					[testUri]: {
+						POST: testFnc
 					}
 				});
 
@@ -1101,7 +1102,7 @@ describe('core', () => {
 			});
 
 			it('not exist file', async () => {
-				const fullUri : string = `/static/notExistFile.text'`;
+				const fullUri: string = `/static/notExistFile.text'`;
 				const folderPath = path.join(__dirname, '/static');
 
 				await app.static('/static', folderPath);
@@ -1126,28 +1127,28 @@ describe('core', () => {
 		});
 
 		describe('about uri', () => {
-			let folderName : string;
-			let fileName : string;
+			let folderName: string;
+			let fileName: string;
 
-			let folderPath : string;
-			let filePath : string;
+			let folderPath: string;
+			let filePath: string;
 
-			let fileData : string;
+			let fileData: string;
 
-			const checkBefore = (keyUri : string) => {
-				const staticRules : StaticRule[] = (app as any)._staticRules;
+			const checkBefore = (keyUri: string) => {
+				const staticRules: StaticRule[] = (app as any)._staticRules;
 
 				expect(staticRules).to.be.ok;
 				expect(staticRules).to.be.instanceOf(Array);
 
-				const targetRule : StaticRule = staticRules.find(rule => {
+				const targetRule: StaticRule = staticRules.find(rule => {
 					return rule.uri === keyUri;
 				});
 
 				expect(targetRule).to.be.ok;
 			};
 
-			const checkAfter = async (fullUri : string) => {
+			const checkAfter = async (fullUri: string) => {
 				// request twice to check cache working
 				await Promise.all(
 					new Array(2)
@@ -1157,10 +1158,10 @@ describe('core', () => {
 								request(app.getHttpServer())
 									.get(fullUri)
 									.expect(200)
-									.then((_res : any) : void => {
-										const res : Response = _res as Response;
+									.then((_res: any): void => {
+										const res: Response = _res as Response;
 
-										const contentType : string = res.headers['content-type'];
+										const contentType: string = res.headers['content-type'];
 										expect(contentType).to.be.eql('text/plain');
 
 										expect(res).to.be.ok;
@@ -1174,12 +1175,12 @@ describe('core', () => {
 
 							if (i === 0) {
 								// check cache
-								const staticCache : StaticCache[] = (app as any)._staticCache;
+								const staticCache: StaticCache[] = (app as any)._staticCache;
 
 								expect(staticCache).to.be.ok;
 								expect(staticCache).to.be.instanceOf(Array);
 
-								const targetCache : StaticCache = staticCache.find(cache => {
+								const targetCache: StaticCache = staticCache.find(cache => {
 									return cache.uri === fullUri;
 								});
 
@@ -1199,10 +1200,11 @@ describe('core', () => {
 				filePath = path.join(folderPath, fileName);
 
 				fileData = await new Promise<string>((resolve, reject) => {
-					fs.readFile(filePath, (err : Error, data : Buffer) => {
+					fs.readFile(filePath, (err: Error, data: Buffer) => {
 						if (!err) {
 							resolve(data.toString());
-						} else {
+						}
+						else {
 							reject(err);
 						}
 					});
@@ -1214,7 +1216,7 @@ describe('core', () => {
 				'/static'
 			].forEach(uri => {
 				it(`ok : ${ uri }`, async () => {
-					const fullUri : string = `${ uri === '/' ? '' : uri }/${ fileName }`;
+					const fullUri: string = `${ uri === '/' ? '' : uri }/${ fileName }`;
 
 					await app.static(uri, folderPath);
 
@@ -1227,8 +1229,8 @@ describe('core', () => {
 			});
 
 			it('ok - end with /', async () => {
-				const uri : string = '/static/';
-				const fullUri : string = `${ uri }${ fileName }`;
+				const uri: string = '/static/';
+				const fullUri: string = `${ uri }${ fileName }`;
 
 				await app.static(uri, folderPath);
 
@@ -1240,8 +1242,8 @@ describe('core', () => {
 			});
 
 			it('ok - nested url', async () => {
-				const uri : string = '/static/some/inner/path';
-				const fullUri : string = `${ uri }/${ fileName }`;
+				const uri: string = '/static/some/inner/path';
+				const fullUri: string = `${ uri }/${ fileName }`;
 
 				await app.static(uri, folderPath);
 
@@ -1253,14 +1255,14 @@ describe('core', () => {
 			});
 
 			it('ok - multiple assign', async () => {
-				const uris : string[] = ['/static1', '/static2'];
+				const uris: string[] = ['/static1', '/static2'];
 
-				const testObj : [string, string][] = uris.map(uri => {
+				const testObj: [string, string][] = uris.map(uri => {
 					return [uri, `${ uri }/${ fileName }`];
 				});
 
 				await Promise.all(
-					testObj.map(async ([uri] : [string, string]) => {
+					testObj.map(async ([uri]: [string, string]) => {
 						await app.static(uri, folderPath);
 
 						checkBefore(uri);
@@ -1270,7 +1272,7 @@ describe('core', () => {
 				await app.listen(port);
 
 				await Promise.all(
-					testObj.map(async ([, fullUri] : [string, string]) => {
+					testObj.map(async ([, fullUri]: [string, string]) => {
 						await checkAfter(fullUri);
 					})
 				);
@@ -1278,19 +1280,19 @@ describe('core', () => {
 		});
 
 		it('folder', async () => {
-			const uri : string = '/static';
+			const uri: string = '/static';
 
 			await app.static(uri, path.join(__dirname, 'static'));
 
 			await app.listen(port);
 
 			// check static cache
-			const staticCache : StaticCache[] = (app as any)._staticCache;
+			const staticCache: StaticCache[] = (app as any)._staticCache;
 
 			expect(staticCache).to.be.instanceOf(Array);
 			expect(staticCache.length).to.be.above(0);
 
-			const targetStaticCache : StaticCache = staticCache[0];
+			const targetStaticCache: StaticCache = staticCache[0];
 
 			expect(targetStaticCache).to.be.instanceOf(Object);
 
@@ -1305,8 +1307,8 @@ describe('core', () => {
 			await request(app.getHttpServer())
 				.get('/static/test.txt')
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
@@ -1315,14 +1317,14 @@ describe('core', () => {
 		});
 
 		it('nested folder', async () => {
-			const uri : string = '/static';
+			const uri: string = '/static';
 
 			await app.static(uri, path.join(__dirname, 'static'));
 
 			await app.listen(port);
 
 			// check static cache
-			const staticCache : StaticCache[] = (app as any)._staticCache;
+			const staticCache: StaticCache[] = (app as any)._staticCache;
 
 			expect(staticCache).to.be.instanceOf(Array);
 			expect(staticCache.length).to.be.above(0);
@@ -1330,8 +1332,8 @@ describe('core', () => {
 			await request(app.getHttpServer())
 				.get('/static/nested/test.txt')
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
@@ -1358,12 +1360,12 @@ describe('core', () => {
 				['tiff', 'image/tiff'],
 				['xls', 'application/vnd.ms-excel'],
 				['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
-			].forEach(([extension, mime] : [string, string]) => {
+			].forEach(([extension, mime]: [string, string]) => {
 				it(`ok : .${ extension }`, async () => {
-					const fileName : string = `test.${ extension }`;
-					const filePath : string = path.join(__dirname, '/static');
+					const fileName: string = `test.${ extension }`;
+					const filePath: string = path.join(__dirname, '/static');
 
-					const fullUri : string = `/static/${ fileName }`;
+					const fullUri: string = `/static/${ fileName }`;
 
 					await app.static('/static', filePath);
 
@@ -1373,12 +1375,12 @@ describe('core', () => {
 					await request(app.getHttpServer())
 						.get(fullUri)
 						.expect(200)
-						.then((_res : any) : void => {
-							const res : Response = _res as Response;
+						.then((_res: any): void => {
+							const res: Response = _res as Response;
 
 							expect(res).to.be.ok;
 
-							const contentType : string = res.headers['content-type'];
+							const contentType: string = res.headers['content-type'];
 							expect(contentType).to.be.eql(mime);
 
 							expect(!!res.body || !!res.text).to.be.ok;
@@ -1391,12 +1393,12 @@ describe('core', () => {
 					await request(app.getHttpServer())
 						.get(fullUri)
 						.expect(200)
-						.then((_res : any) : void => {
-							const res : Response = _res as Response;
+						.then((_res: any): void => {
+							const res: Response = _res as Response;
 
 							expect(res).to.be.ok;
 
-							const contentType : string = res.headers['content-type'];
+							const contentType: string = res.headers['content-type'];
 							expect(contentType).to.be.eql(mime);
 
 							expect(!!res.body || !!res.text).to.be.ok;
@@ -1411,8 +1413,8 @@ describe('core', () => {
 	});
 
 	describe('setSPARoot()', () => {
-		let publicPath : string;
-		let indexFileContents : string;
+		let publicPath: string;
+		let indexFileContents: string;
 
 		before(() => {
 			publicPath = path.join(__dirname, 'static', 'public');
@@ -1513,7 +1515,7 @@ describe('core', () => {
 		});
 
 		it('ok - /', async () => {
-			const spaRoot : string = '/';
+			const spaRoot: string = '/';
 
 			await app.setSPARoot(spaRoot, publicPath);
 
@@ -1521,12 +1523,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot)
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1534,12 +1536,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1547,7 +1549,7 @@ describe('core', () => {
 		});
 
 		it('ok - /public', async () => {
-			const spaRoot : string = '/public';
+			const spaRoot: string = '/public';
 
 			await app.setSPARoot(spaRoot, publicPath);
 
@@ -1556,12 +1558,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot)
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1569,12 +1571,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1582,7 +1584,7 @@ describe('core', () => {
 		});
 
 		it('ok - / without auth', async () => {
-			const spaRoot : string = '/';
+			const spaRoot: string = '/';
 
 			await app.auth(() => {
 				throw new Error('should be pass this function');
@@ -1594,12 +1596,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot)
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1607,12 +1609,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot + 'index.html')
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1620,12 +1622,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot + 'somethingDeepLink')
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1633,7 +1635,7 @@ describe('core', () => {
 		});
 
 		it('ok - /public without auth', async () => {
-			const spaRoot : string = '/public';
+			const spaRoot: string = '/public';
 
 			await app.auth(() => {
 				throw new Error('should be pass this function');
@@ -1646,12 +1648,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot)
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1659,12 +1661,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot + '/index.html')
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1672,12 +1674,12 @@ describe('core', () => {
 
 			await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
 				.expect(200)
-				.then((_res : any) : void => {
-					const res : Response = _res as Response;
+				.then((_res: any): void => {
+					const res: Response = _res as Response;
 
 					expect(res).to.be.ok;
 
-					const contentType : string = res.headers['content-type'];
+					const contentType: string = res.headers['content-type'];
 					expect(contentType).to.be.eql('text/html');
 
 					expect(res.text).to.be.eql(indexFileContents);
@@ -1712,8 +1714,8 @@ describe('core', () => {
 
 				it('empty address - \'\'', () => {
 					return app.route({
-							'' : {
-								'GET' : async () => {
+							'': {
+								'GET': async () => {
 								}
 							}
 						})
@@ -1725,8 +1727,8 @@ describe('core', () => {
 
 				it('empty address - \' \'', () => {
 					return app.route({
-							' ' : {
-								'GET' : async () => {
+							' ': {
+								'GET': async () => {
 								}
 							}
 						})
@@ -1738,8 +1740,8 @@ describe('core', () => {
 
 				it('empty address - space', () => {
 					return app.route({
-							' ' : {
-								'GET' : async () => {
+							' ': {
+								'GET': async () => {
 								}
 							}
 						})
@@ -1751,8 +1753,8 @@ describe('core', () => {
 
 				it('uri include space', () => {
 					return app.route({
-							' users' : {
-								'GET' : async () => {
+							' users': {
+								'GET': async () => {
 								}
 							}
 						})
@@ -1764,8 +1766,8 @@ describe('core', () => {
 
 				it('uri include space', () => {
 					return app.route({
-							'users ' : {
-								'GET' : async () => {
+							'users ': {
+								'GET': async () => {
 								}
 							}
 						})
@@ -1777,7 +1779,7 @@ describe('core', () => {
 
 				it('no rule', () => {
 					return app.route({
-							'users' : {}
+							'users': {}
 						})
 						.then(fail, err => {
 							expect(err).to.be.ok;
@@ -1787,8 +1789,8 @@ describe('core', () => {
 
 				it('invalid method', () => {
 					return app.route({
-							'users' : {
-								'get' : async () => {
+							'users': {
+								'get': async () => {
 								}
 							}
 						})
@@ -1801,10 +1803,10 @@ describe('core', () => {
 				it('included invalid rule', () => {
 					// setting defaultMethod cover this
 					return app.route({
-							'users' : {
-								'GET' : async () => {
+							'users': {
+								'GET': async () => {
 								},
-								'something' : async () => {
+								'something': async () => {
 								}
 							}
 						})
@@ -1816,8 +1818,8 @@ describe('core', () => {
 
 				it('undefined rule 404', async () => {
 					await app.route({
-						'users' : {
-							'POST' : testFnc
+						'users': {
+							'POST': testFnc
 						}
 					});
 
@@ -1833,8 +1835,8 @@ describe('core', () => {
 
 				it('undefined inner rule', async () => {
 					await app.route({
-						'users' : {
-							'GET' : testFnc
+						'users': {
+							'GET': testFnc
 						}
 					});
 
@@ -1850,8 +1852,8 @@ describe('core', () => {
 
 				it('invalid root path', () => {
 					return app.route({
-							' /' : {
-								'GET' : async () => {
+							' /': {
+								'GET': async () => {
 								}
 							}
 						})
@@ -1863,8 +1865,8 @@ describe('core', () => {
 
 				it('invalid root path', () => {
 					return app.route({
-							'/ ' : {
-								'GET' : async () => {
+							'/ ': {
+								'GET': async () => {
 								}
 							}
 						})
@@ -1880,8 +1882,8 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users' : {
-						'GET' : testFnc
+					'users': {
+						'GET': testFnc
 					}
 				});
 
@@ -1922,8 +1924,8 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users' : {
-						'GET' : testFnc
+					'users': {
+						'GET': testFnc
 					}
 				});
 
@@ -1965,8 +1967,8 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users' : {
-						'GET' : testFnc
+					'users': {
+						'GET': testFnc
 					}
 				});
 
@@ -1986,8 +1988,8 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users' : {
-						'GET' : testFnc
+					'users': {
+						'GET': testFnc
 					}
 				});
 
@@ -2003,12 +2005,12 @@ describe('core', () => {
 
 			it('ok - start with slash', async () => {
 				await app.route({
-					'/users' : {
-						'GET' : testFnc
+					'/users': {
+						'GET': testFnc
 					}
 				});
 
-				const routeRules : RouteRule = (app as any)._routeRules;
+				const routeRules: RouteRule = (app as any)._routeRules;
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
@@ -2043,12 +2045,12 @@ describe('core', () => {
 
 			it('ok - end with slash', async () => {
 				await app.route({
-					'users/' : {
-						'GET' : testFnc
+					'users/': {
+						'GET': testFnc
 					}
 				});
 
-				const routeRules : RouteRule = (app as any)._routeRules;
+				const routeRules: RouteRule = (app as any)._routeRules;
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
@@ -2083,12 +2085,12 @@ describe('core', () => {
 
 			it('ok - start & end with slash', async () => {
 				await app.route({
-					'/users/' : {
-						'GET' : testFnc
+					'/users/': {
+						'GET': testFnc
 					}
 				});
 
-				const routeRules : RouteRule = (app as any)._routeRules;
+				const routeRules: RouteRule = (app as any)._routeRules;
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
@@ -2129,8 +2131,8 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'/' : {
-						'GET' : rootGetFnc
+					'/': {
+						'GET': rootGetFnc
 					}
 				});
 
@@ -2159,8 +2161,8 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'/' : {
-						'POST' : rootPostFnc
+					'/': {
+						'POST': rootPostFnc
 					}
 				});
 
@@ -2197,18 +2199,18 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users' : {
-						GET : fncA
+					'users': {
+						GET: fncA
 					}
 				});
 
 				await app.route({
-					'users' : {
-						POST : fncB
+					'users': {
+						POST: fncB
 					}
 				});
 
-				const routeRules : RouteRule[] = (app as any)._routeRules;
+				const routeRules: RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2244,15 +2246,15 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users/a' : {
-						'GET' : fncA
+					'users/a': {
+						'GET': fncA
 					},
-					'users/b' : {
-						'GET' : fncB
+					'users/b': {
+						'GET': fncB
 					}
 				});
 
-				const routeRules : RouteRule[] = (app as any)._routeRules;
+				const routeRules: RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2301,15 +2303,15 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users' : {
-						'GET' : usersGetFnc
+					'users': {
+						'GET': usersGetFnc
 					},
-					'records' : {
-						'GET' : recordsGetFnc
+					'records': {
+						'GET': recordsGetFnc
 					}
 				});
 
-				const routeRules : RouteRule[] = (app as any)._routeRules;
+				const routeRules: RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2361,18 +2363,18 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'root' : {
-						'GET' : fnc1,
-						'branch1' : {
-							'GET' : fnc2,
-							'branch2' : {
-								'GET' : fnc3
+					'root': {
+						'GET': fnc1,
+						'branch1': {
+							'GET': fnc2,
+							'branch2': {
+								'GET': fnc3
 							}
 						}
 					}
 				});
 
-				const routeRules : RouteRule[] = (app as any)._routeRules;
+				const routeRules: RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2429,8 +2431,8 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users/a/b/c' : {
-						'POST' : testFnc
+					'users/a/b/c': {
+						'POST': testFnc
 					}
 				});
 
@@ -2450,18 +2452,18 @@ describe('core', () => {
 				};
 
 				await app.route({
-					'users' : {
-						'a' : {
-							'b' : {
-								'c' : {
-									'GET' : testFnc
+					'users': {
+						'a': {
+							'b': {
+								'c': {
+									'GET': testFnc
 								}
 							}
 						}
 					}
 				});
 
-				const routeRules : RouteRule[] = (app as any)._routeRules;
+				const routeRules: RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2507,8 +2509,8 @@ describe('core', () => {
 			describe('error', () => {
 				it('invalid format', async () => {
 					await app.route({
-							'users///a' : {
-								'GET' : testFnc
+							'users///a': {
+								'GET': testFnc
 							}
 						})
 						.then(fail, (err) => {
@@ -2519,8 +2521,8 @@ describe('core', () => {
 
 				it('include space', async () => {
 					await app.route({
-							'users/ a' : {
-								'GET' : testFnc
+							'users/ a': {
+								'GET': testFnc
 							}
 						})
 						.then(fail, (err) => {
@@ -2531,8 +2533,8 @@ describe('core', () => {
 
 				it('include space', async () => {
 					await app.route({
-							'users/ /a' : {
-								'GET' : testFnc
+							'users/ /a': {
+								'GET': testFnc
 							}
 						})
 						.then(fail, (err) => {
@@ -2544,12 +2546,12 @@ describe('core', () => {
 
 			it('ok - 2 depth', async () => {
 				await app.route({
-					'users/a' : {
-						'GET' : testFnc
+					'users/a': {
+						'GET': testFnc
 					}
 				});
 
-				const routeRules : RouteRule[] = (app as any)._routeRules;
+				const routeRules: RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2591,14 +2593,14 @@ describe('core', () => {
 				const uri = 'users/a/b/c/d/e/f/g/h/i';
 
 				await app.route({
-					[uri] : {
-						'GET' : testFnc
+					[uri]: {
+						'GET': testFnc
 					}
 				});
 
 				const uriArr = uri.split('/');
 
-				const routeRules : RouteRule[] = (app as any)._routeRules;
+				const routeRules: RouteRule[] = (app as any)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2611,7 +2613,7 @@ describe('core', () => {
 				expect(routeRules[0]['/']).to.be.ok;
 				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 
-				let targetRuleObj : RouteRule | RouteRuleSeed | Function = routeRules[0]['/'];
+				let targetRuleObj: RouteRule | RouteRuleSeed | Function = routeRules[0]['/'];
 
 				uriArr.forEach((uri, i, arr) => {
 					expect(Object.keys(targetRuleObj)).to.includes(uri);
@@ -2636,8 +2638,8 @@ describe('core', () => {
 				describe('error', () => {
 					it('colon in end index', async () => {
 						await app.route({
-								'users/some:id' : {
-									'GET' : async () => {
+								'users/some:id': {
+									'GET': async () => {
 									}
 								}
 							})
@@ -2649,8 +2651,8 @@ describe('core', () => {
 
 					it('colon in middle index', async () => {
 						await app.route({
-								'users/id:some' : {
-									'GET' : async () => {
+								'users/id:some': {
+									'GET': async () => {
 									}
 								}
 							})
@@ -2662,13 +2664,13 @@ describe('core', () => {
 
 					it('same level & multiple colon routing, in same time', async () => {
 						await app.route({
-								'users' : {
-									':id' : {
-										'GET' : async () => {
+								'users': {
+									':id': {
+										'GET': async () => {
 										}
 									},
-									':name' : {
-										'GET' : async () => {
+									':name': {
+										'GET': async () => {
 										}
 									}
 								}
@@ -2681,12 +2683,12 @@ describe('core', () => {
 
 					it('root level & multiple colon routing, in same time', async () => {
 						await app.route({
-								':id' : {
-									GET : async () => {
+								':id': {
+									GET: async () => {
 									}
 								},
-								':name' : {
-									GET : async () => {
+								':name': {
+									GET: async () => {
 									}
 								}
 							})
@@ -2698,15 +2700,15 @@ describe('core', () => {
 
 					it('root level & multiple colon routing, in different time', async () => {
 						await app.route({
-							':id' : {
-								GET : async () => {
+							':id': {
+								GET: async () => {
 								}
 							}
 						});
 
 						return app.route({
-								':name' : {
-									GET : async () => {
+								':name': {
+									GET: async () => {
 									}
 								}
 							})
@@ -2718,18 +2720,18 @@ describe('core', () => {
 
 					it('same level & multiple colon routing, in different time', async () => {
 						await app.route({
-							'users' : {
-								':id' : {
-									'GET' : async () => {
+							'users': {
+								':id': {
+									'GET': async () => {
 									}
 								}
 							}
 						});
 
 						return app.route({
-								'users' : {
-									':name' : {
-										'GET' : async () => {
+								'users': {
+									':name': {
+										'GET': async () => {
 										}
 									}
 								}
@@ -2742,15 +2744,15 @@ describe('core', () => {
 
 					it('same level & multiple colon routing, in different time, in uri', async () => {
 						await app.route({
-							'users/:id' : {
-								'GET' : async () => {
+							'users/:id': {
+								'GET': async () => {
 								}
 							}
 						});
 
 						return app.route({
-								'users/:name' : {
-									'GET' : async () => {
+								'users/:name': {
+									'GET': async () => {
 									}
 								}
 							})
@@ -2776,8 +2778,8 @@ describe('core', () => {
 					};
 
 					await app.route({
-						'users/:id' : {
-							'GET' : testFnc
+						'users/:id': {
+							'GET': testFnc
 						}
 					});
 
@@ -2805,13 +2807,13 @@ describe('core', () => {
 						fncRunFlag = true;
 
 						return {
-							id : testId
+							id: testId
 						};
 					};
 
 					await app.route({
-						'users/:id' : {
-							'GET' : testFnc
+						'users/:id': {
+							'GET': testFnc
 						}
 					});
 
@@ -2845,8 +2847,8 @@ describe('core', () => {
 					};
 
 					await app.route({
-						'users/:firstName/some/:lastName' : {
-							'GET' : testFnc
+						'users/:firstName/some/:lastName': {
+							'GET': testFnc
 						}
 					});
 
@@ -2870,14 +2872,14 @@ describe('core', () => {
 						fncRunFlag = true;
 
 						return {
-							firstName : param.firstName,
-							lastName : param.lastName
+							firstName: param.firstName,
+							lastName: param.lastName
 						};
 					};
 
 					await app.route({
-						'users/:firstName/some/:lastName' : {
-							'GET' : testFnc
+						'users/:firstName/some/:lastName': {
+							'GET': testFnc
 						}
 					});
 
@@ -2912,8 +2914,8 @@ describe('core', () => {
 					};
 
 					await app.route({
-						'users/:id' : {
-							'POST' : testFnc
+						'users/:id': {
+							'POST': testFnc
 						}
 					});
 
@@ -2939,8 +2941,8 @@ describe('core', () => {
 						const testUri = '?users';
 
 						await app.route({
-								[testUri] : {
-									'GET' : () => {
+								[testUri]: {
+									'GET': () => {
 									}
 								}
 							})
@@ -2955,12 +2957,12 @@ describe('core', () => {
 						const normalUri = 'user';
 
 						await app.route({
-								[normalUri] : {
-									'GET' : () => {
+								[normalUri]: {
+									'GET': () => {
 									}
 								},
-								[questionUri] : {
-									'GET' : () => {
+								[questionUri]: {
+									'GET': () => {
 									}
 								}
 							})
@@ -2975,15 +2977,15 @@ describe('core', () => {
 						const normalUri = 'user';
 
 						await app.route({
-							[normalUri] : {
-								'GET' : () => {
+							[normalUri]: {
+								'GET': () => {
 								}
 							}
 						});
 
 						await app.route({
-								[questionUri] : {
-									'GET' : () => {
+								[questionUri]: {
+									'GET': () => {
 									}
 								}
 							})
@@ -3014,15 +3016,15 @@ describe('core', () => {
 						const normalUri = 'user';
 
 						await app.route({
-								[questionUri] : {
-									'GET' : () => {
+								[questionUri]: {
+									'GET': () => {
 									}
 								}
 							})
 							.then(() => {
 								return app.route({
-									[normalUri] : {
-										'GET' : () => {
+									[normalUri]: {
+										'GET': () => {
 										}
 									}
 								});
@@ -3065,8 +3067,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUri] : {
-								'GET' : testFnc
+							[testUri]: {
+								'GET': testFnc
 							}
 						});
 
@@ -3090,8 +3092,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUri] : {
-								'GET' : testFnc
+							[testUri]: {
+								'GET': testFnc
 							}
 						});
 
@@ -3140,15 +3142,15 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUri1] : {
-								'GET' : userFnc
+							[testUri1]: {
+								'GET': userFnc
 							},
-							[testUri2] : {
-								'GET' : recordFnc
+							[testUri2]: {
+								'GET': recordFnc
 							}
 						});
 
-						const appRouteRule : RouteRule[] = (app as any)._routeRules;
+						const appRouteRule: RouteRule[] = (app as any)._routeRules;
 
 						expect(appRouteRule).to.be.lengthOf(1);
 
@@ -3212,8 +3214,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUri] : {
-								'GET' : testFnc
+							[testUri]: {
+								'GET': testFnc
 							}
 						});
 
@@ -3237,7 +3239,7 @@ describe('core', () => {
 					it('group question uri', async () => {
 						const testUri = 'ab(cd)?e';
 
-						let outerCounter : number = 0;
+						let outerCounter: number = 0;
 						let testFncRunCount = 0;
 
 						const testFnc = () => {
@@ -3245,8 +3247,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUri] : {
-								'GET' : testFnc
+							[testUri]: {
+								'GET': testFnc
 							}
 						});
 
@@ -3274,8 +3276,8 @@ describe('core', () => {
 				describe('error', () => {
 					it('start with \'+\'', async () => {
 						await app.route({
-								'+abcd' : {
-									'GET' : () => {
+								'+abcd': {
+									'GET': () => {
 									}
 								}
 							})
@@ -3287,15 +3289,15 @@ describe('core', () => {
 
 					it('duplicated routing, normal uri first', async () => {
 						await app.route({
-							'abc' : {
-								'GET' : () => {
+							'abc': {
+								'GET': () => {
 								}
 							}
 						});
 
 						await app.route({
-								'ab+c' : {
-									'GET' : () => {
+								'ab+c': {
+									'GET': () => {
 									}
 								}
 							})
@@ -3307,15 +3309,15 @@ describe('core', () => {
 
 					it('duplicated routing, plus uri first', async () => {
 						await app.route({
-							'ab+c' : {
-								'GET' : () => {
+							'ab+c': {
+								'GET': () => {
 								}
 							}
 						});
 
 						await app.route({
-								'abc' : {
-									'GET' : () => {
+								'abc': {
+									'GET': () => {
 									}
 								}
 							})
@@ -3327,15 +3329,15 @@ describe('core', () => {
 
 					it('duplicated routing, duplicated plus uri', async () => {
 						await app.route({
-							'ab+c' : {
-								'GET' : () => {
+							'ab+c': {
+								'GET': () => {
 								}
 							}
 						});
 
 						await app.route({
-								'abc+' : {
-									'GET' : () => {
+								'abc+': {
+									'GET': () => {
 									}
 								}
 							})
@@ -3361,8 +3363,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							[testUri] : {
-								'GET' : testFnc
+							[testUri]: {
+								'GET': testFnc
 							}
 						});
 
@@ -3396,8 +3398,8 @@ describe('core', () => {
 						};
 
 						await app.route({
-							'a+b+c' : {
-								'GET' : testFnc
+							'a+b+c': {
+								'GET': testFnc
 							}
 						});
 
@@ -3455,9 +3457,9 @@ describe('core', () => {
 			// * : all uri fragment
 			// ab*cd : abcd, abxcd, abblahcd
 			describe('asterisk routing', () => {
-				let validUrls : string[] = [];
-				let invalidUrls : string[] = [];
-				let calledUrls : string[] = [];
+				let validUrls: string[] = [];
+				let invalidUrls: string[] = [];
+				let calledUrls: string[] = [];
 
 				beforeEach(() => {
 					validUrls = [];
@@ -3497,14 +3499,14 @@ describe('core', () => {
 					].forEach(prefix => {
 						it(prefix + '/**', async () => {
 							await app.route({
-								[prefix + '/**'] : {
-									'GET' : testFnc
+								[prefix + '/**']: {
+									'GET': testFnc
 								}
 							});
 
 							await app.listen(port);
 
-							const routeRules : RouteRule = (app as any)._routeRules;
+							const routeRules: RouteRule = (app as any)._routeRules;
 							expect(routeRules).to.be.instanceOf(Array);
 							expect(routeRules).to.be.lengthOf(1);
 
@@ -3529,17 +3531,17 @@ describe('core', () => {
 						[
 							'',
 							'/nested'
-						].forEach((prefix : string) => {
+						].forEach((prefix: string) => {
 							it(prefix + '/*', async () => {
 								await app.route({
-									[prefix + '/*'] : {
-										'GET' : testFnc
+									[prefix + '/*']: {
+										'GET': testFnc
 									}
 								});
 
 								await app.listen(port);
 
-								const routeRules : RouteRule = (app as any)._routeRules;
+								const routeRules: RouteRule = (app as any)._routeRules;
 								expect(routeRules).to.be.instanceOf(Array);
 								expect(routeRules).to.be.lengthOf(1);
 
@@ -3563,14 +3565,14 @@ describe('core', () => {
 						].forEach(prefix => {
 							it(prefix + '/*/a', async () => {
 								await app.route({
-									[prefix + '/*/a'] : {
-										'GET' : testFnc
+									[prefix + '/*/a']: {
+										'GET': testFnc
 									}
 								});
 
 								await app.listen(port);
 
-								const routeRules : RouteRule = (app as any)._routeRules;
+								const routeRules: RouteRule = (app as any)._routeRules;
 								expect(routeRules).to.be.instanceOf(Array);
 								expect(routeRules).to.be.lengthOf(1);
 
@@ -3594,7 +3596,7 @@ describe('core', () => {
 					const testFnc = (param, req) => {
 						expect(param).to.be.ok;
 
-						const regExpKey : string = param[testFrag].replace('*', '(\\w)*');
+						const regExpKey: string = param[testFrag].replace('*', '(\\w)*');
 						expect(param[testFrag]).to.be.ok;
 						expect(new RegExp(regExpKey).test(param[testFrag])).to.be.true;
 
@@ -3607,14 +3609,14 @@ describe('core', () => {
 					].forEach(prefix => {
 						it(prefix + '/ab*cd', async () => {
 							await app.route({
-								[`${ prefix }/${ testFrag }`] : {
-									'GET' : testFnc
+								[`${ prefix }/${ testFrag }`]: {
+									'GET': testFnc
 								}
 							});
 
 							await app.listen(port);
 
-							const routeRules : RouteRule = (app as any)._routeRules;
+							const routeRules: RouteRule = (app as any)._routeRules;
 							expect(routeRules).to.be.instanceOf(Array);
 							expect(routeRules).to.be.lengthOf(1);
 
@@ -3673,7 +3675,7 @@ describe('core', () => {
 						fncRun = true;
 
 						return {
-							data : ['user1', 'user2']
+							data: ['user1', 'user2']
 						};
 					});
 
@@ -3720,7 +3722,7 @@ describe('core', () => {
 						fncRun = true;
 
 						return {
-							data : ['user1', 'user2']
+							data: ['user1', 'user2']
 						};
 					});
 
@@ -3767,7 +3769,7 @@ describe('core', () => {
 						fncRun = true;
 
 						return {
-							data : ['user1', 'user2']
+							data: ['user1', 'user2']
 						};
 					});
 
