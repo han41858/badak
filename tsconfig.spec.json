@@ -5,11 +5,7 @@
 		"sourceMap": true,
 		"outDir": "./build",
 		"declaration": true,
-		"declarationDir": "build",
-		"lib": [
-			"es2018",
-			"dom"
-		]
+		"declarationDir": "build"
 	},
 	"exclude": [
 		"node_modules",

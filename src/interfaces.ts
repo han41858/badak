@@ -5,8 +5,8 @@ import { Method } from './constants';
 export type RouteFunction = (param: unknown, req: IncomingMessage, res: ServerResponse) => unknown;
 export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, responseBody?: unknown) => void;
 
-export interface AnyObject {
-	[key: string]: unknown;
+export interface AnyObject<T> {
+	[key: string]: T;
 }
 
 export interface RouteRule {
@@ -29,7 +29,7 @@ export interface RouteRuleSeed {
 	DELETE?: RouteFunctionObj;
 }
 
-export interface BadakOption extends AnyObject {
+export interface BadakOption extends AnyObject<boolean | Method | undefined> {
 	catchErrorLog: boolean; // default true, if false, badak will not show error catching log
 	preventError: boolean; // default true, if false, badak pass error to node
 

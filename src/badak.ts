@@ -433,7 +433,7 @@ export class Badak {
 
 	// parameter can be object of string because request has string
 	// only work for string param
-	private _paramConverter (param: AnyObject): AnyObject {
+	private _paramConverter (param: AnyObject<unknown>): AnyObject<unknown> {
 		if (Array.isArray(param)) {
 			const paramAsArray: unknown[] = param as unknown[];
 
@@ -444,7 +444,7 @@ export class Badak {
 				}
 				else if (typeof value === 'object') {
 					// call recursively
-					arr[i] = this._paramConverter(value as AnyObject);
+					arr[i] = this._paramConverter(value as AnyObject<unknown>);
 				}
 				else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
@@ -464,7 +464,7 @@ export class Badak {
 				}
 				else if (typeof value === 'object') {
 					// call recursively
-					param[key] = this._paramConverter(value as AnyObject);
+					param[key] = this._paramConverter(value as AnyObject<unknown>);
 				}
 				else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
@@ -482,8 +482,8 @@ export class Badak {
 
 	// for POST, PUT
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req: IncomingMessage): Promise<AnyObject | void> {
-		return new Promise<AnyObject | void>((resolve, reject): void => {
+	private async _paramParser (req: IncomingMessage): Promise<AnyObject<unknown> | void> {
+		return new Promise<AnyObject<unknown> | void>((resolve, reject): void => {
 			const bodyBuffer: Buffer[] = [];
 			let bodyStr: string | undefined;
 
@@ -496,7 +496,7 @@ export class Badak {
 			});
 
 			req.on('end', async (): Promise<void> => {
-				let param: AnyObject | undefined;
+				let param: AnyObject<unknown> | undefined;
 
 				const contentTypeInHeader: string = req.headers['content-type'] as string;
 
@@ -532,7 +532,7 @@ export class Badak {
 									const [, key, value] = field.split('"');
 
 									if (!param) {
-										param = {} as AnyObject;
+										param = {} as AnyObject<unknown>;
 									}
 
 									if (key.endsWith('[]')) {
@@ -574,7 +574,7 @@ export class Badak {
 										const [key, value] = field.split('=');
 
 										if (!param) {
-											param = {} as AnyObject;
+											param = {} as AnyObject<unknown>;
 										}
 
 										if (key.endsWith('[]')) {
@@ -763,7 +763,7 @@ export class Badak {
 					}
 
 					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
-					let param: AnyObject | void;
+					let param: AnyObject<unknown> | void;
 
 
 					const routeRuleLength: number = this._routeRules.length;
@@ -1043,7 +1043,7 @@ export class Badak {
 						res.end();
 					}
 				})()
-					.catch(async (err: Error | AnyObject): Promise<void> => {
+					.catch(async (err: Error | AnyObject<unknown>): Promise<void> => {
 						if (this._config.catchErrorLog) {
 							console.error('badak catch error : %o', err);
 						}

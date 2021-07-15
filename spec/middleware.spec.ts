@@ -1,12 +1,14 @@
-import 'mocha';
+import { IncomingMessage, ServerResponse } from 'http';
 
+import 'mocha';
 import { expect } from 'chai';
 import * as request from 'supertest';
 
 import { Badak } from '../src/badak';
-import { MiddlewareFunction, RouteFunction } from '../src/interfaces';
+import { AnyObject, MiddlewareFunction, RouteFunction } from '../src/interfaces';
 
-const fail = async () => {
+
+const fail = async (): Promise<never> => {
 	throw new Error('this should be not execute');
 };
 
@@ -40,7 +42,8 @@ describe('middleware', () => {
 
 		describe('assign', () => {
 			it('normal function', async () => {
-				await app.auth(() => {
+				await app.auth((): void => {
+					// do nothing
 				});
 			});
 
@@ -57,8 +60,8 @@ describe('middleware', () => {
 		});
 
 		describe('run', () => {
-			describe('with headers', () => {
-				const authFnc = (req) => {
+			describe('with headers', (): void => {
+				const authFnc = (req): void => {
 					if (!req.headers['auth']) {
 						throw new Error('auth failed');
 					}
@@ -108,7 +111,7 @@ describe('middleware', () => {
 		const targetFncNames: string[] = ['before', 'after'];
 		const targetArrNames: string[] = ['_middlewaresBefore', '_middlewaresAfter'];
 
-		targetFncNames.forEach((fncName, i) => {
+		targetFncNames.forEach((fncName: string, i: number): void => {
 			describe(`common - ${ fncName }`, () => {
 				it('defined', () => {
 					expect(app[fncName]).to.be.ok;
@@ -118,7 +121,7 @@ describe('middleware', () => {
 				describe('error', () => {
 					it('no parameter', async () => {
 						await app[fncName](undefined)
-							.then(fail, err => {
+							.then(fail, (err: Error): void => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
@@ -126,7 +129,7 @@ describe('middleware', () => {
 
 					it('invalid parameter - null', async () => {
 						await app[fncName](null)
-							.then(fail, err => {
+							.then(fail, (err: Error): void => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
@@ -134,7 +137,7 @@ describe('middleware', () => {
 
 					it('invalid parameter - string', async () => {
 						await app[fncName]('hello')
-							.then(fail, err => {
+							.then(fail, (err: Error): void => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
@@ -142,7 +145,7 @@ describe('middleware', () => {
 
 					it('invalid parameter - number', async () => {
 						await app[fncName](123)
-							.then(fail, err => {
+							.then(fail, (err: Error): void => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
@@ -152,9 +155,10 @@ describe('middleware', () => {
 						// no route rule
 						await app.listen(port);
 
-						await app[fncName](() => {
+						await app[fncName]((): void => {
+							// do nothing
 						})
-							.then(fail, err => {
+							.then(fail, (err: Error): void => {
 								expect(err).to.be.ok;
 								expect(err).to.be.instanceof(Error);
 							});
@@ -166,6 +170,7 @@ describe('middleware', () => {
 						const beforeArrLength: number = app[targetArrNames[i]].length;
 
 						await app[fncName](() => {
+							// do nothing
 						});
 
 						const afterArrLength: number = app[targetArrNames[i]].length;
@@ -177,6 +182,7 @@ describe('middleware', () => {
 						const beforeArrLength: number = app[targetArrNames[i]].length;
 
 						await app[fncName](async () => {
+							// do nothing
 						});
 
 						const afterArrLength: number = app[targetArrNames[i]].length;
@@ -269,12 +275,12 @@ describe('middleware', () => {
 			});
 
 			it('with param', async () => {
-				const beforeFnc: MiddlewareFunction = async (req, res) => {
+				const beforeFnc: MiddlewareFunction = async (req: IncomingMessage, res: ServerResponse) => {
 					expect(req).to.be.ok;
 					expect(res).to.be.ok;
 				};
 
-				const routeFnc: RouteFunction = async (param: object) => {
+				const routeFnc: RouteFunction = async (param: AnyObject<unknown>): Promise<unknown> => {
 					expect(param).to.be.ok;
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified
@@ -286,7 +292,7 @@ describe('middleware', () => {
 					return newParam;
 				};
 
-				const afterFnc: MiddlewareFunction = async (req, res) => {
+				const afterFnc: MiddlewareFunction = async (req: IncomingMessage, res: ServerResponse) => {
 					expect(req).to.be.ok;
 					expect(res).to.be.ok;
 				};
@@ -385,6 +391,7 @@ describe('middleware', () => {
 				await app.route({
 					test: {
 						GET: () => {
+							// do nothing
 						}
 					}
 				});

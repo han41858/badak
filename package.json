@@ -14,7 +14,7 @@
 		"test": "mocha ./build/**/*.spec.js",
 		"prebuild:sample": "yarn clean",
 		"build:sample": "tsc ./sample/index.ts",
-		"lint": "eslint src/**/*.ts"
+		"lint": "eslint src spec"
 	},
 	"repository": {
 		"type": "git",
