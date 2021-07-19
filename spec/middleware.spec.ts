@@ -24,9 +24,9 @@ describe('middleware', () => {
 	});
 
 	afterEach(() => {
-		return app.isRunning() ?
-			app.stop() :
-			Promise.resolve();
+		return app.isRunning()
+			? app.stop()
+			: Promise.resolve();
 	});
 
 	describe('auth()', () => {
