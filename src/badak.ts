@@ -838,12 +838,15 @@ export class Badak {
 								});
 
 								const targetQuestionKey: string | undefined = questionKeyArr.find((questionKey: string): boolean => {
-									const optionalCharacter: string = questionKey.substr(questionKey.indexOf('?') - 1, 1);
-									const mandatoryKey: string = questionKey.substr(0, questionKey.indexOf(optionalCharacter + '?'));
-									const restKey: string = questionKey.substr(
-										questionKey.indexOf(optionalCharacter + '?')
-										+ optionalCharacter.length + 1
+									const questionKeyIndex: number = questionKey.indexOf('?');
+
+									const optionalCharacter: string = questionKey.substring(
+										questionKeyIndex - 1,
+										questionKeyIndex
 									);
+
+									const mandatoryKey: string = questionKey.substring(0, questionKeyIndex - 1);
+									const restKey: string = questionKey.substring(questionKeyIndex + 1);
 
 									return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
 								});
