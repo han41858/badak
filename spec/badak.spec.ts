@@ -3780,7 +3780,7 @@ describe('core', () => {
 					await app.listen(port);
 
 					const requestObj = request(app.getHttpServer());
-					let requestFnc: SuperTestExpect = null;
+					let requestFnc: SuperTestExpect;
 
 					switch (method) {
 						case 'get':
@@ -3827,7 +3827,7 @@ describe('core', () => {
 					await app.listen(port);
 
 					const requestObj = request(app.getHttpServer());
-					let requestFnc: SuperTestExpect = null;
+					let requestFnc: SuperTestExpect;
 
 					switch (method) {
 						case 'get':
