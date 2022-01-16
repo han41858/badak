@@ -6,6 +6,7 @@ import { Stats } from 'fs';
 import * as node_path from 'path';
 
 import { StaticCache } from './interfaces';
+import { ContentType } from './constants';
 
 
 export const convertNumberStr = (param: string): string | number => {
@@ -125,7 +126,7 @@ export const loadFolder = async (uri: string, path: string): Promise<StaticCache
 				const extension: string = matchArr[0];
 
 				const mimeMap: {
-					[key: string]: string;
+					[key: string]: ContentType | string;
 				} = {
 					'.bmp': 'image/bmp',
 					'.css': 'text/css',
@@ -135,11 +136,11 @@ export const loadFolder = async (uri: string, path: string): Promise<StaticCache
 					'.jpeg': 'image/jpeg',
 					'.jpg': 'image/jpeg',
 					'.js': 'text/javascript',
-					'.json': 'application/json',
+					'.json': ContentType.ApplicationJson,
 					'.pdf': 'application/pdf',
 					'.png': 'image/png',
-					'.txt': 'text/plain',
-					'.text': 'text/plain',
+					'.txt': ContentType.TextPlain,
+					'.text': ContentType.TextPlain,
 					'.tif': 'image/tiff',
 					'.tiff': 'image/tiff',
 					'.xls': 'application/vnd.ms-excel',
@@ -179,4 +180,26 @@ const loadFile = async (path: string): Promise<Buffer> => {
 			}
 		});
 	});
+};
+
+export const getContentType = (data: unknown): ContentType => {
+	let contentType: ContentType;
+
+	switch (typeof data) {
+		case 'object':
+			try {
+				JSON.stringify(data);
+
+				contentType = ContentType.ApplicationJson;
+			}
+			catch (e: unknown) {
+				contentType = ContentType.TextPlain;
+			}
+			break;
+
+		default:
+			contentType = ContentType.TextPlain;
+	}
+
+	return contentType;
 };

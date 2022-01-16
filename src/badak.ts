@@ -15,8 +15,17 @@ import {
 	StaticCache,
 	StaticRule
 } from './interfaces';
-import { Method } from './constants';
-import { checkAbsolutePath, checkAbsoluteUri, convertDateStr, convertNumberStr, isExistFile, isFolder, loadFolder } from './util';
+import { ContentType, Method } from './constants';
+import {
+	checkAbsolutePath,
+	checkAbsoluteUri,
+	convertDateStr,
+	convertNumberStr,
+	getContentType,
+	isExistFile,
+	isFolder,
+	loadFolder
+} from './util';
 
 /**
  * rule format, reserved keyword is 4-methods in upper cases
@@ -1010,34 +1019,26 @@ export class Badak {
 					}
 
 
-					const resObj: unknown = typeof targetFncObj === 'function'
+					const responseData: unknown = typeof targetFncObj === 'function'
 						? await targetFncObj(param, req, res)
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
-					if (resObj) {
-						// check result is json
-						if (typeof resObj === 'object') {
-							try {
-								// try to stringify()
-								responseBody = JSON.stringify(resObj);
+					if (responseData) {
+						const contentType: ContentType = getContentType(responseData);
 
-								res.setHeader('Content-Type', 'application/json');
-								res.end(responseBody);
-							}
-							catch (err) {
-								// no json
-								responseBody = resObj;
+						res.setHeader('Content-Type', contentType);
 
-								res.setHeader('Content-Type', 'text/plain');
-								res.end(responseBody);
-							}
+						switch (contentType) {
+							case ContentType.ApplicationJson:
+								responseBody = JSON.stringify(responseData);
+								break;
+
+							default:
+								responseBody = responseData;
+
 						}
-						else {
-							responseBody = resObj;
 
-							res.setHeader('Content-Type', 'text/plain');
-							res.end(responseBody);
-						}
+						res.end(responseBody);
 					}
 					else {
 						res.end();
@@ -1074,15 +1075,21 @@ export class Badak {
 								if (err) {
 									if (err instanceof Error) {
 										responseBody = err.message;
-										res.setHeader('Content-Type', 'text/plain');
-									}
-									else if (typeof err === 'object') {
-										responseBody = JSON.stringify(err);
-										res.setHeader('Content-Type', 'application/json');
+										res.setHeader('Content-Type', ContentType.TextPlain);
 									}
 									else {
-										responseBody = err;
-										res.setHeader('Content-Type', 'text/plain');
+										const contentType: ContentType = getContentType(err);
+
+										res.setHeader('Content-Type', contentType);
+
+										switch (contentType) {
+											case ContentType.ApplicationJson:
+												responseBody = JSON.stringify(err);
+												break;
+
+											default:
+												responseBody = err;
+										}
 									}
 
 									res.end(responseBody);

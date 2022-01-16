@@ -9,7 +9,7 @@ import { Response as SuperTestResponse, Test as SuperTestExpect } from 'supertes
 
 import { Badak } from '../src/badak';
 import { AnyObject, BadakOption, RouteFunction, RouteRule, RouteRuleSeed, StaticCache, StaticRule } from '../src/interfaces';
-import { Method } from '../src/constants';
+import { ContentType, Method } from '../src/constants';
 
 type SuperTestRequest = request.SuperTest<request.Test>;
 
@@ -1198,7 +1198,7 @@ describe('core', () => {
 									.expect(200)
 									.then((res: SuperTestResponse): void => {
 										const contentType: string = res.headers['content-type'];
-										expect(contentType).to.be.eql('text/plain');
+										expect(contentType).to.be.eql(ContentType.TextPlain);
 
 										expect(res).to.be.ok;
 										expect(res.text).to.be.ok;
@@ -1221,7 +1221,7 @@ describe('core', () => {
 								});
 
 								expect(targetCache).to.be.ok;
-								expect(targetCache).to.have.property('mime', 'text/plain');
+								expect(targetCache).to.have.property('mime', ContentType.TextPlain);
 								expect(targetCache).to.have.property('fileData');
 							}
 						})
