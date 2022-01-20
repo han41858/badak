@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'http';
 
 import 'mocha';
-import { before } from 'mocha';
+import { beforeEach } from 'mocha';
 import { expect } from 'chai';
 import * as request from 'supertest';
 
@@ -109,15 +109,11 @@ describe('middleware', () => {
 
 		targetFncNames.forEach((fncName: keyof Badak, i: number): void => {
 			describe(`common - ${ fncName }`, () => {
-				type MiddlewareRegisterType = (fnc: MiddlewareFunction) => Promise<void>;
-
-				let middlewareRegister: MiddlewareRegisterType;
 				let middlewareFnc: MiddlewareFunction = (): void => {
 					// do nothing
 				};
 
-				before(() => {
-					middlewareRegister = app[fncName] as MiddlewareRegisterType;
+				beforeEach(() => {
 					middlewareFnc = (): void => {
 						// do nothing
 					};
@@ -131,25 +127,29 @@ describe('middleware', () => {
 				describe('error', () => {
 					it('no parameter', () => {
 						return promiseFail(
-							middlewareRegister(undefined as unknown as MiddlewareFunction)
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							(app as any)[fncName](undefined as unknown as MiddlewareFunction)
 						);
 					});
 
 					it('invalid parameter - null', () => {
 						return promiseFail(
-							middlewareRegister(null as unknown as MiddlewareFunction)
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							(app as any)[fncName](null as unknown as MiddlewareFunction)
 						);
 					});
 
 					it('invalid parameter - string', () => {
 						return promiseFail(
-							middlewareRegister('hello' as unknown as MiddlewareFunction)
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							(app as any)[fncName]('hello' as unknown as MiddlewareFunction)
 						);
 					});
 
 					it('invalid parameter - number', async () => {
 						return promiseFail(
-							middlewareRegister(123 as unknown as MiddlewareFunction)
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							(app as any)[fncName](123 as unknown as MiddlewareFunction)
 						);
 					});
 
@@ -158,7 +158,8 @@ describe('middleware', () => {
 						await app.listen(port);
 
 						await promiseFail(
-							await middlewareRegister(middlewareFnc)
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							(app as any)[fncName](middlewareFnc)
 						);
 					});
 				});
@@ -170,7 +171,8 @@ describe('middleware', () => {
 
 						const beforeArrLength: number = middlewareArr.length;
 
-						await middlewareRegister(() => {
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+						await (app as any)[fncName](() => {
 							// do nothing
 						});
 
@@ -185,7 +187,8 @@ describe('middleware', () => {
 
 						const beforeArrLength: number = middlewareArr.length;
 
-						await middlewareRegister(async () => {
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+						await (app as any)[fncName](async () => {
 							// do nothing
 						});
 

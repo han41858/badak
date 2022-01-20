@@ -2,13 +2,13 @@ import { IncomingMessage } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { afterEach, before, beforeEach } from 'mocha';
+import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
 import * as request from 'supertest';
 import { Response, Response as SuperTestResponse, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
-import { BadakOption, RouteFunction, RouteOption, RouteRule, RouteRuleSeed, StaticCache, StaticRule, TypedObject } from '../src/interfaces';
+import { BadakOption, RouteFunction, RouteRule, RouteRuleSeed, StaticCache, StaticRule, TypedObject } from '../src/interfaces';
 import { ContentType, Method } from '../src/constants';
 import { promiseFail } from './test-util';
 
@@ -3556,32 +3556,27 @@ describe('core', () => {
 		const methodArr: (keyof Badak)[] = ['get', 'post', 'put', 'delete'];
 
 		methodArr.forEach((method: keyof Badak): void => {
-			type MethodType = (address: string, fnc: RouteFunction, option?: RouteOption) => Promise<void>;
-
-			let routeFnc: MethodType;
 			const testFnc: RouteFunction = (): void => {
 				// do nothing
 			};
 
-			before(() => {
-				routeFnc = app[method] as MethodType;
-			});
-
 			describe(`${ method }()`, () => {
 				it('defined', () => {
-					expect(routeFnc).to.be.ok;
+					expect(app[method]).to.be.ok;
 				});
 
 				describe('error', () => {
 					it('no address', () => {
 						return promiseFail(
-							routeFnc(undefined as unknown as string, testFnc)
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							(app as any)[method](undefined as unknown as string, testFnc)
 						);
 					});
 
 					it('no function', () => {
 						return promiseFail(
-							routeFnc('/users', undefined as unknown as RouteFunction)
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							(app as any)[method]('/users', undefined as unknown as RouteFunction)
 						);
 					});
 				});
@@ -3590,7 +3585,8 @@ describe('core', () => {
 					const uri: string = '/users';
 					let fncRun: boolean = false;
 
-					await routeFnc(uri, async () => {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					await (app as any)[method](uri, async () => {
 						fncRun = true;
 
 						return {
@@ -3641,7 +3637,8 @@ describe('core', () => {
 					const uri: string = '/users';
 					let fncRun: boolean = false;
 
-					await routeFnc(uri, async () => {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					await (app as any)[method](uri, async () => {
 						fncRun = true;
 
 						return {
@@ -3694,7 +3691,8 @@ describe('core', () => {
 					const uri: string = '/users/a/b/c';
 					let fncRun: boolean = false;
 
-					await routeFnc(uri, async () => {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					await (app as any)[method](uri, async () => {
 						fncRun = true;
 
 						return {
@@ -3757,8 +3755,13 @@ describe('core', () => {
 						fnc2RunFlag = true;
 					};
 
-					await routeFnc(uri1, fnc1);
-					await routeFnc(uri2, fnc2);
+
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					await (app as any)[method](uri1, fnc1);
+
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					await (app as any)[method](uri2, fnc2);
+
 
 					await app.listen(port);
 
