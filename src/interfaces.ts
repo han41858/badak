@@ -2,15 +2,17 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { Method } from './constants';
 
-export type RouteFunction = (param: unknown, req: IncomingMessage, res: ServerResponse) => unknown;
-export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, responseBody?: unknown) => void;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type RouteFunction = (param: any, req: IncomingMessage, res: ServerResponse) => unknown;
+export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, responseBody?: unknown) => void | Promise<void>;
 
 export interface AnyObject<T> {
 	[key: string]: T;
 }
 
 export interface RouteRule {
-	[uri: string]: RouteRule | RouteRuleSeed | RouteFunction; // function can be assigned after config('defaultMethod', [method_type])
+	// function can be assigned after config('defaultMethod', [method_type])
+	[uri: string]: RouteRule | RouteRuleSeed | RouteFunction;
 }
 
 export interface RouteOption {
@@ -23,10 +25,10 @@ export interface RouteFunctionObj {
 }
 
 export interface RouteRuleSeed {
-	GET?: RouteFunctionObj;
-	POST?: RouteFunctionObj;
-	PUT?: RouteFunctionObj;
-	DELETE?: RouteFunctionObj;
+	GET?: RouteFunction | RouteFunctionObj;
+	POST?: RouteFunction | RouteFunctionObj;
+	PUT?: RouteFunction | RouteFunctionObj;
+	DELETE?: RouteFunction | RouteFunctionObj;
 }
 
 export interface BadakOption extends AnyObject<boolean | Method | undefined> {

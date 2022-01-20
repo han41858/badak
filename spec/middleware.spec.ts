@@ -1,21 +1,19 @@
 import { IncomingMessage, ServerResponse } from 'http';
 
 import 'mocha';
+import { before } from 'mocha';
 import { expect } from 'chai';
 import * as request from 'supertest';
 
 import { Badak } from '../src/badak';
 import { AnyObject, MiddlewareFunction, RouteFunction } from '../src/interfaces';
+import { promiseFail } from './test-util';
 
-
-const fail = async (): Promise<never> => {
-	throw new Error('this should be not execute');
-};
 
 const port = 65030;
 
 describe('middleware', () => {
-	let app: Badak = null;
+	let app: Badak;
 
 	beforeEach(() => {
 		app = new Badak({
@@ -31,12 +29,10 @@ describe('middleware', () => {
 
 	describe('auth()', () => {
 		describe('error', () => {
-			it('no auth param', async () => {
-				await app.auth(undefined)
-					.then(fail, (err) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceof(Error);
-					});
+			it('no auth param', () => {
+				return promiseFail(
+					app.auth(undefined as unknown as MiddlewareFunction)
+				);
 			});
 		});
 
@@ -61,7 +57,7 @@ describe('middleware', () => {
 
 		describe('run', () => {
 			describe('with headers', (): void => {
-				const authFnc = (req): void => {
+				const authFnc = (req: IncomingMessage): void => {
 					if (!req.headers['auth']) {
 						throw new Error('auth failed');
 					}
@@ -108,84 +104,92 @@ describe('middleware', () => {
 	});
 
 	describe('before() & after()', () => {
-		const targetFncNames: string[] = ['before', 'after'];
+		const targetFncNames: (keyof Badak)[] = ['before', 'after'];
 		const targetArrNames: string[] = ['_middlewaresBefore', '_middlewaresAfter'];
 
-		targetFncNames.forEach((fncName: string, i: number): void => {
+		targetFncNames.forEach((fncName: keyof Badak, i: number): void => {
 			describe(`common - ${ fncName }`, () => {
+				type MiddlewareRegisterType = (fnc: MiddlewareFunction) => Promise<void>;
+
+				let middlewareRegister: MiddlewareRegisterType;
+				let middlewareFnc: MiddlewareFunction = (): void => {
+					// do nothing
+				};
+
+				before(() => {
+					middlewareRegister = app[fncName] as MiddlewareRegisterType;
+					middlewareFnc = (): void => {
+						// do nothing
+					};
+				});
+
 				it('defined', () => {
 					expect(app[fncName]).to.be.ok;
 					expect(typeof app[fncName]).to.be.eql('function');
 				});
 
 				describe('error', () => {
-					it('no parameter', async () => {
-						await app[fncName](undefined)
-							.then(fail, (err: Error): void => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
-							});
+					it('no parameter', () => {
+						return promiseFail(
+							middlewareRegister(undefined as unknown as MiddlewareFunction)
+						);
 					});
 
-					it('invalid parameter - null', async () => {
-						await app[fncName](null)
-							.then(fail, (err: Error): void => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
-							});
+					it('invalid parameter - null', () => {
+						return promiseFail(
+							middlewareRegister(null as unknown as MiddlewareFunction)
+						);
 					});
 
-					it('invalid parameter - string', async () => {
-						await app[fncName]('hello')
-							.then(fail, (err: Error): void => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
-							});
+					it('invalid parameter - string', () => {
+						return promiseFail(
+							middlewareRegister('hello' as unknown as MiddlewareFunction)
+						);
 					});
 
 					it('invalid parameter - number', async () => {
-						await app[fncName](123)
-							.then(fail, (err: Error): void => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
-							});
+						return promiseFail(
+							middlewareRegister(123 as unknown as MiddlewareFunction)
+						);
 					});
 
 					it('after listen()', async () => {
 						// no route rule
 						await app.listen(port);
 
-						await app[fncName]((): void => {
-							// do nothing
-						})
-							.then(fail, (err: Error): void => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceof(Error);
-							});
+						await promiseFail(
+							await middlewareRegister(middlewareFnc)
+						);
 					});
 				});
 
 				describe('assign', () => {
 					it('normal function', async () => {
-						const beforeArrLength: number = app[targetArrNames[i]].length;
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+						const middlewareArr: MiddlewareFunction[] = (app as any)[targetArrNames[i]] as MiddlewareFunction[];
 
-						await app[fncName](() => {
+						const beforeArrLength: number = middlewareArr.length;
+
+						await middlewareRegister(() => {
 							// do nothing
 						});
 
-						const afterArrLength: number = app[targetArrNames[i]].length;
+						const afterArrLength: number = middlewareArr.length;
 
 						expect(afterArrLength).to.be.eql(beforeArrLength + 1);
 					});
 
 					it('async function', async () => {
-						const beforeArrLength: number = app[targetArrNames[i]].length;
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+						const middlewareArr: MiddlewareFunction[] = (app as any)[targetArrNames[i]] as MiddlewareFunction[];
 
-						await app[fncName](async () => {
+						const beforeArrLength: number = middlewareArr.length;
+
+						await middlewareRegister(async () => {
 							// do nothing
 						});
 
-						const afterArrLength: number = app[targetArrNames[i]].length;
+						const afterArrLength: number = middlewareArr.length;
 
 						expect(afterArrLength).to.be.eql(beforeArrLength + 1);
 					});

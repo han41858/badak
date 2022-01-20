@@ -288,7 +288,7 @@ export class Badak {
 	// auth
 	async auth (fnc: MiddlewareFunction): Promise<void> {
 		if (fnc === undefined) {
-			throw  new Error('no auth function');
+			throw new Error('no auth function');
 		}
 
 		if (typeof fnc !== 'function') {
@@ -690,13 +690,17 @@ export class Badak {
 				oneCacheSet.forEach((oneCache: StaticCache): void => {
 					this._staticCache.push(oneCache);
 
-					this.get(oneCache.uri, async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-						res.setHeader('Content-Type', oneCache.mime);
-						res.write(oneCache.fileData);
-						res.end();
-					}, {
-						auth: false
-					});
+					this.get(
+						oneCache.uri,
+						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
+							res.setHeader('Content-Type', oneCache.mime);
+							res.write(oneCache.fileData);
+							res.end();
+						},
+						{
+							auth: false
+						}
+					);
 				});
 			});
 
@@ -706,31 +710,35 @@ export class Badak {
 					: this._spaRoot + '/';
 				const spaRoutingUrl: string = spaPathPrefix + '**';
 
-				await this.get(spaRoutingUrl, async (param, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-					// find index.html in static cache & return
-					const indexHtmlUrl: string = spaPathPrefix + 'index.html';
+				await this.get(
+					spaRoutingUrl,
+					async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
+						// find index.html in static cache & return
+						const indexHtmlUrl: string = spaPathPrefix + 'index.html';
 
-					const targetCache: StaticCache | undefined = this._staticCache.find((cache: StaticCache): boolean => {
-						return cache.uri === indexHtmlUrl;
-					});
+						const targetCache: StaticCache | undefined = this._staticCache.find((cache: StaticCache): boolean => {
+							return cache.uri === indexHtmlUrl;
+						});
 
-					if (targetCache) {
-						const resFileObj: {
-							mime: string;
-							fileData: Buffer;
-						} = {
-							mime: targetCache.mime,
-							fileData: targetCache.fileData
-						};
+						if (targetCache) {
+							const resFileObj: {
+								mime: string;
+								fileData: Buffer;
+							} = {
+								mime: targetCache.mime,
+								fileData: targetCache.fileData
+							};
 
-						res.setHeader('Content-Type', resFileObj.mime);
-						res.write(resFileObj.fileData);
+							res.setHeader('Content-Type', resFileObj.mime);
+							res.write(resFileObj.fileData);
+						}
+
+						res.end();
+					},
+					{
+						auth: false
 					}
-
-					res.end();
-				}, {
-					auth: false
-				});
+				);
 			}
 		}
 
@@ -745,9 +753,11 @@ export class Badak {
 					// before functions can't modify parameters
 					// use try {} to run route function
 					try {
-						await Promise.all(this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): void => {
-							return middlewareFnc(req, res);
-						}));
+						await Promise.all(
+							this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
+								return middlewareFnc(req, res);
+							})
+						);
 					}
 					catch (err) {
 						// catch middleware exception
@@ -1110,9 +1120,11 @@ export class Badak {
 					.then(async (): Promise<void> => {
 						// run after middleware functions
 						try {
-							await Promise.all(this._middlewaresAfter.map((middlewareFnc: MiddlewareFunction): void => {
-								return middlewareFnc(req, res, responseBody);
-							}));
+							await Promise.all(
+								this._middlewaresAfter.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
+									return middlewareFnc(req, res, responseBody);
+								})
+							);
 						}
 						catch (err) {
 							// catch middleware exception

@@ -5,23 +5,20 @@ import * as path from 'path';
 import { afterEach, before, beforeEach } from 'mocha';
 import { expect } from 'chai';
 import * as request from 'supertest';
-import { Response as SuperTestResponse, Test as SuperTestExpect } from 'supertest';
+import { Response, Response as SuperTestResponse, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
-import { AnyObject, BadakOption, RouteFunction, RouteRule, RouteRuleSeed, StaticCache, StaticRule } from '../src/interfaces';
+import { AnyObject, BadakOption, RouteFunction, RouteOption, RouteRule, RouteRuleSeed, StaticCache, StaticRule } from '../src/interfaces';
 import { ContentType, Method } from '../src/constants';
+import { promiseFail } from './test-util';
 
 type SuperTestRequest = request.SuperTest<request.Test>;
 
 
-const fail = async (): Promise<never> => {
-	throw new Error('this should be not execute');
-};
-
 const port: number = 65030;
 
 describe('core', () => {
-	let app: Badak = null;
+	let app!: Badak;
 
 	beforeEach(() => {
 		app = new Badak({
@@ -47,48 +44,38 @@ describe('core', () => {
 			expect(app.config).to.be.ok;
 		});
 
-		it('not defined key', async () => {
-			await app.config('somethingNotDefinedKey', true)
-				.then(fail, (err: Error) => {
-					expect(err).to.be.ok;
-					expect(err).to.be.instanceOf(Error);
-				});
+		it('not defined key', () => {
+			return promiseFail(
+				app.config('somethingNotDefinedKey', true)
+			);
 		});
 
 		describe('invalid value', () => {
 			const booleanKeys: string[] = ['parseNumber', 'parseDate'];
 
 			booleanKeys.forEach((key: string): void => {
-				it(key + ' - undefined', async () => {
-					await app.config(key, undefined)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it(key + ' - undefined', () => {
+					return promiseFail(
+						app.config(key, undefined)
+					);
 				});
 
-				it(key + ' - null', async () => {
-					await app.config(key, null)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it(key + ' - null', () => {
+					return promiseFail(
+						app.config(key, null)
+					);
 				});
 
-				it(key + ' - string', async () => {
-					await app.config(key, 'hello')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it(key + ' - string', () => {
+					return promiseFail(
+						app.config(key, 'hello')
+					);
 				});
 
-				it(key + ' - number', async () => {
-					await app.config(key, 123)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it(key + ' - number', () => {
+					return promiseFail(
+						app.config(key, 123)
+					);
 				});
 			});
 		});
@@ -281,7 +268,7 @@ describe('core', () => {
 
 				describe('object', () => {
 					it('application/json', async () => {
-						const testFnc = (param: unknown): void => {
+						const testFnc = (param: TestObj[]): void => {
 							expect(param).to.be.ok;
 							expect(param).to.be.instanceOf(Array);
 
@@ -564,7 +551,11 @@ describe('core', () => {
 				});
 
 				describe('object', () => {
-					const testFnc = (param: unknown): void => {
+					interface TestObj {
+						value: string;
+					}
+
+					const testFnc = (param: TestObj[]): void => {
 						expect(param).to.be.ok;
 						expect(param).to.be.instanceOf(Array);
 
@@ -609,7 +600,7 @@ describe('core', () => {
 			const getReqFnc = (method: string): SuperTestExpect => {
 				const requestObj: SuperTestRequest = request(app.getHttpServer());
 
-				let requestFnc: SuperTestExpect;
+				let requestFnc: SuperTestExpect | undefined;
 
 				switch (method) {
 					case Method.GET:
@@ -629,7 +620,7 @@ describe('core', () => {
 						break;
 				}
 
-				return requestFnc;
+				return requestFnc as SuperTestExpect;
 			};
 
 			describe('function itself', () => {
@@ -649,42 +640,32 @@ describe('core', () => {
 				});
 
 				it('set value failed - not string', async () => {
-					await app.config('defaultMethod', true)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					await promiseFail(
+						app.config('defaultMethod', true)
+					);
 
-					await app.config('defaultMethod', false)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					await promiseFail(
+						app.config('defaultMethod', false)
+					);
 
-					await app.config('defaultMethod', 123)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					await promiseFail(
+						app.config('defaultMethod', 123)
+					);
 				});
 
-				it('set value failed - not defined method', async () => {
-					await app.config('defaultMethod', 'something_method')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('set value failed - not defined method', () => {
+					return promiseFail(
+						app.config('defaultMethod', 'something_method')
+					);
 				});
 			});
 
-			it('default - can\'t set', async () => {
-				await app.route({
+			it('default - can\'t set', () => {
+				return promiseFail(
+					app.route({
 						[testUri]: echoFnc
 					})
-					.then(fail, (err: Error) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
+				);
 			});
 
 			describe('after set', () => {
@@ -713,7 +694,7 @@ describe('core', () => {
 								expect(routeRules[0]).to.have.property('/');
 
 								expect(routeRules[0]['/']).to.have.property(testUriRefined);
-								expect(routeRules[0]['/'][testUriRefined]).to.have.property(setMethod);
+								expect((routeRules[0]['/'] as RouteRule)[testUriRefined]).to.have.property(setMethod);
 
 								await getReqFnc(testMethod)
 									.expect(setMethod === testMethod ? 200 : 404);
@@ -732,13 +713,11 @@ describe('core', () => {
 
 				await app.config('defaultMethod', null);
 
-				await app.route({
+				await promiseFail(
+					app.route({
 						[testUri]: echoFnc
 					})
-					.then(fail, (err: Error) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
+				);
 			});
 		});
 	});
@@ -944,23 +923,19 @@ describe('core', () => {
 		});
 
 		describe('error', () => {
-			it('no port param', async () => {
-				await app.listen(undefined)
-					.then(fail, (err: Error) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
+			it('no port param', () => {
+				return promiseFail(
+					app.listen(undefined as unknown as number)
+				);
 			});
 
-			it('run twice', async () => {
-				await app.listen(port)
-					.then(() => {
-						return app.listen(port);
-					})
-					.then(fail, (err: Error) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
+			it('run twice', () => {
+				return promiseFail(
+					app.listen(port)
+						.then(() => {
+							return app.listen(port);
+						})
+				);
 			});
 		});
 
@@ -1072,70 +1047,54 @@ describe('core', () => {
 
 		describe('error', () => {
 			describe('uri', () => {
-				it('no parameter', async () => {
-					await app.static(undefined, '.')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('no parameter', () => {
+					return promiseFail(
+						app.static(undefined as unknown as string, '.')
+					);
 				});
 
-				it('invalid parameter === null', async () => {
-					await app.static(null, '.')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('invalid parameter === null', () => {
+					return promiseFail(
+						app.static(null as unknown as string, '.')
+					);
 				});
 
-				it('not absolute path', async () => {
-					await app.static('someUri', 'something')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('not absolute path', () => {
+					return promiseFail(
+						app.static('someUri', 'something')
+					);
 				});
 
-				it('invalid path', async () => {
-					await app.static('/some///thing', 'something')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('invalid path', () => {
+					return promiseFail(
+						app.static('/some///thing', 'something')
+					);
 				});
 			});
 
 			describe('path', () => {
-				it('no parameter', async () => {
-					await app.static('/', undefined)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('no parameter', () => {
+					return promiseFail(
+						app.static('/', undefined as unknown as string)
+					);
 				});
 
-				it('invalid parameter === null', async () => {
-					await app.static('/', null)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('invalid parameter === null', () => {
+					return promiseFail(
+						app.static('/', null as unknown as string)
+					);
 				});
 
-				it('not absolute path', async () => {
-					await app.static('/', 'something')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('not absolute path', () => {
+					return promiseFail(
+						app.static('/', 'something')
+					);
 				});
 
-				it('not folder', async () => {
-					await app.static('/', path.join(__dirname, 'static', 'test.txt'))
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('not folder', () => {
+					return promiseFail(
+						app.static('/', path.join(__dirname, 'static', 'test.txt'))
+					);
 				});
 			});
 
@@ -1153,14 +1112,12 @@ describe('core', () => {
 				await request(app.getHttpServer()).delete(fullUri).expect(404);
 			});
 
-			it('not exist folder', async () => {
+			it('not exist folder', () => {
 				const folderPath = path.join(__dirname, '/static/notExistFolder');
 
-				return app.static('/static', folderPath)
-					.then(fail, (err: Error) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
+				return promiseFail(
+					app.static('/static', folderPath)
+				);
 			});
 		});
 
@@ -1236,7 +1193,7 @@ describe('core', () => {
 				filePath = path.join(folderPath, fileName);
 
 				fileData = await new Promise<string>((resolve, reject) => {
-					fs.readFile(filePath, (err: Error, data: Buffer) => {
+					fs.readFile(filePath, (err: Error | null, data: Buffer) => {
 						if (!err) {
 							resolve(data.toString());
 						}
@@ -1374,7 +1331,7 @@ describe('core', () => {
 		});
 
 		describe('about MIME', () => {
-			[
+			const defines: [string, string][] = [
 				['bmp', 'image/bmp'],
 				['css', 'text/css'],
 				['gif', 'image/gif'],
@@ -1392,7 +1349,9 @@ describe('core', () => {
 				['tiff', 'image/tiff'],
 				['xls', 'application/vnd.ms-excel'],
 				['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
-			].forEach(([extension, mime]: [string, string]) => {
+			];
+
+			defines.forEach(([extension, mime]: [string, string]): void => {
 				it(`ok : .${ extension }`, async () => {
 					const fileName: string = `test.${ extension }`;
 					const filePath: string = path.join(__dirname, '/static');
@@ -1456,89 +1415,69 @@ describe('core', () => {
 		describe('error', () => {
 			// same with static()
 			describe('uri', () => {
-				it('no parameter', async () => {
-					await app.setSPARoot(undefined, '.')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('no parameter', () => {
+					return promiseFail(
+						app.setSPARoot(undefined as unknown as string, '.')
+					);
 				});
 
-				it('invalid parameter === null', async () => {
-					await app.setSPARoot(null, '.')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('invalid parameter === null', () => {
+					return promiseFail(
+						app.setSPARoot(null as unknown as string, '.')
+					);
 				});
 
-				it('not absolute path', async () => {
-					await app.setSPARoot('someUri', 'something')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('not absolute path', () => {
+					return promiseFail(
+						app.setSPARoot('someUri', 'something')
+					);
 				});
 
-				it('invalid path', async () => {
-					await app.setSPARoot('/some///thing', 'something')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('invalid path', () => {
+					return promiseFail(
+						app.setSPARoot('/some///thing', 'something')
+					);
 				});
 			});
 
 			describe('path', () => {
-				it('no parameter', async () => {
-					await app.setSPARoot('/', undefined)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('no parameter', () => {
+					return promiseFail(
+						app.setSPARoot('/', undefined as unknown as string)
+					);
 				});
 
-				it('invalid parameter === null', async () => {
-					await app.setSPARoot('/', null)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('invalid parameter === null', () => {
+					return promiseFail(
+						app.setSPARoot('/', null as unknown as string)
+					);
 				});
 
-				it('not absolute path', async () => {
-					await app.setSPARoot('/', 'something')
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('not absolute path', () => {
+					return promiseFail(
+						app.setSPARoot('/', 'something')
+					);
 				});
 
-				it('not folder', async () => {
-					await app.setSPARoot('/', path.join(__dirname, 'static', 'test.txt'))
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+				it('not folder', () => {
+					return promiseFail(
+						app.setSPARoot('/', path.join(__dirname, 'static', 'test.txt'))
+					);
 				});
 			});
 
-			it('not exist folder', async () => {
+			it('not exist folder', () => {
 				const folderPath = path.join(__dirname, '/static/notExistFolder');
 
-				return app.setSPARoot('/public', folderPath)
-					.then(fail, (err: Error) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
+				return promiseFail(
+					app.setSPARoot('/public', folderPath)
+				);
 			});
 
 			it('no index.html', () => {
-				return app.setSPARoot('/public', path.join(__dirname, 'static'))
-					.then(fail, (err: Error) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
+				return promiseFail(
+					app.setSPARoot('/public', path.join(__dirname, 'static'))
+				);
 			});
 		});
 
@@ -1713,110 +1652,95 @@ describe('core', () => {
 
 			describe('error', () => {
 				it('no param', () => {
-					return app.route(undefined)
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					return promiseFail(
+						app.route(undefined as unknown as RouteRule)
+					);
 				});
 
-				it('empty address - \'\'', () => {
-					return app.route({
-							'': {
+				it.only('empty address - \'\'', () => {
+					return promiseFail(
+						app.route({
+							'aa': {
 								GET: async () => {
 									// do nothing
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('empty address - \' \'', () => {
-					return app.route({
+					return promiseFail(
+						app.route({
 							' ': {
 								GET: async () => {
 									// do nothing
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('empty address - space', () => {
-					return app.route({
+					return promiseFail(
+						app.route({
 							' ': {
 								GET: async () => {
 									// do nothing
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('uri include space', () => {
-					return app.route({
+					return promiseFail(
+						app.route({
 							' users': {
 								GET: async () => {
 									// do nothing
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('uri include space', () => {
-					return app.route({
+					return promiseFail(
+						app.route({
 							'users ': {
 								GET: async () => {
 									// do nothing
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('no rule', () => {
-					return app.route({
+					return promiseFail(
+						app.route({
 							users: {}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('invalid method', () => {
-					return app.route({
+					return promiseFail(
+						app.route({
 							users: {
 								'get': async () => {
 									// do nothing
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('included invalid rule', () => {
 					// setting defaultMethod cover this
-					return app.route({
+					return promiseFail(
+						app.route({
 							users: {
 								GET: async () => {
 									// do nothing
@@ -1826,10 +1750,7 @@ describe('core', () => {
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('undefined rule 404', async () => {
@@ -1867,33 +1788,60 @@ describe('core', () => {
 				});
 
 				it('invalid root path', () => {
-					return app.route({
+					return promiseFail(
+						app.route({
 							' /': {
 								GET: async () => {
 									// do nothing
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
 				it('invalid root path', () => {
-					return app.route({
+					return promiseFail(
+						app.route({
 							'/ ': {
 								GET: async () => {
 									// do nothing
 								}
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 			});
+
+			const checkRuleFnc = (app: Badak, targetFnc: () => unknown): void => {
+				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				expect(routeRules).to.be.ok;
+				expect(routeRules).to.be.instanceOf(Array);
+				expect(routeRules).to.be.lengthOf(1);
+
+				expect(routeRules[0]).to.be.ok;
+				expect(routeRules[0]).to.be.instanceOf(Object);
+				expect(routeRules[0]).to.have.property('/');
+
+				const routeRule: RouteRule = routeRules[0];
+
+				expect(routeRule['/']).to.be.ok;
+				expect(routeRule['/']).to.be.instanceOf(Object);
+				expect(routeRule['/']).to.have.property('users');
+
+				const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
+
+				expect(routeRuleRoot['users']).to.be.ok;
+				expect(routeRuleRoot['users']).to.be.instanceOf(Object);
+				expect(routeRuleRoot['users']).to.have.property('GET');
+
+				const routeRuleUsers: RouteRule = routeRuleRoot['users'] as RouteRule;
+
+				const routeFnc = routeRuleUsers['GET'];
+				expect(routeFnc).to.be.ok;
+				expect(routeFnc).to.be.instanceOf(Function);
+				expect(routeFnc).to.eql(targetFnc);
+			};
+
 
 			it('ok - normal function', async () => {
 				const testFnc = (): void => {
@@ -1906,27 +1854,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
-				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceOf(Array);
-				expect(routeRules).to.be.lengthOf(1);
-
-				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceOf(Object);
-				expect(routeRules[0]).to.have.property('/');
-
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']).to.have.property('users');
-
-				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['users']).to.have.property('GET');
-
-				const routeFnc = routeRules[0]['/']['users']['GET'];
-				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceOf(Function);
-				expect(routeFnc).to.eql(testFnc);
+				checkRuleFnc(app, testFnc);
 
 				await app.listen(port);
 
@@ -1946,27 +1874,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
-				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceOf(Array);
-				expect(routeRules).to.be.lengthOf(1);
-
-				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceOf(Object);
-				expect(routeRules[0]).to.have.property('/');
-
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']).to.have.property('users');
-
-				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['users']).to.have.property('GET');
-
-				const routeFnc = routeRules[0]['/']['users']['GET'];
-				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceOf(Function);
-				expect(routeFnc).to.eql(testFnc);
+				checkRuleFnc(app, testFnc);
 
 				await app.listen(port);
 
@@ -2027,27 +1935,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
-				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceOf(Array);
-				expect(routeRules).to.be.lengthOf(1);
-
-				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceOf(Object);
-				expect(routeRules[0]).to.have.property('/');
-
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']).to.have.property('users');
-
-				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['users']).to.have.property('GET');
-
-				const routeFnc = routeRules[0]['/']['users']['GET'];
-				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceOf(Function);
-				expect(routeFnc).to.eql(commonTestFnc);
+				checkRuleFnc(app, commonTestFnc);
 
 				await app.listen(port);
 
@@ -2067,27 +1955,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
-				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceOf(Array);
-				expect(routeRules).to.be.lengthOf(1);
-
-				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceOf(Object);
-				expect(routeRules[0]).to.have.property('/');
-
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']).to.have.property('users');
-
-				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['users']).to.have.property('GET');
-
-				const routeFnc = routeRules[0]['/']['users']['GET'];
-				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceOf(Function);
-				expect(routeFnc).to.eql(commonTestFnc);
+				checkRuleFnc(app, commonTestFnc);
 
 				await app.listen(port);
 
@@ -2107,27 +1975,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
-				expect(routeRules).to.be.ok;
-				expect(routeRules).to.be.instanceOf(Array);
-				expect(routeRules).to.be.lengthOf(1);
-
-				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceOf(Object);
-				expect(routeRules[0]).to.have.property('/');
-
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']).to.have.property('users');
-
-				expect(routeRules[0]['/']['users']).to.be.ok;
-				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['users']).to.have.property('GET');
-
-				const routeFnc = routeRules[0]['/']['users']['GET'];
-				expect(routeFnc).to.be.ok;
-				expect(routeFnc).to.be.instanceOf(Function);
-				expect(routeFnc).to.eql(commonTestFnc);
+				checkRuleFnc(app, commonTestFnc);
 
 				await app.listen(port);
 
@@ -2230,15 +2078,18 @@ describe('core', () => {
 					expect(rule).to.have.property('/');
 
 					expect(rule['/']).to.have.property('users');
-					expect(rule['/']['users']).to.be.instanceOf(Object);
+
+					const routeRuleRoot: RouteRule = rule['/'] as RouteRule;
+
+					expect(routeRuleRoot['users']).to.be.instanceOf(Object);
 
 					switch (i) {
 						case 0:
-							expect(rule['/']['users']).to.have.property('GET', fncA);
+							expect(routeRuleRoot['users']).to.have.property('GET', fncA);
 							break;
 
 						case 1:
-							expect(rule['/']['users']).to.have.property('POST', fncB);
+							expect(routeRuleRoot['users']).to.have.property('POST', fncB);
 							break;
 					}
 				});
@@ -2270,21 +2121,27 @@ describe('core', () => {
 				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
-				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceOf(Object);
-				expect(routeRules[0]).to.have.property('/');
+				const routeRule: RouteRule = routeRules[0];
 
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']).to.have.property('users');
+				expect(routeRule).to.be.ok;
+				expect(routeRule).to.be.instanceOf(Object);
+				expect(routeRule).to.have.property('/');
 
-				expect(routeRules[0]['/']['users']).to.have.property('a');
-				expect(routeRules[0]['/']['users']['a']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['users']['a']).to.have.property('GET', fncA);
+				expect(routeRule['/']).to.be.ok;
+				expect(routeRule['/']).to.be.instanceOf(Object);
+				expect(routeRule['/']).to.have.property('users');
 
-				expect(routeRules[0]['/']['users']).to.have.property('b');
-				expect(routeRules[0]['/']['users']['b']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['users']['b']).to.have.property('GET', fncB);
+				const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
+
+				const routeRuleInsideUser: RouteRule = routeRuleRoot['users'] as RouteRule;
+
+				expect(routeRuleInsideUser).to.have.property('a');
+				expect(routeRuleInsideUser['a']).to.be.instanceOf(Object);
+				expect(routeRuleInsideUser['a']).to.have.property('GET', fncA);
+
+				expect(routeRuleInsideUser).to.have.property('b');
+				expect(routeRuleInsideUser['b']).to.be.instanceOf(Object);
+				expect(routeRuleInsideUser['b']).to.have.property('GET', fncB);
 
 				await app.listen(port);
 
@@ -2327,20 +2184,24 @@ describe('core', () => {
 				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
 
-				expect(routeRules[0]).to.be.ok;
-				expect(routeRules[0]).to.be.instanceOf(Object);
-				expect(routeRules[0]).to.have.property('/');
+				const routeRule: RouteRule = routeRules[0];
 
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
+				expect(routeRule).to.be.ok;
+				expect(routeRule).to.be.instanceOf(Object);
+				expect(routeRule).to.have.property('/');
 
-				expect(routeRules[0]['/']).to.have.property('users');
-				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['users']).to.have.property('GET', usersGetFnc);
+				expect(routeRule['/']).to.be.ok;
+				expect(routeRule['/']).to.be.instanceOf(Object);
 
-				expect(routeRules[0]['/']).to.have.property('records');
-				expect(routeRules[0]['/']['records']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['records']).to.have.property('GET', recordsGetFnc);
+				const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
+
+				expect(routeRuleRoot).to.have.property('users');
+				expect(routeRuleRoot['users']).to.be.instanceOf(Object);
+				expect(routeRuleRoot['users']).to.have.property('GET', usersGetFnc);
+
+				expect(routeRuleRoot).to.have.property('records');
+				expect(routeRuleRoot['records']).to.be.instanceOf(Object);
+				expect(routeRuleRoot['records']).to.have.property('GET', recordsGetFnc);
 
 				await app.listen(port);
 
@@ -2394,21 +2255,30 @@ describe('core', () => {
 				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']).to.have.property('root');
+				const routeRule: RouteRule = routeRules[0];
 
-				expect(routeRules[0]['/']['root']).to.be.ok;
-				expect(routeRules[0]['/']['root']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['root']).to.have.property('GET', fnc1);
+				expect(routeRule['/']).to.be.ok;
+				expect(routeRule['/']).to.be.instanceOf(Object);
+				expect(routeRule['/']).to.have.property('root');
 
-				expect(routeRules[0]['/']['root']).to.have.property('branch1');
-				expect(routeRules[0]['/']['root']['branch1']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['root']['branch1']).to.have.property('GET', fnc2);
+				const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
 
-				expect(routeRules[0]['/']['root']['branch1']).to.have.property('branch2');
-				expect(routeRules[0]['/']['root']['branch1']['branch2']).to.be.instanceOf(Object);
-				expect(routeRules[0]['/']['root']['branch1']['branch2']).to.have.property('GET', fnc3);
+				expect(routeRuleRoot['root']).to.be.ok;
+				expect(routeRuleRoot['root']).to.be.instanceOf(Object);
+				expect(routeRuleRoot['root']).to.have.property('GET', fnc1);
+
+				const routeRuleRootInside: RouteRule = routeRuleRoot['root'] as RouteRule;
+
+				expect(routeRuleRootInside).to.have.property('branch1');
+				expect(routeRuleRootInside['branch1']).to.be.instanceOf(Object);
+				expect(routeRuleRootInside['branch1']).to.have.property('GET', fnc2);
+
+				expect(routeRuleRootInside['branch1']).to.have.property('branch2');
+
+				const routeRuleRootInsideDeep: RouteRule = routeRuleRootInside['branch1'] as RouteRule;
+
+				expect(routeRuleRootInsideDeep['branch2']).to.be.instanceOf(Object);
+				expect(routeRuleRootInsideDeep['branch2']).to.have.property('GET', fnc3);
 
 				await app.listen(port);
 
@@ -2483,22 +2353,31 @@ describe('core', () => {
 				expect(routeRules[0]).to.be.instanceOf(Object);
 				expect(routeRules[0]).to.have.property('/');
 
-				expect(routeRules[0]['/']).to.be.ok;
-				expect(routeRules[0]['/']).to.be.instanceOf(Object);
+				const routeRule: RouteRule = routeRules[0];
 
-				expect(routeRules[0]['/']).to.have.property('users');
-				expect(routeRules[0]['/']['users']).to.be.instanceOf(Object);
+				expect(routeRule['/']).to.be.ok;
+				expect(routeRule['/']).to.be.instanceOf(Object);
+				expect(routeRule['/']).to.have.property('users');
 
-				expect(routeRules[0]['/']['users']).to.have.property('a');
-				expect(routeRules[0]['/']['users']['a']).to.be.instanceOf(Object);
+				const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
 
-				expect(routeRules[0]['/']['users']['a']).to.have.property('b');
-				expect(routeRules[0]['/']['users']['a']['b']).to.be.instanceOf(Object);
+				expect(routeRuleRoot['users']).to.be.instanceOf(Object);
+				expect(routeRuleRoot['users']).to.have.property('a');
 
-				expect(routeRules[0]['/']['users']['a']['b']).to.have.property('c');
-				expect(routeRules[0]['/']['users']['a']['b']['c']).to.be.instanceOf(Object);
+				const routeRuleUsers: RouteRule = routeRuleRoot['users'] as RouteRule;
 
-				expect(routeRules[0]['/']['users']['a']['b']['c']).to.have.property('GET', testFnc);
+				expect(routeRuleUsers['a']).to.be.instanceOf(Object);
+				expect(routeRuleUsers['a']).to.have.property('b');
+
+				const routeRuleUsersA: RouteRule = routeRuleUsers['a'] as RouteRule;
+
+				expect(routeRuleUsersA['b']).to.be.instanceOf(Object);
+				expect(routeRuleUsersA['b']).to.have.property('c');
+
+				const routeRuleUsersAB: RouteRule = routeRuleUsersA['b'] as RouteRule;
+
+				expect(routeRuleUsersAB['c']).to.be.instanceOf(Object);
+				expect(routeRuleUsersAB['c']).to.have.property('GET', testFnc);
 
 				await app.listen(port);
 
@@ -2517,40 +2396,34 @@ describe('core', () => {
 			};
 
 			describe('error', () => {
-				it('invalid format', async () => {
-					await app.route({
+				it('invalid format', () => {
+					return promiseFail(
+						app.route({
 							'users///a': {
 								GET: testFnc
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
-				it('include space', async () => {
-					await app.route({
+				it('include space', () => {
+					return promiseFail(
+						app.route({
 							'users/ a': {
 								GET: testFnc
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 
-				it('include space', async () => {
-					await app.route({
+				it('include space', () => {
+					return promiseFail(
+						app.route({
 							'users/ /a': {
 								GET: testFnc
 							}
 						})
-						.then(fail, (err: Error) => {
-							expect(err).to.be.ok;
-							expect(err).to.be.instanceOf(Error);
-						});
+					);
 				});
 			});
 
@@ -2574,7 +2447,7 @@ describe('core', () => {
 				expect(routeRules[0]['/']).to.be.ok;
 				expect(routeRules[0]['/']).to.be.instanceOf(Object);
 
-				const userRule = routeRules[0]['/']['users'];
+				const userRule: RouteRule = (routeRules[0]['/'] as RouteRule)['users'] as RouteRule;
 				expect(userRule).to.be.ok;
 				expect(userRule).to.be.instanceOf(Object);
 				expect(Object.keys(userRule)).to.includes('a');
@@ -2584,7 +2457,7 @@ describe('core', () => {
 				expect(secondDepthRule).to.be.instanceOf(Object);
 				expect(Object.keys(secondDepthRule)).to.includes('GET');
 
-				const secondDepthFnc = secondDepthRule['GET'];
+				const secondDepthFnc: RouteFunction = (secondDepthRule as RouteRule)['GET'] as RouteFunction;
 				expect(secondDepthFnc).to.be.ok;
 				expect(secondDepthFnc).to.be.instanceOf(Function);
 				expect(secondDepthFnc).to.eql(testFnc);
@@ -2628,10 +2501,10 @@ describe('core', () => {
 				uriArr.forEach((_uri: string, i: number, arr: string[]): void => {
 					expect(Object.keys(targetRuleObj)).to.includes(_uri);
 
-					targetRuleObj = targetRuleObj[_uri];
+					targetRuleObj = (targetRuleObj as RouteRule)[_uri];
 
 					if (i === arr.length - 1) {
-						const targetFnc = targetRuleObj['GET'];
+						const targetFnc: RouteFunction | undefined = (targetRuleObj as RouteRuleSeed)['GET'] as RouteFunction | undefined;
 
 						expect(targetFnc).to.be.ok;
 						expect(targetFnc).to.be.instanceOf(Function);
@@ -2646,36 +2519,33 @@ describe('core', () => {
 		describe('with route param', () => {
 			describe('colon routing', () => {
 				describe('error', () => {
-					it('colon in end index', async () => {
-						await app.route({
+					it('colon in end index', () => {
+						return promiseFail(
+							app.route({
 								'users/some:id': {
 									GET: async () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
-					it('colon in middle index', async () => {
-						await app.route({
+					it('colon in middle index', () => {
+						return promiseFail(
+							app.route({
 								'users/id:some': {
 									GET: async () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
-					it('same level & multiple colon routing, in same time', async () => {
-						await app.route({
+					it('same level & multiple colon routing, in same time', () => {
+						return promiseFail(
+							app.route({
 								users: {
 									':id': {
 										GET: async () => {
@@ -2689,14 +2559,12 @@ describe('core', () => {
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
-					it('root level & multiple colon routing, in same time', async () => {
-						await app.route({
+					it('root level & multiple colon routing, in same time', () => {
+						return promiseFail(
+							app.route({
 								':id': {
 									GET: async () => {
 										// do nothing
@@ -2708,10 +2576,7 @@ describe('core', () => {
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('root level & multiple colon routing, in different time', async () => {
@@ -2723,17 +2588,15 @@ describe('core', () => {
 							}
 						});
 
-						return app.route({
+						await promiseFail(
+							app.route({
 								':name': {
 									GET: async () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('same level & multiple colon routing, in different time', async () => {
@@ -2747,7 +2610,8 @@ describe('core', () => {
 							}
 						});
 
-						return app.route({
+						await promiseFail(
+							app.route({
 								users: {
 									':name': {
 										GET: async () => {
@@ -2756,10 +2620,7 @@ describe('core', () => {
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('same level & multiple colon routing, in different time, in uri', async () => {
@@ -2771,25 +2632,27 @@ describe('core', () => {
 							}
 						});
 
-						return app.route({
+						await promiseFail(
+							app.route({
 								'users/:name': {
 									GET: async () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 				});
 
 				it('ok - GET', async () => {
+					interface ReqParam {
+						id: string;
+					}
+
 					const testId: string = 'this_is_id';
 					let fncRunFlag: boolean = false;
 
-					const testFnc = async (param): Promise<void> => {
+					const testFnc = async (param: ReqParam): Promise<void> => {
 						expect(param).to.be.ok;
 						expect(param).to.be.instanceOf(Object);
 
@@ -2816,6 +2679,10 @@ describe('core', () => {
 				});
 
 				it('ok - GET with response', async () => {
+					interface ReqParam {
+						id: string;
+					}
+
 					interface ReturnObj {
 						id: string;
 					}
@@ -2823,7 +2690,7 @@ describe('core', () => {
 					const testId: string = 'this_is_id';
 					let fncRunFlag: boolean = false;
 
-					const testFnc = async (param): Promise<ReturnObj> => {
+					const testFnc = async (param: ReqParam): Promise<ReturnObj> => {
 						expect(param).to.be.ok;
 						expect(param).to.be.instanceOf(Object);
 
@@ -2857,12 +2724,17 @@ describe('core', () => {
 				});
 
 				it('ok - GET, multiple route param', async () => {
+					interface ReqParam {
+						firstName: string;
+						lastName: string;
+					}
+
 					const firstName: string = 'Janghyun';
 					const lastName: string = 'Han';
 
 					let fncRunFlag: boolean = false;
 
-					const testFnc = async (param): Promise<void> => {
+					const testFnc = async (param: ReqParam): Promise<void> => {
 						expect(param).to.be.ok;
 						expect(param).to.be.instanceOf(Object);
 
@@ -2889,6 +2761,11 @@ describe('core', () => {
 				});
 
 				it('ok - GET multiple route param with response', async () => {
+					interface ReqParam {
+						firstName: string;
+						lastName: string;
+					}
+
 					interface ReturnObj {
 						firstName: string;
 						lastName: string;
@@ -2899,7 +2776,7 @@ describe('core', () => {
 
 					let fncRunFlag: boolean = false;
 
-					const testFnc = async (param): Promise<ReturnObj> => {
+					const testFnc = async (param: ReqParam): Promise<ReturnObj> => {
 						fncRunFlag = true;
 
 						return {
@@ -2929,13 +2806,18 @@ describe('core', () => {
 				});
 
 				it('ok - POST', async () => {
+					interface ReqParam {
+						firstName: string;
+						lastName: string;
+					}
+
 					const testId: string = 'this_is_id';
 					const firstName: string = 'Janghyun';
 					const lastName: string = 'Han';
 
 					let fncRunFlag: boolean = false;
 
-					const testFnc = async (param): Promise<void> => {
+					const testFnc = async (param: ReqParam): Promise<void> => {
 						expect(param).to.be.ok;
 						expect(param).to.be.instanceOf(Object);
 						expect(param).to.have.property('firstName', firstName);
@@ -2968,27 +2850,26 @@ describe('core', () => {
 			// ab?cd - abc, abcd
 			describe('question routing', () => {
 				describe('error', () => {
-					it('start with \'?\'', async () => {
+					it('start with \'?\'', () => {
 						const testUri: string = '?users';
 
-						await app.route({
+						return promiseFail(
+							app.route({
 								[testUri]: {
 									GET: () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
-					it('duplicated routing - normal uri first with route() in same time', async () => {
+					it('duplicated routing - normal uri first with route() in same time', () => {
 						const questionUri: string = 'users?';
 						const normalUri: string = 'user';
 
-						await app.route({
+						return promiseFail(
+							app.route({
 								[normalUri]: {
 									GET: () => {
 										// do nothing
@@ -3000,10 +2881,7 @@ describe('core', () => {
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('duplicated routing - normal uri first with route()', async () => {
@@ -3018,17 +2896,15 @@ describe('core', () => {
 							}
 						});
 
-						await app.route({
+						await promiseFail(
+							app.route({
 								[questionUri]: {
 									GET: () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('duplicated routing - normal uri first with get()', async () => {
@@ -3036,17 +2912,14 @@ describe('core', () => {
 						const normalUri: string = 'user';
 
 						await app.get(normalUri, () => {
+							// do nothing
+						});
+
+						await promiseFail(
+							app.get(questionUri, () => {
 								// do nothing
 							})
-							.then(() => {
-								return app.get(questionUri, () => {
-									// do nothing
-								});
-							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('duplicated routing - question uri first with route()', async () => {
@@ -3054,25 +2927,23 @@ describe('core', () => {
 						const normalUri: string = 'user';
 
 						await app.route({
-								[questionUri]: {
+							[questionUri]: {
+								GET: () => {
+									// do nothing
+								}
+							}
+						});
+
+
+						await promiseFail(
+							app.route({
+								[normalUri]: {
 									GET: () => {
 										// do nothing
 									}
 								}
 							})
-							.then(() => {
-								return app.route({
-									[normalUri]: {
-										GET: () => {
-											// do nothing
-										}
-									}
-								});
-							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('duplicated routing - question uri first with get()', async () => {
@@ -3080,17 +2951,15 @@ describe('core', () => {
 						const normalUri: string = 'user';
 
 						await app.get(questionUri, () => {
+							// do nothing
+						});
+
+
+						await promiseFail(
+							app.get(normalUri, () => {
 								// do nothing
 							})
-							.then(() => {
-								return app.get(normalUri, () => {
-									// do nothing
-								});
-							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 				});
 
@@ -3100,7 +2969,7 @@ describe('core', () => {
 
 						let testFncRunFlag: boolean = false;
 
-						const testFnc = async (param): Promise<void> => {
+						const testFnc = async (param: AnyObject<string>): Promise<void> => {
 							testFncRunFlag = true;
 
 							expect(param).to.be.ok;
@@ -3318,18 +3187,16 @@ describe('core', () => {
 			// ab+cd - abcd, abbcd, abbbcd
 			describe('plus routing', () => {
 				describe('error', () => {
-					it('start with \'+\'', async () => {
-						await app.route({
+					it('start with \'+\'', () => {
+						return promiseFail(
+							app.route({
 								'+abcd': {
 									GET: () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('duplicated routing, normal uri first', async () => {
@@ -3341,17 +3208,15 @@ describe('core', () => {
 							}
 						});
 
-						await app.route({
+						await promiseFail(
+							app.route({
 								'ab+c': {
 									GET: () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('duplicated routing, plus uri first', async () => {
@@ -3363,17 +3228,15 @@ describe('core', () => {
 							}
 						});
 
-						await app.route({
+						await promiseFail(
+							app.route({
 								'abc': {
 									GET: () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 
 					it('duplicated routing, duplicated plus uri', async () => {
@@ -3385,17 +3248,15 @@ describe('core', () => {
 							}
 						});
 
-						await app.route({
+						await promiseFail(
+							app.route({
 								'abc+': {
 									GET: () => {
 										// do nothing
 									}
 								}
 							})
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+						);
 					});
 				});
 
@@ -3404,7 +3265,7 @@ describe('core', () => {
 						const testUri: string = 'ab+cd';
 
 						let testFncRunCount: number = 0;
-						const testFnc = (param: unknown): void => {
+						const testFnc = (param: AnyObject<string>): void => {
 							expect(param).to.be.ok;
 
 							expect(param[testUri]).to.be.ok;
@@ -3541,7 +3402,7 @@ describe('core', () => {
 						expect(param).to.be.ok;
 						expect(param).to.have.property('**');
 
-						calledUrls.push(req.url);
+						calledUrls.push(req.url as string);
 					};
 
 					[
@@ -3575,7 +3436,7 @@ describe('core', () => {
 						expect(param).to.be.ok;
 						expect(param).to.have.property('*');
 
-						calledUrls.push(req.url);
+						calledUrls.push(req.url as string);
 					};
 
 					describe('last frag', () => {
@@ -3644,14 +3505,14 @@ describe('core', () => {
 				describe('partial *', () => {
 					const testFrag: string = 'ab*cd';
 
-					const testFnc = (param, req): void => {
+					const testFnc = (param: AnyObject<string>, req: IncomingMessage): void => {
 						expect(param).to.be.ok;
 
 						const regExpKey: string = param[testFrag].replace('*', '(\\w)*');
 						expect(param[testFrag]).to.be.ok;
 						expect(new RegExp(regExpKey).test(param[testFrag])).to.be.true;
 
-						calledUrls.push(req.url);
+						calledUrls.push(req.url as string);
 					};
 
 					[
@@ -3692,29 +3553,36 @@ describe('core', () => {
 	});
 
 	describe('4-methods', () => {
-		const methodArr: string[] = ['get', 'post', 'put', 'delete'];
+		const methodArr: (keyof Badak)[] = ['get', 'post', 'put', 'delete'];
 
-		methodArr.forEach((method: string): void => {
+		methodArr.forEach((method: keyof Badak): void => {
+			type MethodType = (address: string, fnc: RouteFunction, option?: RouteOption) => Promise<void>;
+
+			let routeFnc: MethodType;
+			const testFnc: RouteFunction = (): void => {
+				// do nothing
+			};
+
+			before(() => {
+				routeFnc = app[method] as MethodType;
+			});
+
 			describe(`${ method }()`, () => {
 				it('defined', () => {
-					expect(app[method]).to.be.ok;
+					expect(routeFnc).to.be.ok;
 				});
 
 				describe('error', () => {
-					it('no address', async () => {
-						await app[method]()
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+					it('no address', () => {
+						return promiseFail(
+							routeFnc(undefined as unknown as string, testFnc)
+						);
 					});
 
-					it('no function', async () => {
-						await app[method]('/users')
-							.then(fail, (err: Error) => {
-								expect(err).to.be.ok;
-								expect(err).to.be.instanceOf(Error);
-							});
+					it('no function', () => {
+						return promiseFail(
+							routeFnc('/users', undefined as unknown as RouteFunction)
+						);
 					});
 				});
 
@@ -3722,7 +3590,7 @@ describe('core', () => {
 					const uri: string = '/users';
 					let fncRun: boolean = false;
 
-					await app[method](uri, async () => {
+					await routeFnc(uri, async () => {
 						fncRun = true;
 
 						return {
@@ -3733,7 +3601,7 @@ describe('core', () => {
 					await app.listen(port);
 
 					const requestObj = request(app.getHttpServer());
-					let requestFnc: SuperTestExpect = null;
+					let requestFnc: SuperTestExpect | undefined;
 
 					switch (method) {
 						case 'get':
@@ -3753,10 +3621,14 @@ describe('core', () => {
 							break;
 					}
 
-					const res = await requestFnc?.expect(200);
+					const res: Response | undefined = await requestFnc?.expect(200);
 
 					expect(res).to.be.ok;
 					expect(fncRun).to.be.true;
+
+					if (!res) {
+						throw new Error('spec failed');
+					}
 
 					expect(res.body).to.be.ok;
 					expect(res.body).to.be.instanceOf(Object);
@@ -3769,7 +3641,7 @@ describe('core', () => {
 					const uri: string = '/users';
 					let fncRun: boolean = false;
 
-					await app[method](uri, async () => {
+					await routeFnc(uri, async () => {
 						fncRun = true;
 
 						return {
@@ -3780,7 +3652,7 @@ describe('core', () => {
 					await app.listen(port);
 
 					const requestObj = request(app.getHttpServer());
-					let requestFnc: SuperTestExpect;
+					let requestFnc: SuperTestExpect | undefined;
 
 					switch (method) {
 						case 'get':
@@ -3800,23 +3672,29 @@ describe('core', () => {
 							break;
 					}
 
-					const res = await requestFnc.expect(200);
+					if (requestFnc) {
+						const res: Response | undefined = await requestFnc.expect(200);
 
-					expect(res).to.be.ok;
-					expect(fncRun).to.be.true;
+						expect(res).to.be.ok;
+						expect(fncRun).to.be.true;
 
-					expect(res.body).to.be.ok;
-					expect(res.body).to.be.instanceOf(Object);
-					expect(res.body.data).to.be.ok;
-					expect(res.body.data).to.be.instanceOf(Array);
-					expect(res.body.data.length).to.be.eql(2);
+						if (!res) {
+							throw new Error('spec failed');
+						}
+
+						expect(res.body).to.be.ok;
+						expect(res.body).to.be.instanceOf(Object);
+						expect(res.body.data).to.be.ok;
+						expect(res.body.data).to.be.instanceOf(Array);
+						expect(res.body.data.length).to.be.eql(2);
+					}
 				});
 
 				it('ok - url abbreviation', async () => {
 					const uri: string = '/users/a/b/c';
 					let fncRun: boolean = false;
 
-					await app[method](uri, async () => {
+					await routeFnc(uri, async () => {
 						fncRun = true;
 
 						return {
@@ -3827,7 +3705,7 @@ describe('core', () => {
 					await app.listen(port);
 
 					const requestObj = request(app.getHttpServer());
-					let requestFnc: SuperTestExpect;
+					let requestFnc: SuperTestExpect | undefined;
 
 					switch (method) {
 						case 'get':
@@ -3847,16 +3725,22 @@ describe('core', () => {
 							break;
 					}
 
-					const res = await requestFnc.expect(200);
+					if (requestFnc) {
+						const res: Response | undefined = await requestFnc?.expect(200);
 
-					expect(res).to.be.ok;
-					expect(fncRun).to.be.true;
+						expect(res).to.be.ok;
+						expect(fncRun).to.be.true;
 
-					expect(res.body).to.be.ok;
-					expect(res.body).to.be.instanceOf(Object);
-					expect(res.body.data).to.be.ok;
-					expect(res.body.data).to.be.instanceOf(Array);
-					expect(res.body.data.length).to.be.eql(2);
+						if (!res) {
+							throw new Error('spec failed');
+						}
+
+						expect(res.body).to.be.ok;
+						expect(res.body).to.be.instanceOf(Object);
+						expect(res.body.data).to.be.ok;
+						expect(res.body.data).to.be.instanceOf(Array);
+						expect(res.body.data.length).to.be.eql(2);
+					}
 				});
 
 				it('ok - assign different uri', async () => {
@@ -3873,13 +3757,13 @@ describe('core', () => {
 						fnc2RunFlag = true;
 					};
 
-					await app[method](uri1, fnc1);
-					await app[method](uri2, fnc2);
+					await routeFnc(uri1, fnc1);
+					await routeFnc(uri2, fnc2);
 
 					await app.listen(port);
 
 					const requestObj1 = request(app.getHttpServer());
-					let requestFnc1: SuperTestExpect = null;
+					let requestFnc1: SuperTestExpect | undefined;
 
 					switch (method) {
 						case 'get':
@@ -3906,7 +3790,7 @@ describe('core', () => {
 					expect(fnc2RunFlag).to.be.false;
 
 					const requestObj2 = request(app.getHttpServer());
-					let requestFnc2: SuperTestExpect = null;
+					let requestFnc2: SuperTestExpect | undefined;
 
 					switch (method) {
 						case 'get':
@@ -3942,12 +3826,10 @@ describe('core', () => {
 		});
 
 		describe('error', () => {
-			it('not started', async () => {
-				await app.stop()
-					.then(fail, (err: Error) => {
-						expect(err).to.be.ok;
-						expect(err).to.be.instanceOf(Error);
-					});
+			it('not started', () => {
+				return promiseFail(
+					app.stop()
+				);
 			});
 		});
 
