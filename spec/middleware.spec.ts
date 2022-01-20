@@ -6,7 +6,7 @@ import { expect } from 'chai';
 import * as request from 'supertest';
 
 import { Badak } from '../src/badak';
-import { AnyObject, MiddlewareFunction, RouteFunction } from '../src/interfaces';
+import { MiddlewareFunction, RouteFunction, TypedObject } from '../src/interfaces';
 import { promiseFail } from './test-util';
 
 
@@ -284,7 +284,7 @@ describe('middleware', () => {
 					expect(res).to.be.ok;
 				};
 
-				const routeFnc: RouteFunction = async (param: AnyObject<unknown>): Promise<unknown> => {
+				const routeFnc: RouteFunction = async (param: TypedObject<unknown>): Promise<unknown> => {
 					expect(param).to.be.ok;
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified

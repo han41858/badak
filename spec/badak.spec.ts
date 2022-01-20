@@ -8,7 +8,7 @@ import * as request from 'supertest';
 import { Response, Response as SuperTestResponse, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
-import { AnyObject, BadakOption, RouteFunction, RouteOption, RouteRule, RouteRuleSeed, StaticCache, StaticRule } from '../src/interfaces';
+import { BadakOption, RouteFunction, RouteOption, RouteRule, RouteRuleSeed, StaticCache, StaticRule, TypedObject } from '../src/interfaces';
 import { ContentType, Method } from '../src/constants';
 import { promiseFail } from './test-util';
 
@@ -633,7 +633,7 @@ describe('core', () => {
 						it('set value - lower case', async () => {
 							await app.config('defaultMethod', method.toLowerCase());
 
-							const appConfig: BadakOption = (app as unknown as AnyObject<BadakOption>)._config;
+							const appConfig: BadakOption = (app as unknown as TypedObject<BadakOption>)._config;
 							expect(appConfig.defaultMethod).to.be.eql(method.toUpperCase());
 						});
 					});
@@ -683,7 +683,7 @@ describe('core', () => {
 
 						methods.forEach((testMethod: Method) => {
 							it('test ' + testMethod, async () => {
-								const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+								const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 								expect(routeRules).to.be.ok;
 								expect(routeRules).to.be.instanceOf(Array);
@@ -1131,7 +1131,7 @@ describe('core', () => {
 			let fileData: string;
 
 			const checkBefore = (keyUri: string): void => {
-				const staticRules: StaticRule[] = (app as unknown as AnyObject<StaticRule[]>)._staticRules;
+				const staticRules: StaticRule[] = (app as unknown as TypedObject<StaticRule[]>)._staticRules;
 
 				expect(staticRules).to.be.ok;
 				expect(staticRules).to.be.instanceOf(Array);
@@ -1168,7 +1168,7 @@ describe('core', () => {
 
 							if (i === 0) {
 								// check cache
-								const staticCache: StaticCache[] = (app as unknown as AnyObject<StaticCache[]>)._staticCache;
+								const staticCache: StaticCache[] = (app as unknown as TypedObject<StaticCache[]>)._staticCache;
 
 								expect(staticCache).to.be.ok;
 								expect(staticCache).to.be.instanceOf(Array);
@@ -1280,7 +1280,7 @@ describe('core', () => {
 			await app.listen(port);
 
 			// check static cache
-			const staticCache: StaticCache[] = (app as unknown as AnyObject<StaticCache[]>)._staticCache;
+			const staticCache: StaticCache[] = (app as unknown as TypedObject<StaticCache[]>)._staticCache;
 
 			expect(staticCache).to.be.instanceOf(Array);
 			expect(staticCache.length).to.be.above(0);
@@ -1315,7 +1315,7 @@ describe('core', () => {
 			await app.listen(port);
 
 			// check static cache
-			const staticCache: StaticCache[] = (app as unknown as AnyObject<StaticCache[]>)._staticCache;
+			const staticCache: StaticCache[] = (app as unknown as TypedObject<StaticCache[]>)._staticCache;
 
 			expect(staticCache).to.be.instanceOf(Array);
 			expect(staticCache.length).to.be.above(0);
@@ -1813,7 +1813,7 @@ describe('core', () => {
 			});
 
 			const checkRuleFnc = (_app: Badak, targetFnc: () => unknown): void => {
-				const routeRules: RouteRule[] = (_app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				const routeRules: RouteRule[] = (_app as unknown as TypedObject<RouteRule[]>)._routeRules;
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);
@@ -2068,7 +2068,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2115,7 +2115,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2178,7 +2178,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2245,7 +2245,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2343,7 +2343,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2434,7 +2434,7 @@ describe('core', () => {
 					}
 				});
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2483,7 +2483,7 @@ describe('core', () => {
 
 				const uriArr = uri.split('/');
 
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+				const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
@@ -2969,7 +2969,7 @@ describe('core', () => {
 
 						let testFncRunFlag: boolean = false;
 
-						const testFnc = async (param: AnyObject<string>): Promise<void> => {
+						const testFnc = async (param: TypedObject<string>): Promise<void> => {
 							testFncRunFlag = true;
 
 							expect(param).to.be.ok;
@@ -3063,7 +3063,7 @@ describe('core', () => {
 							}
 						});
 
-						const appRouteRule: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+						const appRouteRule: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
 						expect(appRouteRule).to.be.lengthOf(1);
 
@@ -3265,7 +3265,7 @@ describe('core', () => {
 						const testUri: string = 'ab+cd';
 
 						let testFncRunCount: number = 0;
-						const testFnc = (param: AnyObject<string>): void => {
+						const testFnc = (param: TypedObject<string>): void => {
 							expect(param).to.be.ok;
 
 							expect(param[testUri]).to.be.ok;
@@ -3418,7 +3418,7 @@ describe('core', () => {
 
 							await app.listen(port);
 
-							const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+							const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 							expect(routeRules).to.be.instanceOf(Array);
 							expect(routeRules).to.be.lengthOf(1);
 
@@ -3453,7 +3453,7 @@ describe('core', () => {
 
 								await app.listen(port);
 
-								const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+								const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 								expect(routeRules).to.be.instanceOf(Array);
 								expect(routeRules).to.be.lengthOf(1);
 
@@ -3484,7 +3484,7 @@ describe('core', () => {
 
 								await app.listen(port);
 
-								const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+								const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 								expect(routeRules).to.be.instanceOf(Array);
 								expect(routeRules).to.be.lengthOf(1);
 
@@ -3505,7 +3505,7 @@ describe('core', () => {
 				describe('partial *', () => {
 					const testFrag: string = 'ab*cd';
 
-					const testFnc = (param: AnyObject<string>, req: IncomingMessage): void => {
+					const testFnc = (param: TypedObject<string>, req: IncomingMessage): void => {
 						expect(param).to.be.ok;
 
 						const regExpKey: string = param[testFrag].replace('*', '(\\w)*');
@@ -3528,7 +3528,7 @@ describe('core', () => {
 
 							await app.listen(port);
 
-							const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+							const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 							expect(routeRules).to.be.instanceOf(Array);
 							expect(routeRules).to.be.lengthOf(1);
 

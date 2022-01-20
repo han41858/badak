@@ -4,7 +4,6 @@ import { Server } from 'net';
 import * as node_path from 'path';
 
 import {
-	AnyObject,
 	BadakOption,
 	MiddlewareFunction,
 	RouteFunction,
@@ -13,7 +12,8 @@ import {
 	RouteRule,
 	RouteRuleSeed,
 	StaticCache,
-	StaticRule
+	StaticRule,
+	TypedObject
 } from './interfaces';
 import { ContentType, Method } from './constants';
 import {
@@ -442,7 +442,7 @@ export class Badak {
 
 	// parameter can be object of string because request has string
 	// only work for string param
-	private _paramConverter (param: AnyObject<unknown>): AnyObject<unknown> {
+	private _paramConverter (param: TypedObject<unknown>): TypedObject<unknown> {
 		if (Array.isArray(param)) {
 			const paramAsArray: unknown[] = param as unknown[];
 
@@ -453,7 +453,7 @@ export class Badak {
 				}
 				else if (typeof value === 'object') {
 					// call recursively
-					arr[i] = this._paramConverter(value as AnyObject<unknown>);
+					arr[i] = this._paramConverter(value as TypedObject<unknown>);
 				}
 				else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
@@ -473,7 +473,7 @@ export class Badak {
 				}
 				else if (typeof value === 'object') {
 					// call recursively
-					param[key] = this._paramConverter(value as AnyObject<unknown>);
+					param[key] = this._paramConverter(value as TypedObject<unknown>);
 				}
 				else if (typeof value === 'string') {
 					if (this._config.parseNumber) {
@@ -491,8 +491,8 @@ export class Badak {
 
 	// for POST, PUT
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req: IncomingMessage): Promise<AnyObject<unknown> | void> {
-		return new Promise<AnyObject<unknown> | void>((resolve, reject): void => {
+	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | void> {
+		return new Promise<TypedObject<unknown> | void>((resolve, reject): void => {
 			const bodyBuffer: Buffer[] = [];
 			let bodyStr: string | undefined;
 
@@ -505,7 +505,7 @@ export class Badak {
 			});
 
 			req.on('end', async (): Promise<void> => {
-				let param: AnyObject<unknown> | undefined;
+				let param: TypedObject<unknown> | undefined;
 
 				const contentTypeInHeader: string = req.headers['content-type'] as string;
 
@@ -541,7 +541,7 @@ export class Badak {
 									const [, key, value] = field.split('"');
 
 									if (!param) {
-										param = {} as AnyObject<unknown>;
+										param = {} as TypedObject<unknown>;
 									}
 
 									if (key.endsWith('[]')) {
@@ -583,7 +583,7 @@ export class Badak {
 										const [key, value] = field.split('=');
 
 										if (!param) {
-											param = {} as AnyObject<unknown>;
+											param = {} as TypedObject<unknown>;
 										}
 
 										if (key.endsWith('[]')) {
@@ -782,7 +782,7 @@ export class Badak {
 					}
 
 					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
-					let param: AnyObject<unknown> | void;
+					let param: TypedObject<unknown> | void;
 
 
 					const routeRuleLength: number = this._routeRules.length;
@@ -1057,7 +1057,7 @@ export class Badak {
 						res.end();
 					}
 				})()
-					.catch(async (err: Error | AnyObject<unknown>): Promise<void> => {
+					.catch(async (err: Error | TypedObject<unknown>): Promise<void> => {
 						if (this._config.catchErrorLog) {
 							console.error('badak catch error : %o', err);
 						}
