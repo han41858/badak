@@ -2,16 +2,14 @@
 	"name": "badak",
 	"version": "1.0.0",
 	"description": "node.js Server framework based on Promise and TypeScript",
-	"main": "build/public_api.js",
+	"type": "module",
+	"main": "build/cjs/public_api.js",
+	"module": "build/esm/public_api.js",
 	"types": "build/public_api.d.ts",
 	"scripts": {
-		"clean": "rimraf ./build",
-		"prebuild": "yarn clean",
-		"build": "tsc",
-		"prebuild:test": "yarn clean",
-		"test": "mocha --config .mocharc.json",
-		"prebuild:sample": "yarn clean",
-		"build:sample": "tsc ./sample/index.ts",
+		"prebuild": "rimraf ./build",
+		"build": "tsc -p ./tsconfig.esm.json&&tsc -p ./tsconfig.cjs.json",
+		"test": "mocha",
 		"lint": "eslint src spec"
 	},
 	"repository": {

@@ -1,15 +1,12 @@
 {
 	"compilerOptions": {
+		"module": "ESNext",
+		"target": "ESNext",
 		"baseUrl": ".",
-		"module": "commonjs",
-		"target": "ES2015",
-		"forceConsistentCasingInFileNames": true,
 		"strict": true,
+		"forceConsistentCasingInFileNames": true,
 		"noImplicitReturns": true,
-		"sourceMap": true,
-		"outDir": "build",
-		"declaration": true,
-		"declarationDir": "build"
+		"sourceMap": true
 	},
 	"exclude": [
 		"node_modules",
