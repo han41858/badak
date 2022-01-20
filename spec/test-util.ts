@@ -24,3 +24,5 @@ export const promiseFail = async (promiseResult: unknown | Promise<unknown>): Pr
 		fail();
 	}
 };
+
+export const TestPort = 65030;
