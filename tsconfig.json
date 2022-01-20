@@ -12,10 +12,5 @@
 		"node_modules",
 		"sample",
 		"spec"
-	],
-	"ts-node": {
-		"compilerOptions": {
-			"module": "CommonJS"
-		}
-	}
+	]
 }
