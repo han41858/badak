@@ -2,7 +2,6 @@
 	"name": "badak",
 	"version": "1.0.0",
 	"description": "node.js Server framework based on Promise and TypeScript",
-	"type": "module",
 	"main": "build/cjs/public_api.js",
 	"module": "build/esm/public_api.js",
 	"types": "build/public_api.d.ts",

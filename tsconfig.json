@@ -1,7 +1,7 @@
 {
 	"compilerOptions": {
-		"module": "ESNext",
-		"target": "ESNext",
+		"module": "commonjs",
+		"target": "ES2015",
 		"baseUrl": ".",
 		"strict": true,
 		"forceConsistentCasingInFileNames": true,
@@ -12,5 +12,10 @@
 		"node_modules",
 		"sample",
 		"spec"
-	]
+	],
+	"ts-node": {
+		"compilerOptions": {
+			"module": "CommonJS"
+		}
+	}
 }

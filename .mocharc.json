@@ -5,9 +5,5 @@
 	"spec": [
 		"spec/**/*.spec.ts"
 	],
-	"timeout": 1000,
-	"node-option": [
-		"experimental-specifier-resolution=node",
-		"loader=ts-node/esm"
-	]
+	"timeout": 1000
 }
