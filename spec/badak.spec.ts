@@ -198,8 +198,8 @@ describe('core', () => {
 
 					it('multipart/form-data', async () => {
 						const testFnc = (param: {
-							num: number[],
-							float: number[]
+							num: number[];
+							float: number[];
 						}): void => {
 							expect(param).to.be.ok;
 
@@ -234,8 +234,8 @@ describe('core', () => {
 
 					it('application/x-www-form-urlencoded', async () => {
 						const testFnc = (param: {
-							num: number[],
-							float: number[]
+							num: number[];
+							float: number[];
 						}): void => {
 							expect(param).to.be.ok;
 
@@ -502,7 +502,7 @@ describe('core', () => {
 			describe('in array', () => {
 				describe('single value', () => {
 					const testFnc = (param: {
-						arr: Date[]
+						arr: Date[];
 					}): void => {
 						expect(param).to.be.ok;
 						expect(param).to.be.a('object');
@@ -728,7 +728,7 @@ describe('core', () => {
 		describe('single string', () => {
 			const str: string = 'string_value';
 			const testFnc = (param: {
-				str: string
+				str: string;
 			}): void => {
 				expect(param).to.be.ok;
 				expect(param).to.be.a('object');
@@ -785,7 +785,7 @@ describe('core', () => {
 			const strArr: string[] = ['str1', 'str2', 'str3'];
 
 			const testFnc = (param: {
-				strArr: string[]
+				strArr: string[];
 			}): void => {
 				expect(param).to.be.ok;
 				expect(param).to.be.a('object');
@@ -838,7 +838,7 @@ describe('core', () => {
 			const strArr: (string | undefined)[] = ['str1', 'str2', undefined];
 
 			const testFnc = (param: {
-				strArr: (string | undefined)[]
+				strArr: (string | undefined)[];
 			}): void => {
 				expect(param).to.be.ok;
 				expect(param).to.be.a('object');
@@ -881,7 +881,7 @@ describe('core', () => {
 			const strArr: (string | null)[] = ['str1', 'str2', null];
 
 			const testFnc = (param: {
-				strArr: (string | null)[]
+				strArr: (string | null)[];
 			}): void => {
 				expect(param).to.be.ok;
 				expect(param).to.be.a('object');
@@ -1657,7 +1657,7 @@ describe('core', () => {
 					);
 				});
 
-				it.only('empty address - \'\'', () => {
+				it('empty address - \'\'', () => {
 					return promiseFail(
 						app.route({
 							'aa': {
@@ -1812,8 +1812,8 @@ describe('core', () => {
 				});
 			});
 
-			const checkRuleFnc = (app: Badak, targetFnc: () => unknown): void => {
-				const routeRules: RouteRule[] = (app as unknown as AnyObject<RouteRule[]>)._routeRules;
+			const checkRuleFnc = (_app: Badak, targetFnc: () => unknown): void => {
+				const routeRules: RouteRule[] = (_app as unknown as AnyObject<RouteRule[]>)._routeRules;
 				expect(routeRules).to.be.ok;
 				expect(routeRules).to.be.instanceOf(Array);
 				expect(routeRules).to.be.lengthOf(1);

@@ -170,12 +170,12 @@ export class Badak {
 						targetObj = targetObj[uriFrag] as RouteRule;
 					}
 					else {
+						interface AnyRuleObj {
+							[key: string]: RouteRuleSeed | RouteFunction;
+						}
+
 						// last uri frag
-						const ruleAsAny: {
-							[key: string]: RouteRuleSeed | RouteFunction
-						} = rule as {
-							[key: string]: RouteRuleSeed | RouteFunction
-						};
+						const ruleAsAny: AnyRuleObj = rule as AnyRuleObj;
 
 						if (typeof value === 'object') {
 							targetObj[uriFrag] = this._refineRouteRule(value, false);
