@@ -9,9 +9,7 @@
 		"prebuild": "yarn clean",
 		"build": "tsc",
 		"prebuild:test": "yarn clean",
-		"build:test": "tsc -p tsconfig.spec.json&node ./scripts/cp_static_files",
-		"pretest": "yarn build:test",
-		"test": "mocha ./build/**/*.spec.js",
+		"test": "mocha --config .mocharc.json",
 		"prebuild:sample": "yarn clean",
 		"build:sample": "tsc ./sample/index.ts",
 		"lint": "eslint src spec"
@@ -46,6 +44,7 @@
 		"mocha": "^9.1.4",
 		"rimraf": "^3.0.2",
 		"supertest": "^6.2.1",
+		"ts-node": "^10.4.0",
 		"typescript": "^4.5.4"
 	}
 }
