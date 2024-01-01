@@ -1,7 +1,7 @@
-import * as http from 'http';
-import { IncomingMessage, ServerResponse } from 'http';
-import { Server } from 'net';
-import * as node_path from 'path';
+import * as http from 'node:http';
+import { IncomingMessage, ServerResponse } from 'node:http';
+import { Server } from 'node:net';
+import * as node_path from 'node:path';
 
 import {
 	BadakOption,
@@ -491,12 +491,12 @@ export class Badak {
 
 	// for POST, PUT
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | void> {
-		return new Promise<TypedObject<unknown> | void>((resolve, reject): void => {
-			const bodyBuffer: Buffer[] = [];
+	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | undefined> {
+		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
+			const bodyBuffer: Uint8Array[] = [];
 			let bodyStr: string | undefined;
 
-			req.on('data', (stream: Buffer): void => {
+			req.on('data', (stream: Uint8Array): void => {
 				bodyBuffer.push(stream);
 			});
 
@@ -511,7 +511,7 @@ export class Badak {
 
 				if (contentTypeInHeader) {
 					const contentTypeStrArr: string[] = contentTypeInHeader.split(';');
-					const contentType = contentTypeStrArr[0].trim();
+					const contentType: string = contentTypeStrArr[0].trim();
 
 					bodyStr = Buffer.concat(bodyBuffer).toString();
 
@@ -615,7 +615,7 @@ export class Badak {
 				}
 				else {
 					// no content-type, but ok
-					resolve();
+					resolve(undefined);
 				}
 			});
 		});
@@ -723,7 +723,7 @@ export class Badak {
 						if (targetCache) {
 							const resFileObj: {
 								mime: string;
-								fileData: Buffer;
+								fileData: Uint8Array;
 							} = {
 								mime: targetCache.mime,
 								fileData: targetCache.fileData
@@ -782,7 +782,7 @@ export class Badak {
 					}
 
 					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
-					let param: TypedObject<unknown> | void;
+					let param: TypedObject<unknown> | undefined;
 
 
 					const routeRuleLength: number = this._routeRules.length;

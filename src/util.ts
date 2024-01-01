@@ -1,9 +1,9 @@
 // convert if number string
 // if not number string, return itself
-import * as fs from 'fs';
-import { Stats } from 'fs';
+import * as fs from 'node:fs';
+import { Stats } from 'node:fs';
 
-import * as node_path from 'path';
+import * as node_path from 'node:path';
 
 import { StaticCache } from './interfaces';
 import { ContentType } from './constants';

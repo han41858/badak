@@ -1,6 +1,8 @@
 // function type definition for IDE
-import { IncomingMessage, ServerResponse } from 'http';
+import { IncomingMessage, ServerResponse } from 'node:http';
+
 import { Method } from './constants';
+
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type RouteFunction = (param: any, req: IncomingMessage, res: ServerResponse) => unknown;

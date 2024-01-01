@@ -1,0 +1,15 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"outDir": "build/scripts",
+		"module": "commonjs"
+	},
+	"include": [
+		"scripts"
+	],
+	"exclude": [
+		"node_modules",
+		"spec",
+		"sample"
+	]
+}

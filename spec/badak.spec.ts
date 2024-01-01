@@ -1,3 +1,5 @@
+import { Server } from 'node:net';
+
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
 import * as request from 'supertest';
@@ -35,15 +37,16 @@ describe('core', () => {
 
 		describe('single string', () => {
 			const str: string = 'string_value';
-			const testFnc = (param: {
-				str: string;
-			}): void => {
-				expect(param).to.be.ok;
-				expect(param).to.be.a('object');
-				expect(param.str).to.be.eql(str);
-			};
 
-			it('application/json', async () => {
+			beforeEach(async () => {
+				const testFnc = (param: {
+					str: string;
+				}): void => {
+					expect(param).to.be.ok;
+					expect(param).to.be.a('object');
+					expect(param.str).to.be.eql(str);
+				};
+
 				await app.route({
 					[testUrl]: {
 						POST: testFnc
@@ -51,38 +54,46 @@ describe('core', () => {
 				});
 
 				await app.listen(TestPort);
+			});
 
-				await request(app.getHttpServer())
+			afterEach(async () => {
+				await app.stop();
+			});
+
+			it('application/json', async () => {
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				await request(server)
 					.post(testUrl)
 					.send({ str })
 					.expect(200); // 200 means no error while call testFnc()
 			});
 
 			it('multipart/form-data', async () => {
-				await app.route({
-					[testUrl]: {
-						POST: testFnc
-					}
-				});
+				const server: Server | undefined = app.getHttpServer();
 
-				await app.listen(TestPort);
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
 
-				await request(app.getHttpServer())
+				await request(server)
 					.post(testUrl)
 					.field('str', str)
 					.expect(200); // 200 means no error while call testFnc()
 			});
 
 			it('application/x-www-form-urlencoded', async () => {
-				await app.route({
-					[testUrl]: {
-						POST: testFnc
-					}
-				});
+				const server: Server | undefined = app.getHttpServer();
 
-				await app.listen(TestPort);
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
 
-				await request(app.getHttpServer())
+				await request(server)
 					.post(testUrl)
 					.send(`str=${ str }`)
 					.expect(200); // 200 means no error while call testFnc()
@@ -92,22 +103,22 @@ describe('core', () => {
 		describe('array string', () => {
 			const strArr: string[] = ['str1', 'str2', 'str3'];
 
-			const testFnc = (param: {
-				strArr: string[];
-			}): void => {
-				expect(param).to.be.ok;
-				expect(param).to.be.a('object');
-
-				expect(param.strArr).to.be.instanceOf(Array);
-				expect(param.strArr).to.be.lengthOf(strArr.length);
-
-				param.strArr.forEach((value, i) => {
-					expect(value).to.be.a('string');
-					expect(value).to.be.eql(strArr[i]);
-				});
-			};
-
 			beforeEach(async () => {
+				const testFnc = (param: {
+					strArr: string[];
+				}): void => {
+					expect(param).to.be.ok;
+					expect(param).to.be.a('object');
+
+					expect(param.strArr).to.be.instanceOf(Array);
+					expect(param.strArr).to.be.lengthOf(strArr.length);
+
+					param.strArr.forEach((value, i) => {
+						expect(value).to.be.a('string');
+						expect(value).to.be.eql(strArr[i]);
+					});
+				};
+
 				await app.route({
 					[testUrl]: {
 						POST: testFnc
@@ -118,14 +129,26 @@ describe('core', () => {
 			});
 
 			it('application/json', async () => {
-				await request(app.getHttpServer())
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				await request(server)
 					.post(testUrl)
 					.send({ strArr: strArr })
 					.expect(200); // 200 means no error while call testFnc()
 			});
 
 			it('multipart/form-data', async () => {
-				await request(app.getHttpServer())
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				await request(server)
 					.post(testUrl)
 					.field('strArr[]', strArr[0])
 					.field('strArr[]', strArr[1])
@@ -134,7 +157,13 @@ describe('core', () => {
 			});
 
 			it('application/x-www-form-urlencoded', async () => {
-				await request(app.getHttpServer())
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				await request(server)
 					.post(testUrl)
 					.send(`strArr[]=${ strArr[0] }&strArr[]=${ strArr[1] }&strArr[]=${ strArr[2] }`)
 					.expect(200); // 200 means no error while call testFnc()
@@ -145,26 +174,26 @@ describe('core', () => {
 		describe('array contains undefined', () => {
 			const strArr: (string | undefined)[] = ['str1', 'str2', undefined];
 
-			const testFnc = (param: {
-				strArr: (string | undefined)[];
-			}): void => {
-				expect(param).to.be.ok;
-				expect(param).to.be.a('object');
-
-				expect(param.strArr).to.be.instanceOf(Array);
-				expect(param.strArr).to.be.lengthOf(strArr.length);
-
-				param.strArr.forEach((str: string | undefined, i: number): void => {
-					if (strArr[i]) {
-						expect(str).to.be.eql(strArr[i]);
-					}
-					else {
-						expect(str).to.be.eql(null); // not undefined
-					}
-				});
-			};
-
 			beforeEach(async () => {
+				const testFnc = (param: {
+					strArr: (string | undefined)[];
+				}): void => {
+					expect(param).to.be.ok;
+					expect(param).to.be.a('object');
+
+					expect(param.strArr).to.be.instanceOf(Array);
+					expect(param.strArr).to.be.lengthOf(strArr.length);
+
+					param.strArr.forEach((str: string | undefined, i: number): void => {
+						if (strArr[i]) {
+							expect(str).to.be.eql(strArr[i]);
+						}
+						else {
+							expect(str).to.be.eql(null); // not undefined
+						}
+					});
+				};
+
 				await app.route({
 					[testUrl]: {
 						POST: testFnc
@@ -175,7 +204,13 @@ describe('core', () => {
 			});
 
 			it('application/json', async () => {
-				await request(app.getHttpServer())
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				await request(server)
 					.post(testUrl)
 					.send({ strArr: strArr })
 					.expect(200); // 200 means no error while call testFnc()
@@ -188,22 +223,22 @@ describe('core', () => {
 		describe('array contains null', () => {
 			const strArr: (string | null)[] = ['str1', 'str2', null];
 
-			const testFnc = (param: {
-				strArr: (string | null)[];
-			}): void => {
-				expect(param).to.be.ok;
-				expect(param).to.be.a('object');
-
-				expect(param.strArr).to.be.instanceOf(Array);
-				expect(param.strArr).to.be.lengthOf(strArr.length);
-
-				param.strArr.forEach((str: string | null, i: number): void => {
-					expect(str).to.be.eql(strArr[i]);
-					expect(typeof str).to.be.eql(typeof strArr[i]);
-				});
-			};
-
 			beforeEach(async () => {
+				const testFnc = (param: {
+					strArr: (string | null)[];
+				}): void => {
+					expect(param).to.be.ok;
+					expect(param).to.be.a('object');
+
+					expect(param.strArr).to.be.instanceOf(Array);
+					expect(param.strArr).to.be.lengthOf(strArr.length);
+
+					param.strArr.forEach((str: string | null, i: number): void => {
+						expect(str).to.be.eql(strArr[i]);
+						expect(typeof str).to.be.eql(typeof strArr[i]);
+					});
+				};
+
 				await app.route({
 					[testUrl]: {
 						POST: testFnc
@@ -214,7 +249,13 @@ describe('core', () => {
 			});
 
 			it('application/json', async () => {
-				await request(app.getHttpServer())
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				await request(server)
 					.post(testUrl)
 					.send({ strArr: strArr })
 					.expect(200); // 200 means no error while call testFnc()
@@ -258,20 +299,22 @@ describe('core', () => {
 			const lastName: string = 'Han';
 
 			let testFncCalled: boolean = false;
-			const testFnc = async <T> (param: T): Promise<T> => {
-				testFncCalled = true;
 
-				expect(param).to.be.ok;
-				expect(param).to.be.instanceOf(Object);
-
-				expect(param).to.have.property('firstName', firstName);
-				expect(param).to.have.property('lastName', lastName);
-
-				// returns param data
-				return param;
-			};
 
 			beforeEach(async () => {
+				const testFnc = async <T> (param: T): Promise<T> => {
+					testFncCalled = true;
+
+					expect(param).to.be.ok;
+					expect(param).to.be.instanceOf(Object);
+
+					expect(param).to.have.property('firstName', firstName);
+					expect(param).to.have.property('lastName', lastName);
+
+					// returns param data
+					return param;
+				};
+
 				testFncCalled = false;
 
 				await app.route({
@@ -288,7 +331,13 @@ describe('core', () => {
 			});
 
 			it('application/json', async () => {
-				const res = await request(app.getHttpServer())
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				const res = await request(server)
 					.post('/users')
 					.send({
 						firstName,
@@ -306,7 +355,13 @@ describe('core', () => {
 			});
 
 			it('multipart/form-data', async () => {
-				const res = await request(app.getHttpServer())
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				const res = await request(server)
 					.post('/users')
 					.field('firstName', firstName)
 					.field('lastName', lastName)
@@ -322,7 +377,13 @@ describe('core', () => {
 			});
 
 			it('application/x-www-form-urlencoded', async () => {
-				const res = await request(app.getHttpServer())
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				const res = await request(server)
 					.post('/users')
 					.send(`firstName=${ firstName }&lastName=${ lastName }`)
 					.expect(200);
@@ -392,7 +453,14 @@ describe('core', () => {
 
 					await app.listen(TestPort);
 
-					const requestObj = request(app.getHttpServer());
+
+					const server: Server | undefined = app.getHttpServer();
+
+					if (server === undefined) {
+						throw new Error('spec failed');
+					}
+
+					const requestObj = request(server);
 					let requestFnc: SuperTestExpect | undefined;
 
 					switch (method) {
@@ -444,7 +512,14 @@ describe('core', () => {
 
 					await app.listen(TestPort);
 
-					const requestObj = request(app.getHttpServer());
+
+					const server: Server | undefined = app.getHttpServer();
+
+					if (server === undefined) {
+						throw new Error('spec failed');
+					}
+
+					const requestObj = request(server);
 					let requestFnc: SuperTestExpect | undefined;
 
 					switch (method) {
@@ -498,7 +573,14 @@ describe('core', () => {
 
 					await app.listen(TestPort);
 
-					const requestObj = request(app.getHttpServer());
+
+					const server: Server | undefined = app.getHttpServer();
+
+					if (server === undefined) {
+						throw new Error('spec failed');
+					}
+
+					const requestObj = request(server);
 					let requestFnc: SuperTestExpect | undefined;
 
 					switch (method) {
@@ -561,7 +643,14 @@ describe('core', () => {
 
 					await app.listen(TestPort);
 
-					const requestObj1 = request(app.getHttpServer());
+
+					const server: Server | undefined = app.getHttpServer();
+
+					if (server === undefined) {
+						throw new Error('spec failed');
+					}
+
+					const requestObj1 = request(server);
 					let requestFnc1: SuperTestExpect | undefined;
 
 					switch (method) {
@@ -588,7 +677,7 @@ describe('core', () => {
 					expect(fnc1RunFlag).to.be.true;
 					expect(fnc2RunFlag).to.be.false;
 
-					const requestObj2 = request(app.getHttpServer());
+					const requestObj2 = request(server);
 					let requestFnc2: SuperTestExpect | undefined;
 
 					switch (method) {
