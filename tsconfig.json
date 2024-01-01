@@ -1,6 +1,7 @@
 {
 	"compilerOptions": {
 		"target": "ES2022",
+		"moduleResolution": "Node",
 		"sourceMap": true,
 		"strict": true,
 		"forceConsistentCasingInFileNames": true,
