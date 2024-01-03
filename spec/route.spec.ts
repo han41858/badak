@@ -2,8 +2,7 @@ import { IncomingMessage } from 'http';
 
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
-import * as request from 'supertest';
-import { Test as SuperTestExpect } from 'supertest';
+import { agent as request, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { RouteFunction, RouteRule, RouteRuleSeed, TypedObject } from '../src/interfaces';

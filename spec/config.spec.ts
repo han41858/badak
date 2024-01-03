@@ -1,15 +1,11 @@
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
-import * as request from 'supertest';
-import { Test as SuperTestExpect } from 'supertest';
+import { agent as request, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { Method } from '../src/constants';
 import { BadakOption, RouteRule, TypedObject } from '../src/interfaces';
 import { promiseFail, TestPort } from './test-util';
-
-
-type SuperTestRequest = request.SuperTest<request.Test>;
 
 
 describe('config()', () => {
@@ -586,7 +582,7 @@ describe('config()', () => {
 		};
 
 		const getReqFnc = (method: string): SuperTestExpect => {
-			const requestObj: SuperTestRequest = request(app.getHttpServer());
+			const requestObj = request(app.getHttpServer());
 
 			let requestFnc: SuperTestExpect | undefined;
 

@@ -2,8 +2,7 @@ import { Server } from 'node:net';
 
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
-import * as request from 'supertest';
-import { Response, Test as SuperTestExpect } from 'supertest';
+import { agent as request, Response, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { RouteFunction } from '../src/interfaces';

@@ -1,9 +1,8 @@
 import { IncomingMessage, ServerResponse } from 'http';
 
-import 'mocha';
 import { beforeEach } from 'mocha';
 import { expect } from 'chai';
-import * as request from 'supertest';
+import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { MiddlewareFunction, RouteFunction, TypedObject } from '../src/interfaces';

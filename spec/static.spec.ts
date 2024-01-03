@@ -3,8 +3,7 @@ import * as path from 'path';
 
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
-import * as request from 'supertest';
-import { Response as SuperTestResponse } from 'supertest';
+import { agent as request, Response as SuperTestResponse } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { ContentType } from '../src/constants';
