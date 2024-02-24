@@ -205,7 +205,10 @@ export class Badak {
 		for (const [key, value] of Object.entries(routeRule)) {
 			if (typeof value === 'object') {
 				this.getUriKeyArr(value).forEach((one: string[]): void => {
-					result.push([key, ...one]);
+					// filter out route option
+					if (one[one.length - 2] && one[one.length - 2] !== 'option') {
+						result.push([key, ...one]);
+					}
 				});
 			}
 			else {
@@ -231,7 +234,7 @@ export class Badak {
 				: cur.length;
 		}, 0);
 
-		for (let i = 0; i < maxDepthLength; i++) {
+		for (let i: number = 0; i < maxDepthLength; i++) {
 			const targetKeys: string[] = allUriKeys
 				.map((oneTree: string[]): string => oneTree[i])
 				.filter((frag: string): frag is string => !!frag); // for different depth
@@ -273,7 +276,12 @@ export class Badak {
 				});
 			}
 
-			// TODO: asterisk routing
+			// asterisk routing
+			const asteriskRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('*'));
+
+			if (asteriskRouteArr.length > 1) {
+				throw new Error('duplicated asterisk routing');
+			}
 		}
 	}
 
@@ -790,7 +798,7 @@ export class Badak {
 					let targetRouteObj: RouteRule | undefined;
 
 					// don't use for-in/for-of here, targetRouteObj is not flat flow
-					for (let i = 0; i < routeRuleLength; i++) {
+					for (let i: number = 0; i < routeRuleLength; i++) {
 						targetRouteObj = this._routeRules[i];
 
 						// normal routing
@@ -803,7 +811,7 @@ export class Badak {
 
 						// find target function
 						// use 'for' instead of 'forEach' to break
-						for (let j = 0; j < uriArrLength; j++) {
+						for (let j: number = 0; j < uriArrLength; j++) {
 							let loopControl: LoopControl | undefined;
 
 							const routeRuleKeyArr: string[] = Object.keys(targetRouteObj);
@@ -908,6 +916,7 @@ export class Badak {
 							}
 
 							if (!loopControl) {
+								// asterisk routing
 								if (routeRuleKeyArr.includes('*')) {
 									targetRouteObj = targetRouteObj['*'] as RouteRule;
 

@@ -13,10 +13,10 @@ const isThenable = (input: any): input is Promise<any> => {
 	return input && typeof input.then === 'function';
 };
 
-export const promiseFail = async (promiseResult: unknown | Promise<unknown>): Promise<void> => {
+export const promiseFail = async (promiseResult: Promise<unknown>): Promise<void> => {
 	if (promiseResult
 		&& isThenable(promiseResult)) {
-		promiseResult.then(fail, (err: Error) => {
+		promiseResult.then(fail, (err: Error): void => {
 			expect(err).to.be.instanceof(Error);
 		});
 	}

@@ -33,7 +33,7 @@ console.log('* add-js-extensions');
 			const matchResults: RegExpMatchArray[] = [...fileContents.matchAll(importStateRegExp)];
 
 			if (matchResults.length > 0) {
-				for (let i = 0; i < matchResults.length; i++) {
+				for (let i: number = 0; i < matchResults.length; i++) {
 					const oneResult: RegExpMatchArray = matchResults[i];
 
 					const beforeStr: string = oneResult[0];

@@ -1589,6 +1589,23 @@ describe('route()', () => {
 					);
 				});
 
+				it('duplicated routing, in same time', async () => {
+					await promiseFail(
+						app.route({
+							'abc': {
+								GET: () => {
+									// do nothing
+								}
+							},
+							'ab+c': {
+								GET: () => {
+									// do nothing
+								}
+							}
+						})
+					);
+				});
+
 				it('duplicated routing, normal uri first', async () => {
 					await app.route({
 						'abc': {
@@ -1785,6 +1802,18 @@ describe('route()', () => {
 						.get(testUri)
 						.expect(404);
 				}));
+			});
+
+			it('** & *', () => {
+				app.get('*', () => {
+					// do nothing
+				});
+
+				return promiseFail(
+					app.get('**', () => {
+						// do nothing
+					})
+				);
 			});
 
 			describe('**', () => {
