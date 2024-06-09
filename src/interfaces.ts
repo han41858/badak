@@ -1,7 +1,7 @@
 // function type definition for IDE
 import { IncomingMessage, ServerResponse } from 'node:http';
 
-import { Method } from './constants';
+import { METHOD } from './constants';
 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,11 +33,11 @@ export interface RouteRuleSeed {
 	DELETE?: RouteFunction | RouteFunctionObj;
 }
 
-export interface BadakOption extends TypedObject<boolean | Method | undefined> {
+export interface BadakOption extends TypedObject<boolean | METHOD | undefined> {
 	catchErrorLog: boolean; // default true, if false, badak will not show error catching log
 	preventError: boolean; // default true, if false, badak pass error to node
 
-	defaultMethod: Method | undefined; // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
+	defaultMethod: METHOD | undefined; // can be ['GET', 'POST', 'PUT', 'DELETE', null] or lower cases, if set, can assign routing rule object without method
 	/**
 	 * before rule :
 	 * {

@@ -15,7 +15,7 @@ import {
 	StaticRule,
 	TypedObject
 } from './interfaces';
-import { ContentType, Method } from './constants';
+import { ContentType, METHOD } from './constants';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -44,9 +44,9 @@ import {
  * }
  */
 
-enum LoopControl {
-	Break,
-	Continue
+enum LOOP_CONTROL {
+	BREAK = 'B',
+	CONTINUE = 'C'
 }
 
 export class Badak {
@@ -96,29 +96,25 @@ export class Badak {
 			throw new Error('no rule in rule object');
 		}
 
-		// check validation
-		for (const [uri] of Object.entries(rule)) {
+		const refinedRuleObj: RouteRule = {};
+
+		// called recursively
+		for (const [uri, value] of Object.entries(rule)) {
 			if (uri.includes('//')) {
 				throw new Error('invalid double slash');
 			}
 
-			let uriArr: string[];
+			// make array for uri abbreviation
+			const uriArr: string[] = [
+				isRoot ? '/' : '', // start from root
+				...uri.split('/')
+			]
+				.filter((uriFrag: string): boolean => uriFrag !== '');
 
-			if (uri === '/') {
-				uriArr = ['/'];
-			}
-			else {
-				uriArr = uri
-					.split('/')
-					.filter((uriFrag: string): uriFrag is string => !!uriFrag);
-			}
+			let targetObj: RouteRule = refinedRuleObj;
 
-			if (uriArr.length === 0) {
-				throw new Error('empty rule');
-			}
-
-			uriArr.forEach((uriFrag: string): void => {
-				if (uriFrag.trim() !== uriFrag) {
+			uriArr.forEach((uriFrag: string, i: number, arr: string[]): void => {
+				if (uriFrag.trim() === '') {
 					throw new Error('uri include space');
 				}
 
@@ -130,6 +126,12 @@ export class Badak {
 					throw new Error('invalid colon route');
 				}
 
+				if (uriFrag.includes('?')) {
+					if (uriFrag === '?') {
+						throw new Error('invalid question character');
+					}
+				}
+
 				if (uriFrag.includes('?') && uriFrag.startsWith('?')) {
 					throw new Error('invalid question route');
 				}
@@ -137,26 +139,9 @@ export class Badak {
 				if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
 					throw new Error('invalid plus route');
 				}
-			});
-		}
 
-
-		const refinedRuleObj: RouteRule = {};
-
-		// called recursively
-		for (const [uri, value] of Object.entries(rule)) {
-			// make array for uri abbreviation
-			const uriArr: string[] = [
-				isRoot ? '/' : '', // start from root
-				...uri.split('/')
-			]
-				.filter((uriFrag: string): boolean => uriFrag !== '');
-
-			let targetObj: RouteRule = refinedRuleObj;
-
-			uriArr.forEach((uriFrag: string, i: number, arr: string[]): void => {
-				if (Object.values(Method).includes(uriFrag as Method)) {
-					const method: Method = uriFrag as Method; // re-assign for readability
+				if (Object.values(METHOD).includes(uriFrag as METHOD)) {
+					const method: METHOD = uriFrag as METHOD; // re-assign for readability
 
 					targetObj[method] = rule[method] as RouteRuleSeed;
 				}
@@ -357,13 +342,13 @@ export class Badak {
 							throw new Error('invalid method parameter');
 						}
 
-						if (!Object.values(Method).some((method: string): boolean => {
+						if (!Object.values(METHOD).some((method: string): boolean => {
 							return value.toUpperCase() === method;
 						})) {
 							throw new Error('not defined method');
 						}
 
-						this._config.defaultMethod = value.toUpperCase() as Method;
+						this._config.defaultMethod = value.toUpperCase() as METHOD;
 					}
 					else {
 						// null is clearing
@@ -398,7 +383,7 @@ export class Badak {
 		// assign to route rule
 		this._assignRule({
 			[address]: {
-				[Method.GET]: {
+				[METHOD.GET]: {
 					fnc: fnc,
 					option: option
 				}
@@ -412,7 +397,7 @@ export class Badak {
 		// assign to route rule
 		this._assignRule({
 			[address]: {
-				[Method.POST]: {
+				[METHOD.POST]: {
 					fnc: fnc,
 					option: option
 				}
@@ -426,7 +411,7 @@ export class Badak {
 		// assign to route rule
 		this._assignRule({
 			[address]: {
-				[Method.PUT]: {
+				[METHOD.PUT]: {
 					fnc: fnc,
 					option: option
 				}
@@ -440,7 +425,7 @@ export class Badak {
 		// assign to route rule
 		this._assignRule({
 			[address]: {
-				[Method.DELETE]: {
+				[METHOD.DELETE]: {
 					fnc: fnc,
 					option: option
 				}
@@ -790,38 +775,54 @@ export class Badak {
 					}
 
 					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
+					let queryStr: string | undefined;
 					let param: TypedObject<unknown> | undefined;
-
 
 					const routeRuleLength: number = this._routeRules.length;
 
-					let targetRouteObj: RouteRule | undefined;
+					let checkTargetRule: RouteRule | undefined;
 
-					// don't use for-in/for-of here, targetRouteObj is not flat flow
-					for (let i: number = 0; i < routeRuleLength; i++) {
-						targetRouteObj = this._routeRules[i];
+					// don't use for-in/for-of here, checkTargetRule is not flat flow
+					for (let parallelIter: number = 0; parallelIter < routeRuleLength; parallelIter++) {
+						checkTargetRule = this._routeRules[parallelIter];
 
 						// normal routing
 						const uriArr: string[] = [
 							'/', // start from root
 							...uri.split('/')
 						]
-							.filter((frag: string): boolean => frag !== '');
-						const uriArrLength: number = uriArr.length;
+							.filter((frag: string): boolean => {
+								return frag !== '';
+							});
 
 						// find target function
 						// use 'for' instead of 'forEach' to break
-						for (let j: number = 0; j < uriArrLength; j++) {
-							let loopControl: LoopControl | undefined;
+						for (let depthIter: number = 0; depthIter < uriArr.length; depthIter++) {
+							let loopControl: LOOP_CONTROL | undefined;
 
-							const routeRuleKeyArr: string[] = Object.keys(targetRouteObj);
-							const uriFrag: string = uriArr[j];
+							const routeRuleKeyArr: string[] = Object.keys(checkTargetRule);
+
+							const uriFragRaw: string = uriArr[depthIter];
+
+							let uriFrag: string;
+
+							if (
+								depthIter === uriArr.length - 1 // last index
+								&& method === METHOD.GET
+								&& uriFragRaw.includes('?')
+							) {
+								[uriFrag, queryStr] = uriFragRaw.split('?');
+							}
+							else {
+								uriFrag = uriFragRaw;
+							}
+
 
 							// normal routing
-							if (targetRouteObj[uriFrag] !== undefined) {
-								targetRouteObj = targetRouteObj[uriFrag] as RouteRule;
+							if (checkTargetRule[uriFrag] !== undefined) {
+								checkTargetRule = checkTargetRule[uriFrag] as RouteRule;
 
-								loopControl = LoopControl.Continue;
+								loopControl = LOOP_CONTROL.CONTINUE;
 							}
 
 							if (!loopControl) {
@@ -831,7 +832,7 @@ export class Badak {
 								});
 
 								if (colonParam !== undefined) {
-									targetRouteObj = targetRouteObj[colonParam] as RouteRule;
+									checkTargetRule = checkTargetRule[colonParam] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -844,15 +845,14 @@ export class Badak {
 									// param.matcher.push(colonParam);
 									param[colonParam.replace(':', '')] = uriFrag;
 
-									loopControl = LoopControl.Continue;
+									loopControl = LOOP_CONTROL.CONTINUE;
 								}
 							}
 
 							if (!loopControl) {
 								// question routing
 								const questionKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
-									return routeRuleKey.includes('?')
-										&& routeRuleKey.indexOf('?') !== 0;
+									return !!routeRuleKey.match(/.+\?/);
 								});
 
 								const targetQuestionKey: string | undefined = questionKeyArr.find((questionKey: string): boolean => {
@@ -870,7 +870,7 @@ export class Badak {
 								});
 
 								if (targetQuestionKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetQuestionKey] as RouteRule;
+									checkTargetRule = checkTargetRule[targetQuestionKey] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -883,7 +883,7 @@ export class Badak {
 									// param.matcher.push(targetQuestionKey);
 									param[targetQuestionKey] = uriFrag;
 
-									loopControl = LoopControl.Continue;
+									loopControl = LOOP_CONTROL.CONTINUE;
 								}
 							}
 
@@ -898,7 +898,7 @@ export class Badak {
 								});
 
 								if (targetPlusKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetPlusKey] as RouteRule;
+									checkTargetRule = checkTargetRule[targetPlusKey] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -911,14 +911,14 @@ export class Badak {
 									// param.matcher.push(targetPlusKey);
 									param[targetPlusKey] = uriFrag;
 
-									loopControl = LoopControl.Continue;
+									loopControl = LOOP_CONTROL.CONTINUE;
 								}
 							}
 
 							if (!loopControl) {
 								// asterisk routing
 								if (routeRuleKeyArr.includes('*')) {
-									targetRouteObj = targetRouteObj['*'] as RouteRule;
+									checkTargetRule = checkTargetRule['*'] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -926,7 +926,7 @@ export class Badak {
 
 									param['*'] = uriFrag;
 
-									loopControl = LoopControl.Continue;
+									loopControl = LOOP_CONTROL.CONTINUE;
 								}
 							}
 
@@ -944,7 +944,7 @@ export class Badak {
 									});
 
 								if (targetAsteriskKey !== undefined) {
-									targetRouteObj = targetRouteObj[targetAsteriskKey] as RouteRule;
+									checkTargetRule = checkTargetRule[targetAsteriskKey] as RouteRule;
 
 									if (param === undefined) {
 										param = {};
@@ -957,17 +957,17 @@ export class Badak {
 									// param.matcher.push(targetAsteriskKey);
 									param[targetAsteriskKey] = uriFrag;
 
-									loopControl = LoopControl.Continue;
+									loopControl = LOOP_CONTROL.CONTINUE;
 								}
 							}
 
 
 							// * / ** asterisk child routing
-							const childRouteRuleKeyArr: string[] = Object.keys(targetRouteObj);
+							const childRouteRuleKeyArr: string[] = Object.keys(checkTargetRule);
 
-							if (j === uriArrLength - 1 // for urls like '/something/'
+							if (depthIter === uriArr.length - 1 // for urls like '/something/'
 								&& childRouteRuleKeyArr.includes('*')) {
-								targetRouteObj = targetRouteObj['*'] as RouteRule;
+								checkTargetRule = checkTargetRule['*'] as RouteRule;
 
 								if (param === undefined) {
 									param = {};
@@ -975,10 +975,10 @@ export class Badak {
 
 								param['*'] = uriFrag;
 
-								loopControl = LoopControl.Break;
+								loopControl = LOOP_CONTROL.BREAK;
 							}
 							else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
-								targetRouteObj = targetRouteObj['**'] as RouteRule;
+								checkTargetRule = checkTargetRule['**'] as RouteRule;
 
 								if (param === undefined) {
 									param = {};
@@ -987,24 +987,26 @@ export class Badak {
 								param['**'] = uriFrag;
 
 								// ignore after uriFrag
-								loopControl = LoopControl.Break;
+								loopControl = LOOP_CONTROL.BREAK;
 							}
 
 							// use if/else instead of switch to break for loop
-							if (loopControl === LoopControl.Break) {
+							if (
+								loopControl === LOOP_CONTROL.BREAK
+								|| uriFrag === '' // last frag with query string param
+							) {
 								break;
 							}
 							else if (loopControl === undefined) {
 								// not found
-								targetRouteObj = undefined;
+								checkTargetRule = undefined;
 								break;
 							}
 							// loopControl === LoopControl.Continue : continue
 						}
 
-						if (targetRouteObj && targetRouteObj[method]) {
-							targetFncObj = targetRouteObj[method] as RouteFunctionObj;
-
+						if (checkTargetRule && checkTargetRule[method]) {
+							targetFncObj = checkTargetRule[method] as RouteFunctionObj;
 							break;
 						}
 					}
@@ -1014,8 +1016,44 @@ export class Badak {
 					}
 
 					switch (method) {
-						case Method.PUT:
-						case Method.POST:
+						case METHOD.GET: {
+							// parse query string param
+							if (queryStr !== undefined) {
+								const paramStrPairs: string[] = queryStr
+									.replace(/^\?/, '') // remove starting ?
+									.split('&')
+									.filter((str: string): boolean => str !== '');
+
+								if (param === undefined) {
+									param = {};
+								}
+
+								for (const pairStr of paramStrPairs) {
+									if (pairStr.includes('=')) {
+										const [key, value]: string[] = pairStr.split('=');
+
+										if (param[key] === undefined) {
+											param[key] = decodeURIComponent(value);
+										}
+										else if (typeof param[key] === 'string') {
+											// change to array
+											param[key] = [param[key], value];
+										}
+										else {
+											// array already
+											(param[key] as string[]).push(value);
+										}
+									}
+									else {
+										param[pairStr] = null;
+									}
+								}
+							}
+							break;
+						}
+
+						case METHOD.PUT:
+						case METHOD.POST:
 							if (param) {
 								// TODO: overwrite? uri param & param object
 								param = Object.assign(param, await this._paramParser(req));

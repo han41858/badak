@@ -2,11 +2,11 @@ import { IncomingMessage } from 'http';
 
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
-import { agent as request, Test as SuperTestExpect } from 'supertest';
+import { agent as request, Response as SuperTestResponse, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { RouteFunction, RouteRule, RouteRuleSeed, TypedObject } from '../src/interfaces';
-import { promiseFail, TestPort } from './test-util';
+import { echoFnc, emptyFnc, promiseFail, TestPort } from './test-util';
 
 
 describe('route()', () => {
@@ -99,6 +99,18 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						'users ': {
+							GET: async () => {
+								// do nothing
+							}
+						}
+					})
+				);
+			});
+
+			it('invalid characters - //', () => {
+				return promiseFail(
+					app.route({
+						'//': {
 							GET: async () => {
 								// do nothing
 							}
@@ -903,8 +915,6 @@ describe('route()', () => {
 			});
 		});
 	});
-
-	// TODO: with query string param
 
 	describe('with route param', () => {
 		describe('colon routing', () => {
@@ -1968,5 +1978,157 @@ describe('route()', () => {
 		});
 
 		// TODO: regular expression
+
+		describe('query string param', () => {
+			describe('set error', () => {
+				// destination url should not have question mark
+				[
+					'/?',
+					'/?key1',
+					'/?key1=',
+					'/?key1=value1',
+					// '/dest?key1', // not error
+					'/dest?key1=',
+					'/dest?key1=value1'
+				].forEach((url: string): void => {
+					it(url, () => {
+						return promiseFail(
+							app.route({
+								[url]: {
+									'GET': emptyFnc
+								}
+							})
+						);
+					});
+				});
+			});
+
+			[
+				['root path', '/'],
+				['sub path', '/dest']
+			].forEach(([desc, url]: string[]): void => {
+				describe(desc, () => {
+					beforeEach(async () => {
+						await app.route({
+							[url]: {
+								'GET': echoFnc
+							}
+						});
+
+						await app.listen(TestPort);
+					});
+
+					describe('ok', () => {
+						it('no param', () => {
+							return request(app.getHttpServer())
+								.get(url)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object'); // not undefined
+								});
+						});
+
+						it('empty object', async () => {
+							return request(app.getHttpServer())
+								.get(`${ url }?`)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object');
+									expect(Object.keys(res.body)).to.be.lengthOf(0);
+								});
+						});
+
+						it('null', async () => {
+							return request(app.getHttpServer())
+								.get(`${ url }?key1`)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object');
+									expect(res.body).to.have.property('key1');
+									expect(res.body['key1']).to.be.null;
+								});
+						});
+
+						// JSON not allow undefined
+						it('undefined, replaced with empty string', async () => {
+							return request(app.getHttpServer())
+								.get(`${ url }?key1=`)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object');
+									expect(res.body).to.have.property('key1');
+									expect(res.body['key1']).to.be.a('string');
+									expect(res.body['key1']).to.be.eql('');
+								});
+						});
+
+						it('string null', async () => {
+							return request(app.getHttpServer())
+								.get(`${ url }?key1=null`)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object');
+									expect(res.body).to.have.property('key1');
+									expect(res.body['key1']).to.be.a('string');
+									expect(res.body['key1']).to.be.eql('null');
+								});
+						});
+
+						it('string value', async () => {
+							return request(app.getHttpServer())
+								.get(`${ url }?key1=value`)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object');
+									expect(res.body).to.have.property('key1');
+									expect(res.body['key1']).to.be.a('string');
+									expect(res.body['key1']).to.be.eql('value');
+								});
+						});
+
+						it('string value with decode', async () => {
+							return request(app.getHttpServer())
+								.get(`${ url }?key1=this%20is%20sentence%2E`)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object');
+									expect(res.body).to.have.property('key1');
+									expect(res.body['key1']).to.be.a('string');
+									expect(res.body['key1']).to.be.eql('this is sentence.');
+								});
+						});
+
+						it('string array', async () => {
+							return request(app.getHttpServer())
+								.get(`${ url }?key1=value1&key1=value2`)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object');
+									expect(res.body).to.have.property('key1');
+									expect(res.body['key1']).to.be.instanceOf(Array);
+									expect(res.body['key1']).to.be.lengthOf(2);
+								});
+						});
+
+						it('multiple keys', async () => {
+							return request(app.getHttpServer())
+								.get(`${ url }?key1=value1&key2=value2`)
+								.expect(200)
+								.expect((res: SuperTestResponse): void => {
+									expect(res.body).to.be.a('object');
+
+									expect(res.body).to.have.property('key1');
+									expect(res.body['key1']).to.be.a('string');
+									expect(res.body['key1']).to.be.eql('value1');
+
+									expect(res.body).to.have.property('key2');
+									expect(res.body['key2']).to.be.a('string');
+									expect(res.body['key2']).to.be.eql('value2');
+								});
+						});
+					});
+				});
+			});
+		});
 	});
 });

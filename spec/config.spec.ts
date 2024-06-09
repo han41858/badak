@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import { agent as request, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
-import { Method } from '../src/constants';
+import { METHOD } from '../src/constants';
 import { BadakOption, RouteRule, TypedObject } from '../src/interfaces';
 import { promiseFail, TestPort } from './test-util';
 
@@ -575,7 +575,7 @@ describe('config()', () => {
 		const testUri: string = '/defaultMethod';
 		const testUriRefined: string = testUri.replace('/', '');
 
-		const methods: Method[] = [Method.GET, Method.POST, Method.PUT, Method.DELETE];
+		const methods: METHOD[] = [METHOD.GET, METHOD.POST, METHOD.PUT, METHOD.DELETE];
 
 		const echoFnc = <T> (param: T): T => {
 			return param;
@@ -587,19 +587,19 @@ describe('config()', () => {
 			let requestFnc: SuperTestExpect | undefined;
 
 			switch (method) {
-				case Method.GET:
+				case METHOD.GET:
 					requestFnc = requestObj.get(testUri);
 					break;
 
-				case Method.POST:
+				case METHOD.POST:
 					requestFnc = requestObj.post(testUri);
 					break;
 
-				case Method.PUT:
+				case METHOD.PUT:
 					requestFnc = requestObj.put(testUri);
 					break;
 
-				case Method.DELETE:
+				case METHOD.DELETE:
 					requestFnc = requestObj.delete(testUri);
 					break;
 			}
@@ -608,7 +608,7 @@ describe('config()', () => {
 		};
 
 		describe('function itself', () => {
-			methods.forEach((method: Method): void => {
+			methods.forEach((method: METHOD): void => {
 				describe(method, () => {
 					it('set value - capital', async () => {
 						await app.config('defaultMethod', method);
@@ -653,7 +653,7 @@ describe('config()', () => {
 		});
 
 		describe('after set', () => {
-			methods.forEach((setMethod: Method) => {
+			methods.forEach((setMethod: METHOD) => {
 				describe('set ' + setMethod, () => {
 					beforeEach(async () => {
 						await app.config('defaultMethod', setMethod);
@@ -665,7 +665,7 @@ describe('config()', () => {
 						await app.listen(TestPort);
 					});
 
-					methods.forEach((testMethod: Method) => {
+					methods.forEach((testMethod: METHOD) => {
 						it('test ' + testMethod, async () => {
 							const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 

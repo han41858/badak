@@ -13,6 +13,15 @@ const isThenable = (input: any): input is Promise<any> => {
 	return input && typeof input.then === 'function';
 };
 
+export function emptyFnc (): void {
+	// empty function
+}
+
+export function echoFnc<T> (param: T): T {
+	return param;
+}
+
+
 export const promiseFail = async (promiseResult: Promise<unknown>): Promise<void> => {
 	if (promiseResult
 		&& isThenable(promiseResult)) {
