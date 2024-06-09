@@ -15,7 +15,7 @@ import {
 	StaticRule,
 	TypedObject
 } from './interfaces';
-import { ContentType, METHOD } from './constants';
+import { CONTENT_TYPE, HEADER_KEY, METHOD } from './constants';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -500,7 +500,7 @@ export class Badak {
 			req.on('end', async (): Promise<void> => {
 				let param: TypedObject<unknown> | undefined;
 
-				const contentTypeInHeader: string = req.headers['content-type'] as string;
+				const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
 
 				if (contentTypeInHeader) {
 					const contentTypeStrArr: string[] = contentTypeInHeader.split(';');
@@ -556,7 +556,7 @@ export class Badak {
 							break;
 						}
 
-						case 'application/json':
+						case CONTENT_TYPE.APPLICATION_JSON:
 							if (bodyStr) {
 								try {
 									param = JSON.parse(bodyStr);
@@ -568,7 +568,7 @@ export class Badak {
 							// no payload, but ok
 							break;
 
-						case 'application/x-www-form-urlencoded':
+						case CONTENT_TYPE.APPLICATION_WWW_FORM_URLENCODED:
 							if (bodyStr) {
 								bodyStr
 									.split('&')
@@ -686,7 +686,7 @@ export class Badak {
 					this.get(
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-							res.setHeader('Content-Type', oneCache.mime);
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, oneCache.mime);
 							res.write(oneCache.fileData);
 							res.end();
 						},
@@ -722,7 +722,7 @@ export class Badak {
 								fileData: targetCache.fileData
 							};
 
-							res.setHeader('Content-Type', resFileObj.mime);
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, resFileObj.mime);
 							res.write(resFileObj.fileData);
 						}
 
@@ -1084,12 +1084,12 @@ export class Badak {
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
 					if (responseData) {
-						const contentType: ContentType = getContentType(responseData);
+						const contentType: CONTENT_TYPE = getContentType(responseData);
 
-						res.setHeader('Content-Type', contentType);
+						res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
 
 						switch (contentType) {
-							case ContentType.ApplicationJson:
+							case CONTENT_TYPE.APPLICATION_JSON:
 								responseBody = JSON.stringify(responseData);
 								break;
 
@@ -1135,15 +1135,15 @@ export class Badak {
 								if (err) {
 									if (err instanceof Error) {
 										responseBody = err.message;
-										res.setHeader('Content-Type', ContentType.TextPlain);
+										res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.TEXT_PLAIN);
 									}
 									else {
-										const contentType: ContentType = getContentType(err);
+										const contentType: CONTENT_TYPE = getContentType(err);
 
-										res.setHeader('Content-Type', contentType);
+										res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
 
 										switch (contentType) {
-											case ContentType.ApplicationJson:
+											case CONTENT_TYPE.APPLICATION_JSON:
 												responseBody = JSON.stringify(err);
 												break;
 

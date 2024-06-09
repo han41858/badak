@@ -6,7 +6,7 @@ import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse } from 'supertest';
 
 import { Badak } from '../src/badak';
-import { ContentType } from '../src/constants';
+import { CONTENT_TYPE, HEADER_KEY } from '../src/constants';
 import { StaticCache, StaticRule, TypedObject } from '../src/interfaces';
 import { promiseFail, TestPort } from './test-util';
 
@@ -140,8 +140,8 @@ describe('static()', () => {
 								.get(fullUri)
 								.expect(200)
 								.then((res: SuperTestResponse): void => {
-									const contentType: string = res.headers['content-type'];
-									expect(contentType).to.be.eql(ContentType.TextPlain);
+									const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
+									expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_PLAIN);
 
 									expect(res).to.be.ok;
 									expect(res.text).to.be.ok;
@@ -164,7 +164,7 @@ describe('static()', () => {
 							});
 
 							expect(targetCache).to.be.ok;
-							expect(targetCache).to.have.property('mime', ContentType.TextPlain);
+							expect(targetCache).to.have.property('mime', CONTENT_TYPE.TEXT_PLAIN);
 							expect(targetCache).to.have.property('fileData');
 						}
 					})
@@ -318,21 +318,21 @@ describe('static()', () => {
 
 	describe('about MIME', () => {
 		const defines: [string, string][] = [
-			['bmp', 'image/bmp'],
-			['css', 'text/css'],
-			['gif', 'image/gif'],
-			['htm', 'text/html'],
-			['html', 'text/html'],
-			['jpeg', 'image/jpeg'],
-			['jpg', 'image/jpeg'],
-			['js', 'text/javascript'],
-			['json', 'application/json'],
-			['pdf', 'application/pdf'],
-			['png', 'image/png'],
-			['txt', 'text/plain'],
-			['text', 'text/plain'],
-			['tif', 'image/tiff'],
-			['tiff', 'image/tiff'],
+			['bmp', CONTENT_TYPE.IMAGE_BMP],
+			['css', CONTENT_TYPE.TEXT_CSS],
+			['gif', CONTENT_TYPE.IMAGE_GIF],
+			['htm', CONTENT_TYPE.TEXT_HTML],
+			['html', CONTENT_TYPE.TEXT_HTML],
+			['jpeg', CONTENT_TYPE.IMAGE_JPEG],
+			['jpg', CONTENT_TYPE.IMAGE_JPEG],
+			['js', CONTENT_TYPE.APPLICATION_JAVASCRIPT],
+			['json', CONTENT_TYPE.APPLICATION_JSON],
+			['pdf', CONTENT_TYPE.APPLICATION_PDF],
+			['png', CONTENT_TYPE.IMAGE_PNG],
+			['txt', CONTENT_TYPE.TEXT_PLAIN],
+			['text', CONTENT_TYPE.TEXT_PLAIN],
+			['tif', CONTENT_TYPE.IMAGE_TIFF],
+			['tiff', CONTENT_TYPE.IMAGE_TIFF],
 			['xls', 'application/vnd.ms-excel'],
 			['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
 		];
@@ -355,7 +355,7 @@ describe('static()', () => {
 					.then((res: SuperTestResponse): void => {
 						expect(res).to.be.ok;
 
-						const contentType: string = res.headers['content-type'];
+						const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 						expect(contentType).to.be.eql(mime);
 
 						expect(!!res.body || !!res.text).to.be.ok;
@@ -371,7 +371,7 @@ describe('static()', () => {
 					.then((res: SuperTestResponse): void => {
 						expect(res).to.be.ok;
 
-						const contentType: string = res.headers['content-type'];
+						const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 						expect(contentType).to.be.eql(mime);
 
 						expect(!!res.body || !!res.text).to.be.ok;

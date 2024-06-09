@@ -6,7 +6,7 @@ import { Stats } from 'node:fs';
 import * as node_path from 'node:path';
 
 import { StaticCache } from './interfaces';
-import { ContentType } from './constants';
+import { CONTENT_TYPE } from './constants';
 
 
 export const convertNumberStr = (param: string): string | number => {
@@ -120,29 +120,29 @@ export const loadFolder = async (uri: string, path: string): Promise<StaticCache
 		else {
 			const matchArr: RegExpMatchArray | null = fullPath.match(/(\.[\w\d]+)?\.[\w\d]+$/);
 
-			let mime = 'application/octet-stream'; // default
+			let mime: CONTENT_TYPE | string = CONTENT_TYPE.APPLICATION_OCTET_STREAM; // default
 
 			if (matchArr) {
 				const extension: string = matchArr[0];
 
 				const mimeMap: {
-					[key: string]: ContentType | string;
+					[key: string]: CONTENT_TYPE | string;
 				} = {
-					'.bmp': 'image/bmp',
-					'.css': 'text/css',
-					'.gif': 'image/gif',
-					'.htm': 'text/html',
-					'.html': 'text/html',
-					'.jpeg': 'image/jpeg',
-					'.jpg': 'image/jpeg',
-					'.js': 'text/javascript',
-					'.json': ContentType.ApplicationJson,
-					'.pdf': 'application/pdf',
-					'.png': 'image/png',
-					'.txt': ContentType.TextPlain,
-					'.text': ContentType.TextPlain,
-					'.tif': 'image/tiff',
-					'.tiff': 'image/tiff',
+					'.bmp': CONTENT_TYPE.IMAGE_BMP,
+					'.css': CONTENT_TYPE.TEXT_CSS,
+					'.gif': CONTENT_TYPE.IMAGE_GIF,
+					'.htm': CONTENT_TYPE.TEXT_HTML,
+					'.html': CONTENT_TYPE.TEXT_HTML,
+					'.jpeg': CONTENT_TYPE.IMAGE_JPEG,
+					'.jpg': CONTENT_TYPE.IMAGE_JPEG,
+					'.js': CONTENT_TYPE.APPLICATION_JAVASCRIPT,
+					'.json': CONTENT_TYPE.APPLICATION_JSON,
+					'.pdf': CONTENT_TYPE.APPLICATION_PDF,
+					'.png': CONTENT_TYPE.IMAGE_PNG,
+					'.txt': CONTENT_TYPE.TEXT_PLAIN,
+					'.text': CONTENT_TYPE.TEXT_PLAIN,
+					'.tif': CONTENT_TYPE.IMAGE_TIFF,
+					'.tiff': CONTENT_TYPE.IMAGE_TIFF,
 					'.xls': 'application/vnd.ms-excel',
 					'.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 				};
@@ -182,23 +182,23 @@ const loadFile = async (path: string): Promise<Buffer> => {
 	});
 };
 
-export const getContentType = (data: unknown): ContentType => {
-	let contentType: ContentType;
+export const getContentType = (data: unknown): CONTENT_TYPE => {
+	let contentType: CONTENT_TYPE;
 
 	switch (typeof data) {
 		case 'object':
 			try {
 				JSON.stringify(data);
 
-				contentType = ContentType.ApplicationJson;
+				contentType = CONTENT_TYPE.APPLICATION_JSON;
 			}
 			catch (e: unknown) {
-				contentType = ContentType.TextPlain;
+				contentType = CONTENT_TYPE.TEXT_PLAIN;
 			}
 			break;
 
 		default:
-			contentType = ContentType.TextPlain;
+			contentType = CONTENT_TYPE.TEXT_PLAIN;
 	}
 
 	return contentType;
