@@ -4,6 +4,8 @@
 		"emitDeclarationOnly": true,
 		"outDir": "build",
 		"declaration": true,
-		"declarationDir": "build"
+		"declarationDir": "build",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext"
 	}
 }
