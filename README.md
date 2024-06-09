@@ -2,6 +2,8 @@
 
 ![logo](https://github.com/han41858/badak/raw/main/docs/logo/badak_200.png)
 
+[한국어](https://github.com/han41858/badak/blob/main/README-KR.md)
+
 # badak
 
 badak is a backend framework developed based on Promises and TypeScript.
