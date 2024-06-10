@@ -28,7 +28,7 @@ describe('static()', () => {
 
 
 	it('defined', () => {
-		expect(app.static).to.be.ok;
+		expect(app.static).to.be.a('function');
 	});
 
 	describe('error', () => {
@@ -86,7 +86,7 @@ describe('static()', () => {
 
 		it('not exist file', async () => {
 			const fullUri: string = '/static/notExistFile.text';
-			const folderPath = path.join(__dirname, '/static');
+			const folderPath: string = path.join(__dirname, '/static');
 
 			await app.static('/static', folderPath);
 
@@ -119,14 +119,13 @@ describe('static()', () => {
 		const checkBefore = (keyUri: string): void => {
 			const staticRules: StaticRule[] = (app as unknown as TypedObject<StaticRule[]>)._staticRules;
 
-			expect(staticRules).to.be.ok;
 			expect(staticRules).to.be.instanceOf(Array);
 
 			const targetRule: StaticRule | undefined = staticRules.find((rule: StaticRule): boolean => {
 				return rule.uri === keyUri;
 			});
 
-			expect(targetRule).to.be.ok;
+			expect(targetRule).to.be.a('object');
 		};
 
 		const checkAfter = async (fullUri: string): Promise<void> => {
@@ -143,8 +142,8 @@ describe('static()', () => {
 									const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 									expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_PLAIN);
 
-									expect(res).to.be.ok;
-									expect(res.text).to.be.ok;
+									expect(res).to.be.a('object');
+									expect(res.text).to.be.a('string');
 									expect(res.text).to.be.eql(fileData);
 								}),
 							request(app.getHttpServer()).post(fullUri).expect(404),
@@ -156,14 +155,13 @@ describe('static()', () => {
 							// check cache
 							const staticCache: StaticCache[] = (app as unknown as TypedObject<StaticCache[]>)._staticCache;
 
-							expect(staticCache).to.be.ok;
 							expect(staticCache).to.be.instanceOf(Array);
 
 							const targetCache: StaticCache | undefined = staticCache.find((cache: StaticCache): boolean => {
 								return cache.uri === fullUri;
 							});
 
-							expect(targetCache).to.be.ok;
+							expect(targetCache).to.be.a('object');
 							expect(targetCache).to.have.property('mime', CONTENT_TYPE.TEXT_PLAIN);
 							expect(targetCache).to.have.property('fileData');
 						}
@@ -273,7 +271,7 @@ describe('static()', () => {
 
 		const targetStaticCache: StaticCache = staticCache[0];
 
-		expect(targetStaticCache).to.be.instanceOf(Object);
+		expect(targetStaticCache).to.be.a('object');
 
 		expect(targetStaticCache).to.have.property('uri');
 		expect(targetStaticCache.uri).to.be.a('string');
@@ -287,7 +285,7 @@ describe('static()', () => {
 			.get('/static/test.txt')
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				expect(!!res.body || !!res.text).to.be.ok;
 			});
@@ -310,7 +308,7 @@ describe('static()', () => {
 			.get('/static/nested/test.txt')
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				expect(!!res.body || !!res.text).to.be.ok;
 			});
@@ -353,7 +351,7 @@ describe('static()', () => {
 					.get(fullUri)
 					.expect(200)
 					.then((res: SuperTestResponse): void => {
-						expect(res).to.be.ok;
+						expect(res).to.be.a('object');
 
 						const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 						expect(contentType).to.be.eql(mime);
@@ -369,7 +367,7 @@ describe('static()', () => {
 					.get(fullUri)
 					.expect(200)
 					.then((res: SuperTestResponse): void => {
-						expect(res).to.be.ok;
+						expect(res).to.be.a('object');
 
 						const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 						expect(contentType).to.be.eql(mime);

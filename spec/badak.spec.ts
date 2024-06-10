@@ -2,7 +2,7 @@ import { Server } from 'node:net';
 
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
-import { agent as request, Response, Test as SuperTestExpect } from 'supertest';
+import { agent as request, Response as SuperTestResponse, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { RouteFunction } from '../src/interfaces';
@@ -41,7 +41,6 @@ describe('core', () => {
 				const testFnc = (param: {
 					str: string;
 				}): void => {
-					expect(param).to.be.ok;
 					expect(param).to.be.a('object');
 					expect(param.str).to.be.eql(str);
 				};
@@ -106,7 +105,6 @@ describe('core', () => {
 				const testFnc = (param: {
 					strArr: string[];
 				}): void => {
-					expect(param).to.be.ok;
 					expect(param).to.be.a('object');
 
 					expect(param.strArr).to.be.instanceOf(Array);
@@ -177,7 +175,6 @@ describe('core', () => {
 				const testFnc = (param: {
 					strArr: (string | undefined)[];
 				}): void => {
-					expect(param).to.be.ok;
 					expect(param).to.be.a('object');
 
 					expect(param.strArr).to.be.instanceOf(Array);
@@ -226,7 +223,6 @@ describe('core', () => {
 				const testFnc = (param: {
 					strArr: (string | null)[];
 				}): void => {
-					expect(param).to.be.ok;
 					expect(param).to.be.a('object');
 
 					expect(param.strArr).to.be.instanceOf(Array);
@@ -267,7 +263,7 @@ describe('core', () => {
 
 	describe('listen()', () => {
 		it('defined', () => {
-			expect(app.listen).to.be.ok;
+			expect(app.listen).to.be.a('function');
 		});
 
 		describe('error', () => {
@@ -304,8 +300,7 @@ describe('core', () => {
 				const testFnc = async <T> (param: T): Promise<T> => {
 					testFncCalled = true;
 
-					expect(param).to.be.ok;
-					expect(param).to.be.instanceOf(Object);
+					expect(param).to.be.a('object');
 
 					expect(param).to.have.property('firstName', firstName);
 					expect(param).to.have.property('lastName', lastName);
@@ -336,21 +331,22 @@ describe('core', () => {
 					throw new Error('spec failed');
 				}
 
-				const res = await request(server)
+				await request(server)
 					.post('/users')
 					.send({
 						firstName,
 						lastName
 					})
-					.expect(200);
+					.expect(200)
+					.then((res: SuperTestResponse) => {
+						expect(res).to.be.a('object');
 
-				expect(res).to.be.ok;
+						expect(res.body).to.be.a('object');
+						expect(res.body).to.have.property('firstName', firstName);
+						expect(res.body).to.have.property('lastName', lastName);
+					});
+
 				expect(testFncCalled).to.be.true;
-
-				expect(res.body).to.be.ok;
-				expect(res.body).to.be.instanceOf(Object);
-				expect(res.body).to.have.property('firstName', firstName);
-				expect(res.body).to.have.property('lastName', lastName);
 			});
 
 			it('multipart/form-data', async () => {
@@ -360,19 +356,20 @@ describe('core', () => {
 					throw new Error('spec failed');
 				}
 
-				const res = await request(server)
+				await request(server)
 					.post('/users')
 					.field('firstName', firstName)
 					.field('lastName', lastName)
-					.expect(200);
+					.expect(200)
+					.then((res: SuperTestResponse) => {
+						expect(res).to.be.a('object');
 
-				expect(res).to.be.ok;
+						expect(res.body).to.be.a('object');
+						expect(res.body).to.have.property('firstName', firstName);
+						expect(res.body).to.have.property('lastName', lastName);
+					});
+
 				expect(testFncCalled).to.be.true;
-
-				expect(res.body).to.be.ok;
-				expect(res.body).to.be.instanceOf(Object);
-				expect(res.body).to.have.property('firstName', firstName);
-				expect(res.body).to.have.property('lastName', lastName);
 			});
 
 			it('application/x-www-form-urlencoded', async () => {
@@ -382,18 +379,19 @@ describe('core', () => {
 					throw new Error('spec failed');
 				}
 
-				const res = await request(server)
+				await request(server)
 					.post('/users')
 					.send(`firstName=${ firstName }&lastName=${ lastName }`)
-					.expect(200);
+					.expect(200)
+					.then((res: SuperTestResponse) => {
+						expect(res).to.be.a('object');
 
-				expect(res).to.be.ok;
+						expect(res.body).to.be.a('object');
+						expect(res.body).to.have.property('firstName', firstName);
+						expect(res.body).to.have.property('lastName', lastName);
+					});
+
 				expect(testFncCalled).to.be.true;
-
-				expect(res.body).to.be.ok;
-				expect(res.body).to.be.instanceOf(Object);
-				expect(res.body).to.have.property('firstName', firstName);
-				expect(res.body).to.have.property('lastName', lastName);
 			});
 		});
 
@@ -418,7 +416,7 @@ describe('core', () => {
 
 			describe(`${ method }()`, () => {
 				it('defined', () => {
-					expect(app[method]).to.be.ok;
+					expect(app[method]).to.be.a('function');
 				});
 
 				describe('error', () => {
@@ -480,20 +478,16 @@ describe('core', () => {
 							break;
 					}
 
-					const res: Response | undefined = await requestFnc?.expect(200);
+					await requestFnc?.expect(200)
+						.then((res: SuperTestResponse) => {
+							expect(res).to.be.a('object');
 
-					expect(res).to.be.ok;
+							expect(res.body).to.be.a('object');
+							expect(res.body.data).to.be.instanceOf(Array);
+							expect(res.body.data.length).to.be.eql(2);
+						});
+
 					expect(fncRun).to.be.true;
-
-					if (!res) {
-						throw new Error('spec failed');
-					}
-
-					expect(res.body).to.be.ok;
-					expect(res.body).to.be.instanceOf(Object);
-					expect(res.body.data).to.be.ok;
-					expect(res.body.data).to.be.instanceOf(Array);
-					expect(res.body.data.length).to.be.eql(2);
 				});
 
 				it('ok - async function', async () => {
@@ -540,20 +534,16 @@ describe('core', () => {
 					}
 
 					if (requestFnc) {
-						const res: Response | undefined = await requestFnc.expect(200);
+						await requestFnc
+							.expect(200)
+							.then((res: SuperTestResponse) => {
+								expect(res).to.be.a('object');
+								expect(res.body).to.be.a('object');
+								expect(res.body.data).to.be.instanceOf(Array);
+								expect(res.body.data.length).to.be.eql(2);
+							});
 
-						expect(res).to.be.ok;
 						expect(fncRun).to.be.true;
-
-						if (!res) {
-							throw new Error('spec failed');
-						}
-
-						expect(res.body).to.be.ok;
-						expect(res.body).to.be.instanceOf(Object);
-						expect(res.body.data).to.be.ok;
-						expect(res.body.data).to.be.instanceOf(Array);
-						expect(res.body.data.length).to.be.eql(2);
 					}
 				});
 
@@ -601,20 +591,15 @@ describe('core', () => {
 					}
 
 					if (requestFnc) {
-						const res: Response | undefined = await requestFnc?.expect(200);
+						await requestFnc?.expect(200)
+							.then((res: SuperTestResponse) => {
+								expect(res).to.be.a('object');
+								expect(res.body).to.be.a('object');
+								expect(res.body.data).to.be.instanceOf(Array);
+								expect(res.body.data.length).to.be.eql(2);
+							});
 
-						expect(res).to.be.ok;
 						expect(fncRun).to.be.true;
-
-						if (!res) {
-							throw new Error('spec failed');
-						}
-
-						expect(res.body).to.be.ok;
-						expect(res.body).to.be.instanceOf(Object);
-						expect(res.body.data).to.be.ok;
-						expect(res.body.data).to.be.instanceOf(Array);
-						expect(res.body.data.length).to.be.eql(2);
 					}
 				});
 
@@ -670,9 +655,8 @@ describe('core', () => {
 							break;
 					}
 
-					const res1 = await requestFnc1?.expect(200);
+					await requestFnc1?.expect(200);
 
-					expect(res1).to.be.ok;
 					expect(fnc1RunFlag).to.be.true;
 					expect(fnc2RunFlag).to.be.false;
 
@@ -697,9 +681,8 @@ describe('core', () => {
 							break;
 					}
 
-					const res2 = await requestFnc2?.expect(200);
+					await requestFnc2?.expect(200);
 
-					expect(res2).to.be.ok;
 					expect(fnc1RunFlag).to.be.true;
 					expect(fnc2RunFlag).to.be.true;
 				});
@@ -709,7 +692,7 @@ describe('core', () => {
 
 	describe('stop()', () => {
 		it('defined', () => {
-			expect(app.stop).to.be.ok;
+			expect(app.stop).to.be.a('function');
 		});
 
 		describe('error', () => {

@@ -33,7 +33,7 @@ describe('setSPARoot()', () => {
 
 
 	it('defined', () => {
-		expect(app.setSPARoot).to.be.ok;
+		expect(app.setSPARoot).to.be.a('function');
 	});
 
 	describe('error', () => {
@@ -115,7 +115,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot)
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -126,7 +126,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -146,7 +146,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot)
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -157,7 +157,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -180,7 +180,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot)
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -191,7 +191,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot + 'index.html')
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -202,7 +202,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot + 'somethingDeepLink')
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -226,7 +226,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot)
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -237,7 +237,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot + '/index.html')
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
@@ -248,7 +248,7 @@ describe('setSPARoot()', () => {
 		await request(app.getHttpServer()).get(spaRoot + '/somethingDeepLink')
 			.expect(200)
 			.then((res: SuperTestResponse): void => {
-				expect(res).to.be.ok;
+				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
 				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);

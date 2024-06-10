@@ -25,7 +25,7 @@ describe('config()', () => {
 
 
 	it('config itself defined', () => {
-		expect(app.config).to.be.ok;
+		expect(app.config).to.be.a('function');
 	});
 
 	it('not defined key', () => {
@@ -77,7 +77,7 @@ describe('config()', () => {
 		const float: number = 123.45;
 
 		const testFncStr = (param: TestObj): void => {
-			expect(param).to.be.ok;
+			expect(param).to.be.a('object');
 
 			expect(param.num).to.be.a('string');
 			expect(param.num).to.be.eql('' + num);
@@ -87,7 +87,7 @@ describe('config()', () => {
 		};
 
 		const testFncNum = (param: TestObj): void => {
-			expect(param).to.be.ok;
+			expect(param).to.be.a('object');
 
 			expect(param.num).to.be.a('number');
 			expect(param.num).to.be.eql(num);
@@ -156,7 +156,6 @@ describe('config()', () => {
 			describe('single value', () => {
 				it('application/json', async () => {
 					const testFnc = (param: number[]): void => {
-						expect(param).to.be.ok;
 						expect(param).to.be.instanceOf(Array);
 
 						param.forEach((value: number): void => {
@@ -185,9 +184,9 @@ describe('config()', () => {
 						num: number[];
 						float: number[];
 					}): void => {
-						expect(param).to.be.ok;
-
+						expect(param).to.be.a('object');
 						expect(param.num).to.be.instanceOf(Array);
+
 						param.num.forEach((value: number): void => {
 							expect(value).to.be.a('number');
 						});
@@ -221,9 +220,9 @@ describe('config()', () => {
 						num: number[];
 						float: number[];
 					}): void => {
-						expect(param).to.be.ok;
-
+						expect(param).to.be.a('object');
 						expect(param.num).to.be.instanceOf(Array);
+
 						param.num.forEach((value: number): void => {
 							expect(value).to.be.a('number');
 						});
@@ -253,7 +252,6 @@ describe('config()', () => {
 			describe('object', () => {
 				it('application/json', async () => {
 					const testFnc = (param: TestObj[]): void => {
-						expect(param).to.be.ok;
 						expect(param).to.be.instanceOf(Array);
 
 						expect(param[0].num).to.be.a('number');
@@ -302,7 +300,7 @@ describe('config()', () => {
 			}
 
 			const testFncJson = (param: TestObj): void => {
-				expect(param).to.be.ok;
+				expect(param).to.be.a('object');
 
 				expect(param.num).to.be.a('number'); // not string
 				expect(param.num).to.be.eql(num);
@@ -317,7 +315,7 @@ describe('config()', () => {
 			};
 
 			const testFncStr = (param: TestObj): void => {
-				expect(param).to.be.ok;
+				expect(param).to.be.a('object');
 
 				expect(param.num).to.be.a('string');
 				expect(param.num).to.be.eql('' + num);
@@ -394,7 +392,7 @@ describe('config()', () => {
 			}
 
 			const testFncJson = (param: TestObj): void => {
-				expect(param).to.be.ok;
+				expect(param).to.be.a('object');
 
 				expect(param.num).to.be.a('number'); // not string
 				expect(param.num).to.be.eql(num);
@@ -409,7 +407,7 @@ describe('config()', () => {
 			};
 
 			const testFncStr = (param: TestObj): void => {
-				expect(param).to.be.ok;
+				expect(param).to.be.a('object');
 
 				expect(param.num).to.be.a('string');
 				expect(param.num).to.be.eql('' + num);
@@ -488,7 +486,6 @@ describe('config()', () => {
 				const testFnc = (param: {
 					arr: Date[];
 				}): void => {
-					expect(param).to.be.ok;
 					expect(param).to.be.a('object');
 
 					expect(param.arr).to.be.instanceOf(Array);
@@ -540,7 +537,6 @@ describe('config()', () => {
 				}
 
 				const testFnc = (param: TestObj[]): void => {
-					expect(param).to.be.ok;
 					expect(param).to.be.instanceOf(Array);
 
 					expect(param[0].value).to.be.instanceOf(Date);
@@ -669,12 +665,10 @@ describe('config()', () => {
 						it('test ' + testMethod, async () => {
 							const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
-							expect(routeRules).to.be.ok;
 							expect(routeRules).to.be.instanceOf(Array);
 							expect(routeRules).to.be.lengthOf(1);
 
-							expect(routeRules[0]).to.be.ok;
-							expect(routeRules[0]).to.be.instanceOf(Object);
+							expect(routeRules[0]).to.be.a('object');
 							expect(routeRules[0]).to.have.property('/');
 
 							expect(routeRules[0]['/']).to.have.property(testUriRefined);

@@ -17,6 +17,10 @@ export function emptyFnc (): void {
 	// empty function
 }
 
+export async function emptyAsyncFnc (): Promise<void> {
+	// empty function
+}
+
 export function echoFnc<T> (param: T): T {
 	return param;
 }

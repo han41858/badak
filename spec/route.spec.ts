@@ -6,7 +6,7 @@ import { agent as request, Response as SuperTestResponse, Test as SuperTestExpec
 
 import { Badak } from '../src/badak';
 import { RouteFunction, RouteRule, RouteRuleSeed, TypedObject } from '../src/interfaces';
-import { echoFnc, emptyFnc, promiseFail, TestPort } from './test-util';
+import { echoFnc, emptyAsyncFnc, emptyFnc, promiseFail, TestPort } from './test-util';
 
 
 describe('route()', () => {
@@ -26,7 +26,7 @@ describe('route()', () => {
 
 
 	it('defined', () => {
-		expect(app.route).to.be.ok;
+		expect(app.route).to.be.a('function');
 	});
 
 	describe('normal', () => {
@@ -51,9 +51,7 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						'aa': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					})
 				);
@@ -63,9 +61,7 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						' ': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					})
 				);
@@ -75,9 +71,7 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						' ': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					})
 				);
@@ -87,9 +81,7 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						' users': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					})
 				);
@@ -99,9 +91,7 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						'users ': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					})
 				);
@@ -111,9 +101,7 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						'//': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					})
 				);
@@ -131,9 +119,7 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						users: {
-							'get': async () => {
-								// do nothing
-							}
+							'get': emptyFnc
 						}
 					})
 				);
@@ -144,12 +130,8 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						users: {
-							GET: async () => {
-								// do nothing
-							},
-							something: async () => {
-								// do nothing
-							}
+							GET: emptyFnc,
+							something: emptyFnc
 						}
 					})
 				);
@@ -164,12 +146,12 @@ describe('route()', () => {
 
 				await app.listen(TestPort);
 
-				const res = await request(app.getHttpServer())
+				await request(app.getHttpServer())
 					.get('/users')
-					.expect(404);
-
-				expect(res).to.be.ok;
-				expect(fncRunFlag).to.be.false;
+					.expect(404)
+					.then(() => {
+						expect(fncRunFlag).to.be.false;
+					});
 			});
 
 			it('undefined inner rule', async () => {
@@ -181,21 +163,19 @@ describe('route()', () => {
 
 				await app.listen(TestPort);
 
-				const res = await request(app.getHttpServer())
+				await request(app.getHttpServer())
 					.get('/users/notDefined')
-					.expect(404);
-
-				expect(res).to.be.ok;
-				expect(fncRunFlag).to.be.false;
+					.expect(404)
+					.then(() => {
+						expect(fncRunFlag).to.be.false;
+					});
 			});
 
 			it('invalid root path', () => {
 				return promiseFail(
 					app.route({
 						' /': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					})
 				);
@@ -205,9 +185,7 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						'/ ': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					})
 				);
@@ -216,47 +194,39 @@ describe('route()', () => {
 
 		const checkRuleFnc = (_app: Badak, targetFnc: () => unknown): void => {
 			const routeRules: RouteRule[] = (_app as unknown as TypedObject<RouteRule[]>)._routeRules;
-			expect(routeRules).to.be.ok;
+
 			expect(routeRules).to.be.instanceOf(Array);
 			expect(routeRules).to.be.lengthOf(1);
 
-			expect(routeRules[0]).to.be.ok;
-			expect(routeRules[0]).to.be.instanceOf(Object);
+			expect(routeRules[0]).to.be.a('object');
 			expect(routeRules[0]).to.have.property('/');
 
 			const routeRule: RouteRule = routeRules[0];
 
-			expect(routeRule['/']).to.be.ok;
-			expect(routeRule['/']).to.be.instanceOf(Object);
+			expect(routeRule['/']).to.be.a('object');
 			expect(routeRule['/']).to.have.property('users');
 
 			const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
 
-			expect(routeRuleRoot['users']).to.be.ok;
-			expect(routeRuleRoot['users']).to.be.instanceOf(Object);
+			expect(routeRuleRoot['users']).to.be.a('object');
 			expect(routeRuleRoot['users']).to.have.property('GET');
 
 			const routeRuleUsers: RouteRule = routeRuleRoot['users'] as RouteRule;
 
 			const routeFnc = routeRuleUsers['GET'];
-			expect(routeFnc).to.be.ok;
-			expect(routeFnc).to.be.instanceOf(Function);
+			expect(routeFnc).to.be.a('function');
 			expect(routeFnc).to.eql(targetFnc);
 		};
 
 
 		it('ok - normal function', async () => {
-			const testFnc = (): void => {
-				// do nothing
-			};
-
 			await app.route({
 				users: {
-					GET: testFnc
+					GET: emptyFnc
 				}
 			});
 
-			checkRuleFnc(app, testFnc);
+			checkRuleFnc(app, emptyFnc);
 
 			await app.listen(TestPort);
 
@@ -266,26 +236,19 @@ describe('route()', () => {
 		});
 
 		it('ok - async function', async () => {
-			const testFnc = async (): Promise<void> => {
-				fncRunFlag = true;
-			};
-
 			await app.route({
 				users: {
-					GET: testFnc
+					GET: emptyAsyncFnc
 				}
 			});
 
-			checkRuleFnc(app, testFnc);
+			checkRuleFnc(app, emptyAsyncFnc);
 
 			await app.listen(TestPort);
 
-			const res = await request(app.getHttpServer())
+			await request(app.getHttpServer())
 				.get('/users')
 				.expect(200);
-
-			expect(res).to.be.ok;
-			expect(fncRunFlag).to.be.true;
 		});
 
 		it('ok - with response', async () => {
@@ -301,12 +264,12 @@ describe('route()', () => {
 
 			await app.listen(TestPort);
 
-			const res = await request(app.getHttpServer())
+			await request(app.getHttpServer())
 				.get('/users')
-				.expect(200);
-
-			expect(res).to.be.ok;
-			expect(res.text).to.be.eql('ok');
+				.expect(200)
+				.then((res: SuperTestResponse): void => {
+					expect(res.text).to.be.eql('ok');
+				});
 		});
 
 		it('ok - with response (empty array)', async () => {
@@ -322,12 +285,12 @@ describe('route()', () => {
 
 			await app.listen(TestPort);
 
-			const res = await request(app.getHttpServer())
+			await request(app.getHttpServer())
 				.get('/users')
-				.expect(200);
-
-			expect(res).to.be.ok;
-			expect(res.body).to.be.ok;
+				.expect(200)
+				.then((res: SuperTestResponse): void => {
+					expect(res.body).to.be.instanceOf(Array);
+				});
 		});
 
 		it('ok - start with slash', async () => {
@@ -433,21 +396,21 @@ describe('route()', () => {
 
 			await app.listen(TestPort);
 
-			const res = await request(app.getHttpServer())
+			await request(app.getHttpServer())
 				.post('/')
 				.send({
 					firstName,
 					lastName
 				})
-				.expect(200);
+				.expect(200)
+				.then((res: SuperTestResponse) => {
+					expect(res).to.be.a('object');
+					expect(res.body).to.be.a('object');
+					expect(res.body).to.have.property('firstName', firstName);
+					expect(res.body).to.have.property('lastName', lastName);
+				});
 
 			expect(fncRunFlag).to.be.true;
-
-			expect(res).to.be.ok;
-			expect(res.body).to.be.ok;
-
-			expect(res.body).to.have.property('firstName', firstName);
-			expect(res.body).to.have.property('lastName', lastName);
 		});
 
 		it('multiple methods in different time', async () => {
@@ -472,7 +435,6 @@ describe('route()', () => {
 
 			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
-			expect(routeRules).to.be.ok;
 			expect(routeRules).to.be.instanceOf(Array);
 			expect(routeRules).to.be.lengthOf(2);
 
@@ -483,7 +445,7 @@ describe('route()', () => {
 
 				const routeRuleRoot: RouteRule = rule['/'] as RouteRule;
 
-				expect(routeRuleRoot['users']).to.be.instanceOf(Object);
+				expect(routeRuleRoot['users']).to.be.a('object');
 
 				switch (i) {
 					case 0:
@@ -519,18 +481,15 @@ describe('route()', () => {
 
 			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
-			expect(routeRules).to.be.ok;
 			expect(routeRules).to.be.instanceOf(Array);
 			expect(routeRules).to.be.lengthOf(1);
 
 			const routeRule: RouteRule = routeRules[0];
 
-			expect(routeRule).to.be.ok;
-			expect(routeRule).to.be.instanceOf(Object);
+			expect(routeRule).to.be.a('object');
 			expect(routeRule).to.have.property('/');
 
-			expect(routeRule['/']).to.be.ok;
-			expect(routeRule['/']).to.be.instanceOf(Object);
+			expect(routeRule['/']).to.be.a('object');
 			expect(routeRule['/']).to.have.property('users');
 
 			const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
@@ -538,11 +497,11 @@ describe('route()', () => {
 			const routeRuleInsideUser: RouteRule = routeRuleRoot['users'] as RouteRule;
 
 			expect(routeRuleInsideUser).to.have.property('a');
-			expect(routeRuleInsideUser['a']).to.be.instanceOf(Object);
+			expect(routeRuleInsideUser['a']).to.be.a('object');
 			expect(routeRuleInsideUser['a']).to.have.property('GET', fncA);
 
 			expect(routeRuleInsideUser).to.have.property('b');
-			expect(routeRuleInsideUser['b']).to.be.instanceOf(Object);
+			expect(routeRuleInsideUser['b']).to.be.a('object');
 			expect(routeRuleInsideUser['b']).to.have.property('GET', fncB);
 
 			await app.listen(TestPort);
@@ -582,27 +541,24 @@ describe('route()', () => {
 
 			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
-			expect(routeRules).to.be.ok;
 			expect(routeRules).to.be.instanceOf(Array);
 			expect(routeRules).to.be.lengthOf(1);
 
 			const routeRule: RouteRule = routeRules[0];
 
-			expect(routeRule).to.be.ok;
-			expect(routeRule).to.be.instanceOf(Object);
+			expect(routeRule).to.be.a('object');
 			expect(routeRule).to.have.property('/');
 
-			expect(routeRule['/']).to.be.ok;
-			expect(routeRule['/']).to.be.instanceOf(Object);
+			expect(routeRule['/']).to.be.a('object');
 
 			const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
 
 			expect(routeRuleRoot).to.have.property('users');
-			expect(routeRuleRoot['users']).to.be.instanceOf(Object);
+			expect(routeRuleRoot['users']).to.be.a('object');
 			expect(routeRuleRoot['users']).to.have.property('GET', usersGetFnc);
 
 			expect(routeRuleRoot).to.have.property('records');
-			expect(routeRuleRoot['records']).to.be.instanceOf(Object);
+			expect(routeRuleRoot['records']).to.be.a('object');
 			expect(routeRuleRoot['records']).to.have.property('GET', recordsGetFnc);
 
 			await app.listen(TestPort);
@@ -649,37 +605,33 @@ describe('route()', () => {
 
 			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
-			expect(routeRules).to.be.ok;
 			expect(routeRules).to.be.instanceOf(Array);
 			expect(routeRules).to.be.lengthOf(1);
 
-			expect(routeRules[0]).to.be.ok;
-			expect(routeRules[0]).to.be.instanceOf(Object);
+			expect(routeRules[0]).to.be.a('object');
 			expect(routeRules[0]).to.have.property('/');
 
 			const routeRule: RouteRule = routeRules[0];
 
-			expect(routeRule['/']).to.be.ok;
-			expect(routeRule['/']).to.be.instanceOf(Object);
+			expect(routeRule['/']).to.be.a('object');
 			expect(routeRule['/']).to.have.property('root');
 
 			const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
 
-			expect(routeRuleRoot['root']).to.be.ok;
-			expect(routeRuleRoot['root']).to.be.instanceOf(Object);
+			expect(routeRuleRoot['root']).to.be.a('object');
 			expect(routeRuleRoot['root']).to.have.property('GET', fnc1);
 
 			const routeRuleRootInside: RouteRule = routeRuleRoot['root'] as RouteRule;
 
 			expect(routeRuleRootInside).to.have.property('branch1');
-			expect(routeRuleRootInside['branch1']).to.be.instanceOf(Object);
+			expect(routeRuleRootInside['branch1']).to.be.a('object');
 			expect(routeRuleRootInside['branch1']).to.have.property('GET', fnc2);
 
 			expect(routeRuleRootInside['branch1']).to.have.property('branch2');
 
 			const routeRuleRootInsideDeep: RouteRule = routeRuleRootInside['branch1'] as RouteRule;
 
-			expect(routeRuleRootInsideDeep['branch2']).to.be.instanceOf(Object);
+			expect(routeRuleRootInsideDeep['branch2']).to.be.a('object');
 			expect(routeRuleRootInsideDeep['branch2']).to.have.property('GET', fnc3);
 
 			await app.listen(TestPort);
@@ -720,11 +672,10 @@ describe('route()', () => {
 
 			await app.listen(TestPort);
 
-			const res = await request(app.getHttpServer())
+			await request(app.getHttpServer())
 				.get('/users/a/b/c')
 				.expect(404);
 
-			expect(res).to.be.ok;
 			expect(fncRunFlag).to.be.false;
 		});
 
@@ -747,48 +698,46 @@ describe('route()', () => {
 
 			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
-			expect(routeRules).to.be.ok;
 			expect(routeRules).to.be.instanceOf(Array);
 			expect(routeRules).to.be.lengthOf(1);
 
-			expect(routeRules[0]).to.be.ok;
-			expect(routeRules[0]).to.be.instanceOf(Object);
+			expect(routeRules[0]).to.be.a('object');
 			expect(routeRules[0]).to.have.property('/');
 
 			const routeRule: RouteRule = routeRules[0];
 
-			expect(routeRule['/']).to.be.ok;
-			expect(routeRule['/']).to.be.instanceOf(Object);
+			expect(routeRule['/']).to.be.a('object');
 			expect(routeRule['/']).to.have.property('users');
 
 			const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
 
-			expect(routeRuleRoot['users']).to.be.instanceOf(Object);
+			expect(routeRuleRoot['users']).to.be.a('object');
 			expect(routeRuleRoot['users']).to.have.property('a');
 
 			const routeRuleUsers: RouteRule = routeRuleRoot['users'] as RouteRule;
 
-			expect(routeRuleUsers['a']).to.be.instanceOf(Object);
+			expect(routeRuleUsers['a']).to.be.a('object');
 			expect(routeRuleUsers['a']).to.have.property('b');
 
 			const routeRuleUsersA: RouteRule = routeRuleUsers['a'] as RouteRule;
 
-			expect(routeRuleUsersA['b']).to.be.instanceOf(Object);
+			expect(routeRuleUsersA['b']).to.be.a('object');
 			expect(routeRuleUsersA['b']).to.have.property('c');
 
 			const routeRuleUsersAB: RouteRule = routeRuleUsersA['b'] as RouteRule;
 
-			expect(routeRuleUsersAB['c']).to.be.instanceOf(Object);
+			expect(routeRuleUsersAB['c']).to.be.a('object');
 			expect(routeRuleUsersAB['c']).to.have.property('GET', testFnc);
 
 			await app.listen(TestPort);
 
-			const res = await request(app.getHttpServer())
+			await request(app.getHttpServer())
 				.get('/users/a/b/c')
-				.expect(200);
-
-			expect(res).to.be.ok;
-			expect(res.text).to.be.eql('ok');
+				.expect(200)
+				.then((res: SuperTestResponse) => {
+					expect(res).to.be.a('object');
+					expect(res.text).to.be.eql('ok');
+				});
 		});
 	});
 
@@ -838,40 +787,35 @@ describe('route()', () => {
 
 			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
-			expect(routeRules).to.be.ok;
 			expect(routeRules).to.be.instanceOf(Array);
 			expect(routeRules).to.be.lengthOf(1);
 
-			expect(routeRules[0]).to.be.ok;
-			expect(routeRules[0]).to.be.instanceOf(Object);
+			expect(routeRules[0]).to.be.a('object');
 			expect(routeRules[0]).to.have.property('/');
 
-			expect(routeRules[0]['/']).to.be.ok;
-			expect(routeRules[0]['/']).to.be.instanceOf(Object);
+			expect(routeRules[0]['/']).to.be.a('object');
 
 			const userRule: RouteRule = (routeRules[0]['/'] as RouteRule)['users'] as RouteRule;
-			expect(userRule).to.be.ok;
-			expect(userRule).to.be.instanceOf(Object);
+			expect(userRule).to.be.a('object');
 			expect(Object.keys(userRule)).to.includes('a');
 
 			const secondDepthRule = userRule['a'];
-			expect(secondDepthRule).to.be.ok;
-			expect(secondDepthRule).to.be.instanceOf(Object);
+			expect(secondDepthRule).to.be.a('object');
 			expect(Object.keys(secondDepthRule)).to.includes('GET');
 
 			const secondDepthFnc: RouteFunction = (secondDepthRule as RouteRule)['GET'] as RouteFunction;
-			expect(secondDepthFnc).to.be.ok;
 			expect(secondDepthFnc).to.be.instanceOf(Function);
 			expect(secondDepthFnc).to.eql(testFnc);
 
 			await app.listen(TestPort);
 
-			const res = await request(app.getHttpServer())
+			await request(app.getHttpServer())
 				.get('/users/a')
-				.expect(200);
-
-			expect(res).to.be.ok;
-			expect(res.text).to.be.eql('ok');
+				.expect(200)
+				.then((res: SuperTestResponse) => {
+					expect(res).to.be.a('object');
+					expect(res.text).to.be.eql('ok');
+				});
 		});
 
 		it('ok - 10 depth', async () => {
@@ -887,16 +831,13 @@ describe('route()', () => {
 
 			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
 
-			expect(routeRules).to.be.ok;
 			expect(routeRules).to.be.instanceOf(Array);
 			expect(routeRules).to.be.lengthOf(1);
 
-			expect(routeRules[0]).to.be.ok;
-			expect(routeRules[0]).to.be.instanceOf(Object);
+			expect(routeRules[0]).to.be.a('object');
 			expect(routeRules[0]).to.have.property('/');
 
-			expect(routeRules[0]['/']).to.be.ok;
-			expect(routeRules[0]['/']).to.be.instanceOf(Object);
+			expect(routeRules[0]['/']).to.be.a('object');
 
 			let targetRuleObj: RouteRule | RouteRuleSeed | RouteFunction = routeRules[0]['/'];
 
@@ -908,8 +849,7 @@ describe('route()', () => {
 				if (i === arr.length - 1) {
 					const targetFnc: RouteFunction | undefined = (targetRuleObj as RouteRuleSeed)['GET'] as RouteFunction | undefined;
 
-					expect(targetFnc).to.be.ok;
-					expect(targetFnc).to.be.instanceOf(Function);
+					expect(targetFnc).to.be.a('function');
 					expect(targetFnc).to.eql(testFnc);
 				}
 			});
@@ -923,9 +863,7 @@ describe('route()', () => {
 					return promiseFail(
 						app.route({
 							'users/some:id': {
-								GET: async () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -935,9 +873,7 @@ describe('route()', () => {
 					return promiseFail(
 						app.route({
 							'users/id:some': {
-								GET: async () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -948,14 +884,10 @@ describe('route()', () => {
 						app.route({
 							users: {
 								':id': {
-									GET: async () => {
-										// do nothing
-									}
+									GET: emptyFnc
 								},
 								':name': {
-									GET: async () => {
-										// do nothing
-									}
+									GET: emptyFnc
 								}
 							}
 						})
@@ -966,14 +898,10 @@ describe('route()', () => {
 					return promiseFail(
 						app.route({
 							':id': {
-								GET: async () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							},
 							':name': {
-								GET: async () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -982,18 +910,14 @@ describe('route()', () => {
 				it('root level & multiple colon routing, in different time', async () => {
 					await app.route({
 						':id': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					});
 
 					await promiseFail(
 						app.route({
 							':name': {
-								GET: async () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1003,9 +927,7 @@ describe('route()', () => {
 					await app.route({
 						users: {
 							':id': {
-								GET: async () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						}
 					});
@@ -1014,9 +936,7 @@ describe('route()', () => {
 						app.route({
 							users: {
 								':name': {
-									GET: async () => {
-										// do nothing
-									}
+									GET: emptyFnc
 								}
 							}
 						})
@@ -1026,18 +946,14 @@ describe('route()', () => {
 				it('same level & multiple colon routing, in different time, in uri', async () => {
 					await app.route({
 						'users/:id': {
-							GET: async () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					});
 
 					await promiseFail(
 						app.route({
 							'users/:name': {
-								GET: async () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1053,10 +969,9 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (param: ReqParam): Promise<void> => {
-					expect(param).to.be.ok;
-					expect(param).to.be.instanceOf(Object);
+					expect(param).to.be.a('object');
 
-					expect(param['id']).to.be.ok;
+					expect(param['id']).to.be.a('string');
 					expect(param['id']).to.be.eql(testId);
 
 					fncRunFlag = true;
@@ -1070,11 +985,10 @@ describe('route()', () => {
 
 				await app.listen(TestPort);
 
-				const res = await request(app.getHttpServer())
+				await request(app.getHttpServer())
 					.get(`/users/${ testId }`)
 					.expect(200);
 
-				expect(res).to.be.ok;
 				expect(fncRunFlag).to.be.true;
 			});
 
@@ -1091,10 +1005,7 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (param: ReqParam): Promise<ReturnObj> => {
-					expect(param).to.be.ok;
-					expect(param).to.be.instanceOf(Object);
-
-					expect(param['id']).to.be.ok;
+					expect(param).to.be.a('object');
 					expect(param['id']).to.be.eql(testId);
 
 					fncRunFlag = true;
@@ -1112,15 +1023,16 @@ describe('route()', () => {
 
 				await app.listen(TestPort);
 
-				const res = await request(app.getHttpServer())
+				await request(app.getHttpServer())
 					.get(`/users/${ testId }`)
-					.expect(200);
+					.expect(200)
+					.then((res: SuperTestResponse) => {
+						expect(res).to.be.a('object');
+						expect(res.body).to.be.a('object');
+						expect(res.body).to.have.property('id', testId);
+					});
 
-				expect(res).to.be.ok;
 				expect(fncRunFlag).to.be.true;
-
-				expect(res.body).to.be.ok;
-				expect(res.body).to.have.property('id', testId);
 			});
 
 			it('ok - GET, multiple route param', async () => {
@@ -1135,8 +1047,7 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (param: ReqParam): Promise<void> => {
-					expect(param).to.be.ok;
-					expect(param).to.be.instanceOf(Object);
+					expect(param).to.be.a('object');
 
 					expect(param).to.have.property('firstName', firstName);
 					expect(param).to.have.property('lastName', lastName);
@@ -1152,11 +1063,10 @@ describe('route()', () => {
 
 				await app.listen(TestPort);
 
-				const res = await request(app.getHttpServer())
+				await request(app.getHttpServer())
 					.get(`/users/${ firstName }/some/${ lastName }`)
 					.expect(200);
 
-				expect(res).to.be.ok;
 				expect(fncRunFlag).to.be.true;
 			});
 
@@ -1193,16 +1103,18 @@ describe('route()', () => {
 
 				await app.listen(TestPort);
 
-				const res = await request(app.getHttpServer())
+				await request(app.getHttpServer())
 					.get(`/users/${ firstName }/some/${ lastName }`)
-					.expect(200);
+					.expect(200)
+					.then((res: SuperTestResponse) => {
+						expect(res).to.be.a('object');
 
-				expect(res).to.be.ok;
+						expect(res.body).to.be.a('object');
+						expect(res.body).to.have.property('firstName', firstName);
+						expect(res.body).to.have.property('lastName', lastName);
+					});
+
 				expect(fncRunFlag).to.be.true;
-
-				expect(res.body).to.be.ok;
-				expect(res.body).to.have.property('firstName', firstName);
-				expect(res.body).to.have.property('lastName', lastName);
 			});
 
 			it('ok - POST', async () => {
@@ -1218,8 +1130,7 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (param: ReqParam): Promise<void> => {
-					expect(param).to.be.ok;
-					expect(param).to.be.instanceOf(Object);
+					expect(param).to.be.a('object');
 					expect(param).to.have.property('firstName', firstName);
 					expect(param).to.have.property('lastName', lastName);
 
@@ -1234,7 +1145,7 @@ describe('route()', () => {
 
 				await app.listen(TestPort);
 
-				const res = await request(app.getHttpServer())
+				await request(app.getHttpServer())
 					.post(`/users/${ testId }`)
 					.send({
 						firstName,
@@ -1242,7 +1153,6 @@ describe('route()', () => {
 					})
 					.expect(200);
 
-				expect(res).to.be.ok;
 				expect(fncRunFlag).to.be.true;
 			});
 		});
@@ -1256,9 +1166,7 @@ describe('route()', () => {
 					return promiseFail(
 						app.route({
 							[testUri]: {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1271,14 +1179,10 @@ describe('route()', () => {
 					return promiseFail(
 						app.route({
 							[normalUri]: {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							},
 							[questionUri]: {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1290,18 +1194,14 @@ describe('route()', () => {
 
 					await app.route({
 						[normalUri]: {
-							GET: () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					});
 
 					await promiseFail(
 						app.route({
 							[questionUri]: {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1311,14 +1211,10 @@ describe('route()', () => {
 					const questionUri: string = 'users?';
 					const normalUri: string = 'user';
 
-					await app.get(normalUri, () => {
-						// do nothing
-					});
+					await app.get(normalUri, emptyFnc);
 
 					await promiseFail(
-						app.get(questionUri, () => {
-							// do nothing
-						})
+						app.get(questionUri, emptyFnc)
 					);
 				});
 
@@ -1328,9 +1224,7 @@ describe('route()', () => {
 
 					await app.route({
 						[questionUri]: {
-							GET: () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					});
 
@@ -1338,9 +1232,7 @@ describe('route()', () => {
 					await promiseFail(
 						app.route({
 							[normalUri]: {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1350,15 +1242,11 @@ describe('route()', () => {
 					const questionUri: string = 'users?';
 					const normalUri: string = 'user';
 
-					await app.get(questionUri, () => {
-						// do nothing
-					});
+					await app.get(questionUri, emptyFnc);
 
 
 					await promiseFail(
-						app.get(normalUri, () => {
-							// do nothing
-						})
+						app.get(normalUri, emptyFnc)
 					);
 				});
 			});
@@ -1372,7 +1260,7 @@ describe('route()', () => {
 					const testFnc = async (param: TypedObject<string>): Promise<void> => {
 						testFncRunFlag = true;
 
-						expect(param).to.be.ok;
+						expect(param).to.be.a('object');
 
 						expect(new RegExp(testUri).test(param[testUri])).to.be.true;
 					};
@@ -1591,9 +1479,7 @@ describe('route()', () => {
 					return promiseFail(
 						app.route({
 							'+abcd': {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1603,14 +1489,10 @@ describe('route()', () => {
 					await promiseFail(
 						app.route({
 							'abc': {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							},
 							'ab+c': {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1619,18 +1501,14 @@ describe('route()', () => {
 				it('duplicated routing, normal uri first', async () => {
 					await app.route({
 						'abc': {
-							GET: () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					});
 
 					await promiseFail(
 						app.route({
 							'ab+c': {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1639,18 +1517,14 @@ describe('route()', () => {
 				it('duplicated routing, plus uri first', async () => {
 					await app.route({
 						'ab+c': {
-							GET: () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					});
 
 					await promiseFail(
 						app.route({
 							'abc': {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1659,18 +1533,14 @@ describe('route()', () => {
 				it('duplicated routing, duplicated plus uri', async () => {
 					await app.route({
 						'ab+c': {
-							GET: () => {
-								// do nothing
-							}
+							GET: emptyFnc
 						}
 					});
 
 					await promiseFail(
 						app.route({
 							'abc+': {
-								GET: () => {
-									// do nothing
-								}
+								GET: emptyFnc
 							}
 						})
 					);
@@ -1683,9 +1553,8 @@ describe('route()', () => {
 
 					let testFncRunCount: number = 0;
 					const testFnc = (param: TypedObject<string>): void => {
-						expect(param).to.be.ok;
-
-						expect(param[testUri]).to.be.ok;
+						expect(param).to.be.a('object');
+						expect(param[testUri]).to.be.a('string');
 						expect(new RegExp(testUri).test(param[testUri])).to.be.true;
 
 						testFncRunCount++;
@@ -1828,7 +1697,7 @@ describe('route()', () => {
 
 			describe('**', () => {
 				const testFnc = (param: unknown, req: IncomingMessage): void => {
-					expect(param).to.be.ok;
+					expect(param).to.be.a('object');
 					expect(param).to.have.property('**');
 
 					calledUrls.push(req.url as string);
@@ -1862,7 +1731,7 @@ describe('route()', () => {
 
 			describe('*', () => {
 				const testFnc = (param: unknown, req: IncomingMessage): void => {
-					expect(param).to.be.ok;
+					expect(param).to.be.a('object');
 					expect(param).to.have.property('*');
 
 					calledUrls.push(req.url as string);
@@ -1935,10 +1804,10 @@ describe('route()', () => {
 				const testFrag: string = 'ab*cd';
 
 				const testFnc = (param: TypedObject<string>, req: IncomingMessage): void => {
-					expect(param).to.be.ok;
+					expect(param).to.be.a('object');
 
 					const regExpKey: string = param[testFrag].replace('*', '(\\w)*');
-					expect(param[testFrag]).to.be.ok;
+					expect(param[testFrag]).to.be.a('string');
 					expect(new RegExp(regExpKey).test(param[testFrag])).to.be.true;
 
 					calledUrls.push(req.url as string);

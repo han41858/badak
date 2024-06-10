@@ -6,7 +6,7 @@ import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { MiddlewareFunction, RouteFunction, TypedObject } from '../src/interfaces';
-import { promiseFail } from './test-util';
+import { emptyAsyncFnc, emptyFnc, promiseFail } from './test-util';
 
 
 const port = 65030;
@@ -37,9 +37,7 @@ describe('middleware', () => {
 
 		describe('assign', () => {
 			it('normal function', async () => {
-				await app.auth((): void => {
-					// do nothing
-				});
+				await app.auth(emptyFnc);
 			});
 
 			it('async function', async () => {
@@ -67,9 +65,7 @@ describe('middleware', () => {
 
 					await app.route({
 						'/test': {
-							'GET': () => {
-								// dummy function
-							}
+							'GET': emptyFnc
 						}
 					});
 
@@ -86,9 +82,7 @@ describe('middleware', () => {
 
 					await app.route({
 						'/test': {
-							'GET': () => {
-								// dummy function
-							}
+							'GET': emptyFnc
 						}
 					});
 
@@ -108,18 +102,8 @@ describe('middleware', () => {
 
 		targetFncNames.forEach((fncName: keyof Badak, i: number): void => {
 			describe(`common - ${ fncName }`, () => {
-				let middlewareFnc: MiddlewareFunction = (): void => {
-					// do nothing
-				};
-
-				beforeEach(() => {
-					middlewareFnc = (): void => {
-						// do nothing
-					};
-				});
-
 				it('defined', () => {
-					expect(app[fncName]).to.be.ok;
+					expect(app[fncName]).to.be.a('function');
 					expect(typeof app[fncName]).to.be.eql('function');
 				});
 
@@ -158,7 +142,7 @@ describe('middleware', () => {
 
 						await promiseFail(
 							// eslint-disable-next-line @typescript-eslint/no-explicit-any
-							(app as any)[fncName](middlewareFnc)
+							(app as any)[fncName](emptyFnc)
 						);
 					});
 				});
@@ -171,9 +155,7 @@ describe('middleware', () => {
 						const beforeArrLength: number = middlewareArr.length;
 
 						// eslint-disable-next-line @typescript-eslint/no-explicit-any
-						await (app as any)[fncName](() => {
-							// do nothing
-						});
+						await (app as any)[fncName](emptyFnc);
 
 						const afterArrLength: number = middlewareArr.length;
 
@@ -187,9 +169,7 @@ describe('middleware', () => {
 						const beforeArrLength: number = middlewareArr.length;
 
 						// eslint-disable-next-line @typescript-eslint/no-explicit-any
-						await (app as any)[fncName](async () => {
-							// do nothing
-						});
+						await (app as any)[fncName](emptyAsyncFnc);
 
 						const afterArrLength: number = middlewareArr.length;
 
@@ -282,12 +262,12 @@ describe('middleware', () => {
 
 			it('with param', async () => {
 				const beforeFnc: MiddlewareFunction = async (req: IncomingMessage, res: ServerResponse) => {
-					expect(req).to.be.ok;
-					expect(res).to.be.ok;
+					expect(req).to.be.a('object');
+					expect(res).to.be.a('object');
 				};
 
 				const routeFnc: RouteFunction = async (param: TypedObject<unknown>): Promise<unknown> => {
-					expect(param).to.be.ok;
+					expect(param).to.be.a('object');
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified
 
@@ -299,8 +279,8 @@ describe('middleware', () => {
 				};
 
 				const afterFnc: MiddlewareFunction = async (req: IncomingMessage, res: ServerResponse) => {
-					expect(req).to.be.ok;
-					expect(res).to.be.ok;
+					expect(req).to.be.a('object');
+					expect(res).to.be.a('object');
 				};
 
 				await app.before(beforeFnc);
@@ -396,9 +376,7 @@ describe('middleware', () => {
 
 				await app.route({
 					test: {
-						GET: () => {
-							// do nothing
-						}
+						GET: emptyFnc
 					}
 				});
 
