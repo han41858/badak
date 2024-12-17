@@ -1,6 +1,6 @@
 {
 	"name": "badak",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "node.js Server framework based on Promise and TypeScript",
 	"exports": {
 		"require": "./build/cjs/index.js",
