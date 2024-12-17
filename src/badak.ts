@@ -759,13 +759,6 @@ export class Badak {
 						}
 					}
 
-					if (!req.method) {
-						throw new Error('no method');
-					}
-
-					const method: string = req.method.toUpperCase();
-					const uri: string = req.url as string;
-
 					if (
 						(!this._routeRules || this._routeRules.length === 0)
 						&& this._staticRules === null
@@ -774,8 +767,28 @@ export class Badak {
 						throw new Error('no rule');
 					}
 
-					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
+
+					if (!req.method) {
+						throw new Error('no method');
+					}
+
+					const method: string = req.method.toUpperCase();
+					const uri: string = req.url as string;
+
+					let uriSanitized: string;
 					let queryStr: string | undefined;
+
+					if (uri.includes('?')) {
+						const firstQuestionMarkIndex: number = uri.indexOf('?');
+
+						uriSanitized = uri.substring(0, firstQuestionMarkIndex);
+						queryStr = uri.substring(firstQuestionMarkIndex);
+					}
+					else {
+						uriSanitized = uri;
+					}
+
+					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
 					let param: TypedObject<unknown> | undefined;
 
 					const routeRuleLength: number = this._routeRules.length;
@@ -789,7 +802,7 @@ export class Badak {
 						// normal routing
 						const uriArr: string[] = [
 							'/', // start from root
-							...uri.split('/')
+							...uriSanitized.split('/')
 						]
 							.filter((frag: string): boolean => {
 								return frag !== '';
@@ -802,20 +815,7 @@ export class Badak {
 
 							const routeRuleKeyArr: string[] = Object.keys(checkTargetRule);
 
-							const uriFragRaw: string = uriArr[depthIter];
-
-							let uriFrag: string;
-
-							if (
-								depthIter === uriArr.length - 1 // last index
-								&& method === METHOD.GET
-								&& uriFragRaw.includes('?')
-							) {
-								[uriFrag, queryStr] = uriFragRaw.split('?');
-							}
-							else {
-								uriFrag = uriFragRaw;
-							}
+							const uriFrag: string = uriArr[depthIter];
 
 
 							// normal routing
@@ -1018,7 +1018,8 @@ export class Badak {
 					switch (method) {
 						case METHOD.GET: {
 							// parse query string param
-							if (queryStr !== undefined) {
+							if (queryStr !== undefined
+								&& queryStr !== '') {
 								const paramStrPairs: string[] = queryStr
 									.replace(/^\?/, '') // remove starting ?
 									.split('&')

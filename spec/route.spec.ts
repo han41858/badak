@@ -1998,6 +1998,53 @@ describe('route()', () => {
 					});
 				});
 			});
+
+			describe('ok', () => {
+				describe('google api', () => {
+					const url = '/api/oauth';
+
+					beforeEach(async () => {
+						await app.route({
+							[url]: {
+								'GET': echoFnc
+							}
+						});
+
+						await app.listen(TestPort);
+					});
+
+					it('normal', () => {
+						return request(app.getHttpServer())
+							.get(`${ url }`)
+							.expect(200)
+							.expect((res: SuperTestResponse): void => {
+								expect(res.body).to.be.a('object');
+								expect(Object.keys(res.body)).to.be.lengthOf(0);
+							});
+					});
+
+					it('with param', () => {
+						const keyValues: [string, string][] = [
+							['state', 'state_parameter_passthrough_value'],
+							['code', '4/0AanRRrsR9_E2ld13zR61JXk7xBO3S7o38gTbPP04WjYjKYidbDl0MQ8jSyJK0Kn_J6hZ74Q'],
+							['scope', 'https://www.googleapis.com/auth/spreadsheets.readonly']
+						];
+
+						return request(app.getHttpServer())
+							.get(`${ url }?${ keyValues.map(([key, value]: [string, string]): string => {
+								return [key, value].join('=');
+							}).join('&') }`)
+							.expect(200)
+							.expect((res: SuperTestResponse): void => {
+								expect(res.body).to.be.a('object');
+
+								keyValues.forEach(([key, value]: [string, string]): void => {
+									expect(res.body).to.have.property(key, value);
+								});
+							});
+					});
+				});
+			});
 		});
 	});
 });
