@@ -561,8 +561,14 @@ export class Badak {
 								try {
 									param = JSON.parse(bodyStr);
 								}
-								catch (e) {
-									throw new Error('parsing parameter failed');
+								catch (e: unknown) {
+									let errStr: string = 'parsing parameter failed';
+
+									if ((e as Error)?.message) {
+										errStr += `: ${ (e as Error).message }`;
+									}
+
+									throw new Error(errStr);
 								}
 							}
 							// no payload, but ok
@@ -1073,9 +1079,15 @@ export class Badak {
 						try {
 							await this._authFnc(req, res);
 						}
-						catch (e) {
+						catch (e: unknown) {
 							// create new error instance
-							throw new Error('auth failed');
+							let errStr: string = 'auth failed';
+
+							if ((e as Error)?.message) {
+								errStr += `: ${ (e as Error).message }`;
+							}
+
+							throw new Error(errStr);
 						}
 					}
 

@@ -1,21 +1,31 @@
 import globals from 'globals';
 import pluginJs from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import stylisticTs from '@stylistic/eslint-plugin-ts';
+import pluginChaiFriendly from 'eslint-plugin-chai-friendly';
 
 
+/** @type {import('eslint').Linter.Config[]} */
 export default [
 	{
 		languageOptions: {
 			globals: globals.node
-		}
+		},
+		files: ['**/*.{js,mjs,cjs,ts}'],
+		plugins: {
+			'@stylistic/ts': stylisticTs,
+			'chai-friendly': pluginChaiFriendly
+		},
 	},
+
+
 	pluginJs.configs.recommended,
 	...tseslint.configs.recommended,
 
 	{
 		rules: {
 			'indent': 'off',
-			'@typescript-eslint/indent': [
+			'@stylistic/ts/indent': [
 				'warn',
 				'tab',
 				{
@@ -30,7 +40,7 @@ export default [
 			],
 			'linebreak-style': [
 				'warn',
-				'windows'
+				'unix'
 			],
 			'arrow-parens': 'warn',
 			'quotes': [
@@ -41,7 +51,7 @@ export default [
 				'warn',
 				'always'
 			],
-			'@typescript-eslint/member-delimiter-style': [
+			'@stylistic/ts/member-delimiter-style': [
 				'warn',
 				{
 					'multiline': {
@@ -71,7 +81,7 @@ export default [
 					'afterColon': true
 				}
 			],
-			'@typescript-eslint/type-annotation-spacing': [
+			'@stylistic/ts/type-annotation-spacing': [
 				'warn',
 				{
 					'before': false,
@@ -88,14 +98,23 @@ export default [
 			'@typescript-eslint/no-inferrable-types': 'off',
 			'@typescript-eslint/no-non-null-assertion': 'warn',
 			'@typescript-eslint/no-empty-function': 'warn',
-			'@typescript-eslint/no-unused-vars': 'warn',
+			'@typescript-eslint/no-unused-vars': [
+				'warn',
+				{
+					'caughtErrors': 'none'
+				}
+			],
 			'@typescript-eslint/explicit-module-boundary-types': 'warn',
 			'operator-linebreak': [
 				'warn',
 				'before'
 			],
 			'no-param-reassign': 'warn',
-			'@typescript-eslint/no-empty-interface': 'off'
+			'@typescript-eslint/no-empty-interface': 'off',
+
+			// chai expect() hack
+			'@typescript-eslint/no-unused-expressions': 'off',
+			'chai-friendly/no-unused-expressions': 'error'
 		}
 	}
 ];
