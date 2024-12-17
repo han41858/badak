@@ -11,8 +11,8 @@
 	"scripts": {
 		"prebuild": "rimraf ./build",
 		"build:types": "tsc -p tsconfig.types.json",
-		"build:cjs": "tsc -p tsconfig.cjs.json&&echo { \"type\": \"commonjs\" } > build/cjs/package.json",
-		"build:esm": "tsc -p tsconfig.esm.json&&echo { \"type\": \"module\" } > build/esm/package.json",
+		"build:cjs": "tsc -p tsconfig.cjs.json&&echo '{ \"type\": \"commonjs\" }' > build/cjs/package.json",
+		"build:esm": "tsc -p tsconfig.esm.json&&echo '{ \"type\": \"module\" }' > build/esm/package.json",
 		"build": "yarn build:types&&yarn build:cjs&&yarn build:esm",
 		"postbuild": "tsc -p tsconfig.scripts.json&&node build/scripts/add-js-extensions",
 		"test": "mocha",
