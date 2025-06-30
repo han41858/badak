@@ -133,7 +133,7 @@ Concatenate the address and file path to be provided as a static file.
 Connect the address and file path to be used with the SPA app.
 Files within the specified folder are served statically and cached.
 
-## 인터페이스
+## Interfaces
 
 ### `MiddlewareFunction`
 
