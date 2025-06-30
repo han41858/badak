@@ -1,8 +1,12 @@
 ![npm](https://img.shields.io/npm/v/badak?logo=npm)
+![NPM Last Update](https://img.shields.io/npm/last-update/ejv)
 
 ![logo](https://github.com/han41858/badak/raw/main/docs/logo/badak_200.png)
 
 # badak
+
+![TypeScript](https://img.shields.io/badge/TypeScript-black?color=3178C6&logo=typescript&logoColor=white)
+![TypeScript](https://img.shields.io/badge/node.js-black?color=5FA04E&logo=nodedotjs&logoColor=white)
 
 badak은 Promise, TypeScript 기반으로 개발된 백엔드 프레임워크입니다.
 
