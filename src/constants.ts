@@ -18,12 +18,14 @@ export enum CONTENT_TYPE {
 	TEXT_CSS = 'text/css',
 	// TEXT_JAVASCRIPT = 'text/javascript', // deprecated with 'application/javascript'
 
+	IMAGE_ICO = 'image/x-icon',
 	IMAGE_GIF = 'image/gif',
-	IMAGE_PNG = 'image/png',
 	IMAGE_JPEG = 'image/jpeg',
 	IMAGE_BMP = 'image/bmp',
+	IMAGE_PNG = 'image/png',
 	IMAGE_TIFF = 'image/tiff',
 	IMAGE_WEBP = 'image/webp',
+	IMAGE_HEIC = 'image/heic',
 
 	APPLICATION_JSON = 'application/json',
 	APPLICATION_JAVASCRIPT = 'application/javascript',

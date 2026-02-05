@@ -182,23 +182,55 @@ const loadFile = async (path: string): Promise<Buffer> => {
 	});
 };
 
+
+interface Signature {
+	type: CONTENT_TYPE;
+	sign: number[] | RegExp; // hex numbers or regular expression
+}
+
 export const getContentType = (data: unknown): CONTENT_TYPE => {
-	let contentType: CONTENT_TYPE;
+	let contentType: CONTENT_TYPE = CONTENT_TYPE.TEXT_PLAIN;
 
-	switch (typeof data) {
-		case 'object':
-			try {
-				JSON.stringify(data);
+	if (
+		data !== null
+		&& data !== undefined
+	) {
+		if (typeof data === 'object') {
+			if (data instanceof Buffer) {
+				const asBuffer: Buffer = data;
+				const asStr: string = data.toString();
 
-				contentType = CONTENT_TYPE.APPLICATION_JSON;
+				const SignatureMap: Signature[] = [
+					{ type: CONTENT_TYPE.IMAGE_ICO, sign: [0x00, 0x00, 0x01, 0x00] },
+					{ type: CONTENT_TYPE.IMAGE_GIF, sign: [0x47, 0x49, 0x46, 0x38] },
+					{ type: CONTENT_TYPE.IMAGE_JPEG, sign: [0xFF, 0xD8, 0xFF] },
+					{ type: CONTENT_TYPE.IMAGE_BMP, sign: [0x42, 0x4D] },
+					{ type: CONTENT_TYPE.IMAGE_PNG, sign: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] },
+					{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x49, 0x49, 0x2A, 0x00] }, // Intel
+					{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x4D, 0x4D, 0x00, 0x2A] }, // Motorola
+					{ type: CONTENT_TYPE.IMAGE_WEBP, sign: /^RIFF....WEBP/ },
+					{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypheic/ },
+					{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypmif1/ }
+				];
+
+				const foundResult: Signature | undefined = SignatureMap.find((one: Signature): boolean => {
+					return one.sign instanceof RegExp
+						? one.sign.test(asStr)
+						: Buffer.from(one.sign).equals(asBuffer.subarray(0, one.sign.length));
+				});
+
+				contentType = foundResult?.type ?? CONTENT_TYPE.TEXT_PLAIN;
 			}
-			catch (e: unknown) {
-				contentType = CONTENT_TYPE.TEXT_PLAIN;
+			else {
+				try {
+					JSON.stringify(data);
+					contentType = CONTENT_TYPE.APPLICATION_JSON;
+				}
+				catch (e: unknown) {
+					contentType = CONTENT_TYPE.TEXT_PLAIN;
+				}
 			}
-			break;
-
-		default:
-			contentType = CONTENT_TYPE.TEXT_PLAIN;
+		}
 	}
 
 	return contentType;
