@@ -1,6 +1,4 @@
-import * as http from 'node:http';
-import { IncomingMessage, ServerResponse } from 'node:http';
-import { Server } from 'node:net';
+import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import * as node_path from 'node:path';
 
 import {
@@ -743,7 +741,7 @@ export class Badak {
 
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject): void => {
-			this._http = http.createServer((req: IncomingMessage, res: ServerResponse): void => {
+			this._http = createServer((req: IncomingMessage, res: ServerResponse): void => {
 				let responseBody: unknown;
 
 				// new Promise loop to catch error
@@ -1080,14 +1078,7 @@ export class Badak {
 							await this._authFnc(req, res);
 						}
 						catch (e: unknown) {
-							// create new error instance
-							let errStr: string = 'auth failed';
-
-							if ((e as Error)?.message) {
-								errStr += `: ${ (e as Error).message }`;
-							}
-
-							throw new Error(errStr);
+							throw new Error('Unauthorized');
 						}
 					}
 
@@ -1123,7 +1114,7 @@ export class Badak {
 						}
 
 						switch (err.message) {
-							case 'auth failed':
+							case 'Unauthorized':
 								res.statusCode = 401; // Unauthorized, Unauthenticated
 
 								res.end();
