@@ -1,10 +1,14 @@
 ![npm](https://img.shields.io/npm/v/badak?logo=npm)
+![NPM Last Update](https://img.shields.io/npm/last-update/ejv)
 
 ![logo](https://github.com/han41858/badak/raw/main/docs/logo/badak_200.png)
 
 [한국어](https://github.com/han41858/badak/blob/main/README-KR.md)
 
 # badak
+
+![TypeScript](https://img.shields.io/badge/TypeScript-black?color=3178C6&logo=typescript&logoColor=white)
+![TypeScript](https://img.shields.io/badge/node.js-black?color=5FA04E&logo=nodedotjs&logoColor=white)
 
 badak is a backend framework developed based on Promises and TypeScript.
 
@@ -133,7 +137,7 @@ Concatenate the address and file path to be provided as a static file.
 Connect the address and file path to be used with the SPA app.
 Files within the specified folder are served statically and cached.
 
-## 인터페이스
+## Interfaces
 
 ### `MiddlewareFunction`
 
