@@ -1,5 +1,6 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import * as node_path from 'node:path';
+import * as querystring from 'node:querystring';
 
 import {
 	BadakOption,
@@ -786,7 +787,7 @@ export class Badak {
 						const firstQuestionMarkIndex: number = uri.indexOf('?');
 
 						uriSanitized = uri.substring(0, firstQuestionMarkIndex);
-						queryStr = uri.substring(firstQuestionMarkIndex);
+						queryStr = uri.substring(firstQuestionMarkIndex + 1);
 					}
 					else {
 						uriSanitized = uri;
@@ -1022,37 +1023,11 @@ export class Badak {
 					switch (method) {
 						case METHOD.GET: {
 							// parse query string param
-							if (queryStr !== undefined
-								&& queryStr !== '') {
-								const paramStrPairs: string[] = queryStr
-									.replace(/^\?/, '') // remove starting ?
-									.split('&')
-									.filter((str: string): boolean => str !== '');
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								for (const pairStr of paramStrPairs) {
-									if (pairStr.includes('=')) {
-										const [key, value]: string[] = pairStr.split('=');
-
-										if (param[key] === undefined) {
-											param[key] = decodeURIComponent(value);
-										}
-										else if (typeof param[key] === 'string') {
-											// change to array
-											param[key] = [param[key], value];
-										}
-										else {
-											// array already
-											(param[key] as string[]).push(value);
-										}
-									}
-									else {
-										param[pairStr] = null;
-									}
-								}
+							if (
+								queryStr !== undefined
+								&& queryStr !== ''
+							) {
+								param = querystring.parse(queryStr);
 							}
 							break;
 						}

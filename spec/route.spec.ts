@@ -1914,7 +1914,7 @@ describe('route()', () => {
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
 									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.null;
+									expect(res.body['key1']).to.be.eql('');
 								});
 						});
 
