@@ -31,5 +31,8 @@ export enum CONTENT_TYPE {
 	APPLICATION_JAVASCRIPT = 'application/javascript',
 	APPLICATION_OCTET_STREAM = 'application/octet-stream',
 	APPLICATION_PDF = 'application/pdf',
-	APPLICATION_WWW_FORM_URLENCODED = 'application/x-www-form-urlencoded'
+	APPLICATION_WWW_FORM_URLENCODED = 'application/x-www-form-urlencoded',
+
+	APPLICATION_XLS = 'application/vnd.ms-excel',
+	APPLICATION_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 }

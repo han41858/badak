@@ -1089,7 +1089,6 @@ export class Badak {
 
 					if (responseData) {
 						const contentType: CONTENT_TYPE = getContentType(responseData);
-
 						res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
 
 						switch (contentType) {
@@ -1143,7 +1142,6 @@ export class Badak {
 									}
 									else {
 										const contentType: CONTENT_TYPE = getContentType(err);
-
 										res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
 
 										switch (contentType) {

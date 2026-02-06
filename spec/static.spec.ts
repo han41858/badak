@@ -316,23 +316,28 @@ describe('static()', () => {
 
 	describe('about MIME', () => {
 		const defines: [string, string][] = [
-			['bmp', CONTENT_TYPE.IMAGE_BMP],
-			['css', CONTENT_TYPE.TEXT_CSS],
+			['ico', CONTENT_TYPE.IMAGE_ICO],
 			['gif', CONTENT_TYPE.IMAGE_GIF],
-			['htm', CONTENT_TYPE.TEXT_HTML],
-			['html', CONTENT_TYPE.TEXT_HTML],
-			['jpeg', CONTENT_TYPE.IMAGE_JPEG],
 			['jpg', CONTENT_TYPE.IMAGE_JPEG],
-			['js', CONTENT_TYPE.APPLICATION_JAVASCRIPT],
-			['json', CONTENT_TYPE.APPLICATION_JSON],
-			['pdf', CONTENT_TYPE.APPLICATION_PDF],
+			['jpeg', CONTENT_TYPE.IMAGE_JPEG],
+			['bmp', CONTENT_TYPE.IMAGE_BMP],
 			['png', CONTENT_TYPE.IMAGE_PNG],
-			['txt', CONTENT_TYPE.TEXT_PLAIN],
-			['text', CONTENT_TYPE.TEXT_PLAIN],
 			['tif', CONTENT_TYPE.IMAGE_TIFF],
 			['tiff', CONTENT_TYPE.IMAGE_TIFF],
-			['xls', 'application/vnd.ms-excel'],
-			['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+			['heic', CONTENT_TYPE.IMAGE_HEIC],
+			['webp', CONTENT_TYPE.IMAGE_WEBP],
+
+			['pdf', CONTENT_TYPE.APPLICATION_PDF],
+
+			['css', CONTENT_TYPE.TEXT_CSS],
+			['htm', CONTENT_TYPE.TEXT_HTML],
+			['html', CONTENT_TYPE.TEXT_HTML],
+			['js', CONTENT_TYPE.APPLICATION_JAVASCRIPT],
+			['json', CONTENT_TYPE.APPLICATION_JSON],
+			['txt', CONTENT_TYPE.TEXT_PLAIN],
+			['text', CONTENT_TYPE.TEXT_PLAIN],
+			['xls', CONTENT_TYPE.APPLICATION_XLS],
+			['xlsx', CONTENT_TYPE.APPLICATION_XLSX]
 		];
 
 		defines.forEach(([extension, mime]: [string, string]): void => {

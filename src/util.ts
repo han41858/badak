@@ -115,47 +115,15 @@ export const loadFolder = async (uri: string, path: string): Promise<StaticCache
 		if (await isFolder(fullPath)) {
 			// call recursively
 			cacheSet = await loadFolder(uriSanitized, fullPath);
-
 		}
 		else {
-			const matchArr: RegExpMatchArray | null = fullPath.match(/(\.[\w\d]+)?\.[\w\d]+$/);
-
-			let mime: CONTENT_TYPE | string = CONTENT_TYPE.APPLICATION_OCTET_STREAM; // default
-
-			if (matchArr) {
-				const extension: string = matchArr[0];
-
-				const mimeMap: {
-					[key: string]: CONTENT_TYPE | string;
-				} = {
-					'.bmp': CONTENT_TYPE.IMAGE_BMP,
-					'.css': CONTENT_TYPE.TEXT_CSS,
-					'.gif': CONTENT_TYPE.IMAGE_GIF,
-					'.htm': CONTENT_TYPE.TEXT_HTML,
-					'.html': CONTENT_TYPE.TEXT_HTML,
-					'.jpeg': CONTENT_TYPE.IMAGE_JPEG,
-					'.jpg': CONTENT_TYPE.IMAGE_JPEG,
-					'.js': CONTENT_TYPE.APPLICATION_JAVASCRIPT,
-					'.json': CONTENT_TYPE.APPLICATION_JSON,
-					'.pdf': CONTENT_TYPE.APPLICATION_PDF,
-					'.png': CONTENT_TYPE.IMAGE_PNG,
-					'.txt': CONTENT_TYPE.TEXT_PLAIN,
-					'.text': CONTENT_TYPE.TEXT_PLAIN,
-					'.tif': CONTENT_TYPE.IMAGE_TIFF,
-					'.tiff': CONTENT_TYPE.IMAGE_TIFF,
-					'.xls': 'application/vnd.ms-excel',
-					'.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-				};
-
-				if (mimeMap[extension]) {
-					mime = mimeMap[extension];
-				}
-			}
+			const fileData: Buffer<ArrayBufferLike> = await loadFile(fullPath);
+			const mimeType: CONTENT_TYPE = getContentType(fileData, folderOrFileName);
 
 			cacheSet = [{
 				uri: uriSanitized,
-				mime: mime,
-				fileData: await loadFile(fullPath)
+				mime: mimeType,
+				fileData: fileData
 			}];
 		}
 
@@ -188,50 +156,85 @@ interface Signature {
 	sign: number[] | RegExp; // hex numbers or regular expression
 }
 
-export const getContentType = (data: unknown): CONTENT_TYPE => {
-	let contentType: CONTENT_TYPE = CONTENT_TYPE.TEXT_PLAIN;
+export const getContentType = (data: unknown, fileName?: string): CONTENT_TYPE => {
+	let contentType: CONTENT_TYPE | undefined;
 
 	if (
 		data !== null
 		&& data !== undefined
 	) {
-		if (typeof data === 'object') {
-			if (data instanceof Buffer) {
-				const asBuffer: Buffer = data;
-				const asStr: string = data.toString();
+		if (data instanceof Buffer) {
+			const asBuffer: Buffer = data;
+			const asStr: string = data.toString();
 
-				const SignatureMap: Signature[] = [
-					{ type: CONTENT_TYPE.IMAGE_ICO, sign: [0x00, 0x00, 0x01, 0x00] },
-					{ type: CONTENT_TYPE.IMAGE_GIF, sign: [0x47, 0x49, 0x46, 0x38] },
-					{ type: CONTENT_TYPE.IMAGE_JPEG, sign: [0xFF, 0xD8, 0xFF] },
-					{ type: CONTENT_TYPE.IMAGE_BMP, sign: [0x42, 0x4D] },
-					{ type: CONTENT_TYPE.IMAGE_PNG, sign: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] },
-					{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x49, 0x49, 0x2A, 0x00] }, // Intel
-					{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x4D, 0x4D, 0x00, 0x2A] }, // Motorola
-					{ type: CONTENT_TYPE.IMAGE_WEBP, sign: /^RIFF....WEBP/ },
-					{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypheic/ },
-					{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypmif1/ }
-				];
+			const SignatureMap: Signature[] = [
+				{ type: CONTENT_TYPE.IMAGE_ICO, sign: [0x00, 0x00, 0x01, 0x00] },
+				{ type: CONTENT_TYPE.IMAGE_GIF, sign: [0x47, 0x49, 0x46, 0x38] },
+				{ type: CONTENT_TYPE.IMAGE_JPEG, sign: [0xFF, 0xD8, 0xFF] },
+				{ type: CONTENT_TYPE.IMAGE_BMP, sign: [0x42, 0x4D] },
+				{ type: CONTENT_TYPE.IMAGE_PNG, sign: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] },
+				{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x49, 0x49, 0x2A, 0x00] }, // Intel
+				{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x4D, 0x4D, 0x00, 0x2A] }, // Motorola
+				{ type: CONTENT_TYPE.IMAGE_WEBP, sign: /^RIFF....WEBP/ },
+				{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypheic/ },
+				{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypmif1/ },
 
-				const foundResult: Signature | undefined = SignatureMap.find((one: Signature): boolean => {
-					return one.sign instanceof RegExp
-						? one.sign.test(asStr)
-						: Buffer.from(one.sign).equals(asBuffer.subarray(0, one.sign.length));
-				});
+				{ type: CONTENT_TYPE.APPLICATION_PDF, sign: [0x25, 0x50, 0x44, 0x46] }
+			];
 
-				contentType = foundResult?.type ?? CONTENT_TYPE.TEXT_PLAIN;
+			const foundResult: Signature | undefined = SignatureMap.find((one: Signature): boolean => {
+				return one.sign instanceof RegExp
+					? one.sign.test(asStr)
+					: Buffer.from(one.sign).equals(asBuffer.subarray(0, one.sign.length));
+			});
+
+			contentType = foundResult?.type;
+		}
+		else if (typeof data === 'object') {
+			try {
+				JSON.stringify(data);
+				contentType = CONTENT_TYPE.APPLICATION_JSON;
 			}
-			else {
-				try {
-					JSON.stringify(data);
-					contentType = CONTENT_TYPE.APPLICATION_JSON;
-				}
-				catch (e: unknown) {
-					contentType = CONTENT_TYPE.TEXT_PLAIN;
-				}
+			catch (e: unknown) {
+				// do nothing
+			}
+		}
+
+		if (contentType === undefined) {
+			if (fileName !== undefined) {
+				const [, extension] = fileName.split('.');
+
+				const extensionMap: Record<string, CONTENT_TYPE> = {
+					ico: CONTENT_TYPE.IMAGE_ICO,
+					gif: CONTENT_TYPE.IMAGE_GIF,
+					jpg: CONTENT_TYPE.IMAGE_JPEG,
+					jpeg: CONTENT_TYPE.IMAGE_JPEG,
+					png: CONTENT_TYPE.IMAGE_PNG,
+					tiff: CONTENT_TYPE.IMAGE_TIFF,
+					webp: CONTENT_TYPE.IMAGE_WEBP,
+					heic: CONTENT_TYPE.IMAGE_HEIC,
+
+					pdf: CONTENT_TYPE.APPLICATION_PDF,
+					css: CONTENT_TYPE.TEXT_CSS,
+					htm: CONTENT_TYPE.TEXT_HTML,
+					html: CONTENT_TYPE.TEXT_HTML,
+					js: CONTENT_TYPE.APPLICATION_JAVASCRIPT,
+					json: CONTENT_TYPE.APPLICATION_JSON,
+					txt: CONTENT_TYPE.TEXT_PLAIN,
+					text: CONTENT_TYPE.TEXT_PLAIN,
+					xls: CONTENT_TYPE.APPLICATION_XLS,
+					xlsx: CONTENT_TYPE.APPLICATION_XLSX
+				};
+
+				contentType = extensionMap[extension];
+			}
+			else if (typeof data === 'string') {
+				contentType = CONTENT_TYPE.TEXT_PLAIN;
 			}
 		}
 	}
 
-	return contentType;
+	// fallback
+	return contentType ?? CONTENT_TYPE.TEXT_PLAIN;
+	;
 };
