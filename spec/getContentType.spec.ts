@@ -32,7 +32,7 @@ describe('getContentType()', () => {
 				app.route({
 					img: {
 						GET: () => {
-							return readFileSync(`./spec/mime/sample.png`);
+							return readFileSync('./spec/mime/sample.png');
 						}
 					}
 				});

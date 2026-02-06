@@ -1,7 +1,7 @@
 import globals from 'globals';
 import pluginJs from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import stylisticTs from '@stylistic/eslint-plugin-ts';
+import stylistic from '@stylistic/eslint-plugin';
 import pluginChaiFriendly from 'eslint-plugin-chai-friendly';
 
 
@@ -13,7 +13,7 @@ export default [
 		},
 		files: ['**/*.{js,mjs,cjs,ts}'],
 		plugins: {
-			'@stylistic/ts': stylisticTs,
+			'@stylistic': stylistic,
 			'chai-friendly': pluginChaiFriendly
 		},
 	},
@@ -24,8 +24,7 @@ export default [
 
 	{
 		rules: {
-			'indent': 'off',
-			'@stylistic/ts/indent': [
+			'@stylistic/indent': [
 				'warn',
 				'tab',
 				{
@@ -47,11 +46,11 @@ export default [
 				'warn',
 				'single'
 			],
-			'semi': [
+			'@stylistic/semi': [
 				'warn',
 				'always'
 			],
-			'@stylistic/ts/member-delimiter-style': [
+			'@stylistic/member-delimiter-style': [
 				'warn',
 				{
 					'multiline': {
@@ -81,17 +80,11 @@ export default [
 					'afterColon': true
 				}
 			],
-			'@stylistic/ts/type-annotation-spacing': [
+			'@stylistic/arrow-spacing': [
 				'warn',
 				{
-					'before': false,
+					'before': true,
 					'after': true,
-					'overrides': {
-						'arrow': {
-							'before': true,
-							'after': true
-						}
-					}
 				}
 			],
 			'@typescript-eslint/explicit-function-return-type': 'warn',
