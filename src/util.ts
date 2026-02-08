@@ -236,5 +236,15 @@ export const getContentType = (data: unknown, fileName?: string): CONTENT_TYPE =
 
 	// fallback
 	return contentType ?? CONTENT_TYPE.TEXT_PLAIN;
-	;
 };
+
+
+export function sift<T> (arr: T[]): T[] {
+	return arr.reduce((acc: T[], one: T): T[] => {
+		if (!acc.includes(one)) {
+			acc.push(one);
+		}
+
+		return acc;
+	}, []);
+}

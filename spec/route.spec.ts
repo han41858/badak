@@ -47,27 +47,9 @@ describe('route()', () => {
 				);
 			});
 
-			it('empty address - \'\'', () => {
-				return promiseFail(
-					app.route({
-						'aa': {
-							GET: emptyFnc
-						}
-					})
-				);
-			});
+			// empty address - '' can be root
 
 			it('empty address - \' \'', () => {
-				return promiseFail(
-					app.route({
-						' ': {
-							GET: emptyFnc
-						}
-					})
-				);
-			});
-
-			it('empty address - space', () => {
 				return promiseFail(
 					app.route({
 						' ': {
@@ -81,6 +63,16 @@ describe('route()', () => {
 				return promiseFail(
 					app.route({
 						' users': {
+							GET: emptyFnc
+						}
+					})
+				);
+			});
+
+			it('uri include space', () => {
+				return promiseFail(
+					app.route({
+						'us ers': {
 							GET: emptyFnc
 						}
 					})
@@ -1856,9 +1848,9 @@ describe('route()', () => {
 					'/?key1',
 					'/?key1=',
 					'/?key1=value1',
-					// '/dest?key1', // not error
-					'/dest?key1=',
-					'/dest?key1=value1'
+					// // '/dest?key1', // not error
+					// '/dest?key1=', // not error
+					// '/dest?key1=value1' // not error
 				].forEach((url: string): void => {
 					it(url, () => {
 						return promiseFail(

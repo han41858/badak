@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-export const fail = (error?: unknown): void => {
+export const fail = (error?: unknown): never => {
 	if (error) { // error can be undefined
 		console.error(error);
 	}
@@ -27,15 +27,9 @@ export function echoFnc<T> (param: T): T {
 
 
 export const promiseFail = async (promiseResult: Promise<unknown>): Promise<void> => {
-	if (promiseResult
-		&& isThenable(promiseResult)) {
-		promiseResult.then(fail, (err: Error): void => {
-			expect(err).to.be.instanceof(Error);
-		});
-	}
-	else {
-		fail();
-	}
+	return promiseResult.then(fail, (err: Error): void => {
+		expect(err).to.be.instanceof(Error);
+	});
 };
 
 export const TestPort = 65030;

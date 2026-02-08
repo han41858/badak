@@ -23,7 +23,8 @@ import {
 	getContentType,
 	isExistFile,
 	isFolder,
-	loadFolder
+	loadFolder,
+	sift
 } from './util';
 
 /**
@@ -114,11 +115,11 @@ export class Badak {
 
 			uriArr.forEach((uriFrag: string, i: number, arr: string[]): void => {
 				if (uriFrag.trim() === '') {
-					throw new Error('uri include space');
+					throw new Error('empty uri frag');
 				}
 
-				if (uriFrag.trim() === '') {
-					throw new Error('empty uri frag');
+				if (uriFrag.includes(' ')) {
+					throw new Error('uri include space');
 				}
 
 				if (uriFrag.includes(':') && !uriFrag.startsWith(':')) {
@@ -188,12 +189,14 @@ export class Badak {
 
 		for (const [key, value] of Object.entries(routeRule)) {
 			if (typeof value === 'object') {
-				this.getUriKeyArr(value).forEach((one: string[]): void => {
-					// filter out route option
-					if (one[one.length - 2] && one[one.length - 2] !== 'option') {
+				if (!Object.values(METHOD).includes(key as METHOD)) {
+					this.getUriKeyArr(value).forEach((one: string[]): void => {
 						result.push([key, ...one]);
-					}
-				});
+					});
+				}
+				else {
+					result.push([key]);
+				}
 			}
 			else {
 				result.push([key]);
@@ -218,10 +221,12 @@ export class Badak {
 				: cur.length;
 		}, 0);
 
-		for (let i: number = 0; i < maxDepthLength; i++) {
-			const targetKeys: string[] = allUriKeys
-				.map((oneTree: string[]): string => oneTree[i])
-				.filter((frag: string): frag is string => !!frag); // for different depth
+		for (let i: number = 0; i <= maxDepthLength; i++) {
+			const targetKeys: string[] = sift(
+				allUriKeys
+					.map((oneTree: string[]): string => oneTree[i])
+					.filter((frag: string): frag is string => !!frag) // for different depth
+			);
 
 			// colon routing
 			const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
