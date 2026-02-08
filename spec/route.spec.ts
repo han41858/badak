@@ -185,15 +185,12 @@ describe('route()', () => {
 		});
 
 		const checkRuleFnc = (_app: Badak, targetFnc: () => unknown): void => {
-			const routeRules: RouteRule[] = (_app as unknown as TypedObject<RouteRule[]>)._routeRules;
+			const routeRule: RouteRule = (_app as unknown as TypedObject<RouteRule>)._routeRule;
 
-			expect(routeRules).to.be.instanceOf(Array);
-			expect(routeRules).to.be.lengthOf(1);
+			expect(routeRule).to.be.a('object');
 
-			expect(routeRules[0]).to.be.a('object');
-			expect(routeRules[0]).to.have.property('/');
-
-			const routeRule: RouteRule = routeRules[0];
+			expect(routeRule).to.be.a('object');
+			expect(routeRule).to.have.property('/');
 
 			expect(routeRule['/']).to.be.a('object');
 			expect(routeRule['/']).to.have.property('users');
@@ -425,30 +422,18 @@ describe('route()', () => {
 				}
 			});
 
-			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
+			const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
-			expect(routeRules).to.be.instanceOf(Array);
-			expect(routeRules).to.be.lengthOf(2);
+			expect(routeRule).to.be.a('object');
 
-			routeRules.forEach((rule: RouteRule, i: number): void => {
-				expect(rule).to.have.property('/');
+			expect(routeRule).to.have.property('/');
+			expect(routeRule['/']).to.have.property('users');
 
-				expect(rule['/']).to.have.property('users');
+			const routeRuleRoot: RouteRule = routeRule['/'] as RouteRule;
 
-				const routeRuleRoot: RouteRule = rule['/'] as RouteRule;
-
-				expect(routeRuleRoot['users']).to.be.a('object');
-
-				switch (i) {
-					case 0:
-						expect(routeRuleRoot['users']).to.have.property('GET', fncA);
-						break;
-
-					case 1:
-						expect(routeRuleRoot['users']).to.have.property('POST', fncB);
-						break;
-				}
-			});
+			expect(routeRuleRoot['users']).to.be.a('object');
+			expect(routeRuleRoot['users']).to.have.property('GET', fncA);
+			expect(routeRuleRoot['users']).to.have.property('POST', fncB);
 		});
 
 		it('ok - multiple assign from root', async () => {
@@ -471,12 +456,7 @@ describe('route()', () => {
 				}
 			});
 
-			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
-
-			expect(routeRules).to.be.instanceOf(Array);
-			expect(routeRules).to.be.lengthOf(1);
-
-			const routeRule: RouteRule = routeRules[0];
+			const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
 			expect(routeRule).to.be.a('object');
 			expect(routeRule).to.have.property('/');
@@ -531,12 +511,7 @@ describe('route()', () => {
 				}
 			});
 
-			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
-
-			expect(routeRules).to.be.instanceOf(Array);
-			expect(routeRules).to.be.lengthOf(1);
-
-			const routeRule: RouteRule = routeRules[0];
+			const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
 			expect(routeRule).to.be.a('object');
 			expect(routeRule).to.have.property('/');
@@ -595,15 +570,7 @@ describe('route()', () => {
 				}
 			});
 
-			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
-
-			expect(routeRules).to.be.instanceOf(Array);
-			expect(routeRules).to.be.lengthOf(1);
-
-			expect(routeRules[0]).to.be.a('object');
-			expect(routeRules[0]).to.have.property('/');
-
-			const routeRule: RouteRule = routeRules[0];
+			const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
 			expect(routeRule['/']).to.be.a('object');
 			expect(routeRule['/']).to.have.property('root');
@@ -688,15 +655,7 @@ describe('route()', () => {
 				}
 			});
 
-			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
-
-			expect(routeRules).to.be.instanceOf(Array);
-			expect(routeRules).to.be.lengthOf(1);
-
-			expect(routeRules[0]).to.be.a('object');
-			expect(routeRules[0]).to.have.property('/');
-
-			const routeRule: RouteRule = routeRules[0];
+			const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
 			expect(routeRule['/']).to.be.a('object');
 			expect(routeRule['/']).to.have.property('users');
@@ -777,17 +736,14 @@ describe('route()', () => {
 				}
 			});
 
-			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
+			const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
-			expect(routeRules).to.be.instanceOf(Array);
-			expect(routeRules).to.be.lengthOf(1);
+			expect(routeRule).to.be.a('object');
+			expect(routeRule).to.have.property('/');
 
-			expect(routeRules[0]).to.be.a('object');
-			expect(routeRules[0]).to.have.property('/');
+			expect(routeRule['/']).to.be.a('object');
 
-			expect(routeRules[0]['/']).to.be.a('object');
-
-			const userRule: RouteRule = (routeRules[0]['/'] as RouteRule)['users'] as RouteRule;
+			const userRule: RouteRule = (routeRule['/'] as RouteRule)['users'] as RouteRule;
 			expect(userRule).to.be.a('object');
 			expect(Object.keys(userRule)).to.includes('a');
 
@@ -821,17 +777,14 @@ describe('route()', () => {
 
 			const uriArr = uri.split('/');
 
-			const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
+			const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
-			expect(routeRules).to.be.instanceOf(Array);
-			expect(routeRules).to.be.lengthOf(1);
+			expect(routeRule).to.be.a('object');
+			expect(routeRule).to.have.property('/');
 
-			expect(routeRules[0]).to.be.a('object');
-			expect(routeRules[0]).to.have.property('/');
+			expect(routeRule['/']).to.be.a('object');
 
-			expect(routeRules[0]['/']).to.be.a('object');
-
-			let targetRuleObj: RouteRule | RouteRuleSeed | RouteFunction = routeRules[0]['/'];
+			let targetRuleObj: RouteRule | RouteRuleSeed | RouteFunction = routeRule['/'];
 
 			uriArr.forEach((_uri: string, i: number, arr: string[]): void => {
 				expect(Object.keys(targetRuleObj)).to.includes(_uri);
@@ -1343,9 +1296,9 @@ describe('route()', () => {
 						}
 					});
 
-					const appRouteRule: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
+					const appRouteRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
-					expect(appRouteRule).to.be.lengthOf(1);
+					expect(appRouteRule).to.be.a('object');
 
 					expect(userRunCount).to.be.eql(0);
 					expect(recordRunCount).to.be.eql(0);
@@ -1658,11 +1611,13 @@ describe('route()', () => {
 			});
 
 			afterEach(async () => {
-				await Promise.all(validUrls.map((testUri: string): SuperTestExpect => {
-					return request(app.getHttpServer())
-						.get(testUri)
-						.expect(200);
-				}));
+				await Promise.all(
+					validUrls.map((url: string): SuperTestExpect => {
+						return request(app.getHttpServer())
+							.get(url)
+							.expect(200);
+					})
+				);
 
 				validUrls.forEach((testUri: string): void => {
 					expect(calledUrls).to.include(testUri);
@@ -1708,9 +1663,8 @@ describe('route()', () => {
 
 						await app.listen(TestPort);
 
-						const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
-						expect(routeRules).to.be.instanceOf(Array);
-						expect(routeRules).to.be.lengthOf(1);
+						const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
+						expect(routeRule).to.be.a('object');
 
 						validUrls.push(
 							`${ prefix }/a`,
@@ -1743,9 +1697,8 @@ describe('route()', () => {
 
 							await app.listen(TestPort);
 
-							const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
-							expect(routeRules).to.be.instanceOf(Array);
-							expect(routeRules).to.be.lengthOf(1);
+							const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
+							expect(routeRule).to.be.a('object');
 
 							validUrls.push(
 								`${ prefix }/`,
@@ -1774,9 +1727,8 @@ describe('route()', () => {
 
 							await app.listen(TestPort);
 
-							const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
-							expect(routeRules).to.be.instanceOf(Array);
-							expect(routeRules).to.be.lengthOf(1);
+							const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
+							expect(routeRule).to.be.a('object');
 
 							validUrls.push(
 								`${ prefix }/a/a`,
@@ -1818,9 +1770,8 @@ describe('route()', () => {
 
 						await app.listen(TestPort);
 
-						const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
-						expect(routeRules).to.be.instanceOf(Array);
-						expect(routeRules).to.be.lengthOf(1);
+						const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
+						expect(routeRule).to.be.a('object');
 
 						validUrls.push(
 							prefix + '/abcd',
@@ -1847,7 +1798,7 @@ describe('route()', () => {
 					'/?',
 					'/?key1',
 					'/?key1=',
-					'/?key1=value1',
+					'/?key1=value1'
 					// // '/dest?key1', // not error
 					// '/dest?key1=', // not error
 					// '/dest?key1=value1' // not error
@@ -2037,6 +1988,95 @@ describe('route()', () => {
 					});
 				});
 			});
+		});
+	});
+
+	describe('various check', async () => {
+		beforeEach(async () => {
+			await app.config('defaultMethod', 'GET');
+
+			// normal routing
+			await app.route({
+				normal: emptyFnc
+			});
+
+			// question routing
+			await app.route({
+				'ab?cd': emptyFnc
+			});
+
+			// plus routing
+			await app.route({
+				'ef+gh': emptyFnc
+			});
+
+			// asterisk routing
+			await app.route({
+				'ij*lk': emptyFnc
+			});
+
+			await app.listen(TestPort);
+		});
+
+		it('ok', async () => {
+			// @ts-expect-error: private property
+			const routeRule: RouteRule = app._routeRule;
+
+			expect(routeRule).to.have.property('/');
+
+			const rootRouting: RouteRule = routeRule['/'] as RouteRule;
+
+			// normal routing
+			expect(rootRouting).to.have.property('normal');
+			expect(rootRouting['normal']).to.have.property('GET');
+			expect((rootRouting['normal'] as RouteRuleSeed)['GET']).to.be.a('function');
+
+			await request(app.getHttpServer())
+				.get('/normal')
+				.expect(200);
+
+			// question routing
+			expect(rootRouting).to.have.property('ab?cd');
+			expect(rootRouting['ab?cd']).to.have.property('GET');
+			expect((rootRouting['ab?cd'] as RouteRuleSeed)['GET']).to.be.a('function');
+
+			await request(app.getHttpServer())
+				.get('/acd')
+				.expect(200);
+
+			await request(app.getHttpServer())
+				.get('/abcd')
+				.expect(200);
+
+			// plus routing
+			expect(rootRouting).to.have.property('ef+gh');
+			expect(rootRouting['ef+gh']).to.have.property('GET');
+			expect((rootRouting['ef+gh'] as RouteRuleSeed)['GET']).to.be.a('function');
+
+			await request(app.getHttpServer())
+				.get('/efgh')
+				.expect(200);
+
+			await request(app.getHttpServer())
+				.get('/efffgh')
+				.expect(200);
+
+			// asterisk routing
+			expect(rootRouting).to.have.property('ij*lk');
+			expect(rootRouting['ij*lk']).to.have.property('GET');
+			expect((rootRouting['ij*lk'] as RouteRuleSeed)['GET']).to.be.a('function');
+
+			await request(app.getHttpServer())
+				.get('/ilk')
+				.expect(200);
+
+			await request(app.getHttpServer())
+				.get('/ijlk')
+				.expect(200);
+
+			await request(app.getHttpServer())
+				.get('/ijjjjjlk')
+				.expect(200);
 		});
 	});
 });

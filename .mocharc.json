@@ -3,7 +3,7 @@
 		"tsx"
 	],
 	"spec": [
-		"spec/**/*.ts"
+		"spec/**/*.spec.ts"
 	],
 	"timeout": 1000
 }

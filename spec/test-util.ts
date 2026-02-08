@@ -8,10 +8,6 @@ export const fail = (error?: unknown): never => {
 	throw new Error('this case should be not execute');
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const isThenable = (input: any): input is Promise<any> => {
-	return input && typeof input.then === 'function';
-};
 
 export function emptyFnc (): void {
 	// empty function

@@ -59,7 +59,7 @@ export class Badak {
 	private _middlewaresBefore: MiddlewareFunction[] = [];
 	private _middlewaresAfter: MiddlewareFunction[] = [];
 
-	private _routeRules: RouteRule[] = [];
+	private _routeRule: RouteRule = {};
 
 	private _staticRules: StaticRule[] = [];
 	private _staticCache: StaticCache[] = [];
@@ -206,14 +206,11 @@ export class Badak {
 		return result;
 	}
 
-	private _checkUriDuplication (currentRouteRule: RouteRule[], newRouteRule: RouteRule): void {
-		const allUriKeys: string[][] = [];
-
-		currentRouteRule.forEach((oneRouteRule: RouteRule): void => {
-			allUriKeys.push(...this.getUriKeyArr(oneRouteRule));
-		});
-
-		allUriKeys.push(...this.getUriKeyArr(newRouteRule));
+	private _checkUriDuplication (currentRouteRule: RouteRule, newRouteRule: RouteRule): void {
+		const allUriKeys: string[][] = [
+			...this.getUriKeyArr(currentRouteRule),
+			...this.getUriKeyArr(newRouteRule)
+		];
 
 		const maxDepthLength: number = allUriKeys.reduce((maxLength: number, cur: string[]): number => {
 			return maxLength > cur.length
@@ -274,12 +271,30 @@ export class Badak {
 		}
 	}
 
+	private _mergeRouteRule (a: RouteRule, b: RouteRule): RouteRule {
+		Object.entries(b).forEach(([key, value]) => {
+			if (a[key] === undefined) {
+				a[key] = {};
+			}
+
+			if (typeof value === 'object') {
+				this._mergeRouteRule((a ?? {})[key] as RouteRule, b[key] as RouteRule);
+			}
+			else {
+				a[key] = b[key];
+			}
+		});
+
+		return a;
+	}
+
+
 	private _assignRule (rule: RouteRule): void {
 		const refinedRule: RouteRule = this._refineRouteRule(rule);
 
-		this._checkUriDuplication(this._routeRules, refinedRule);
+		this._checkUriDuplication(this._routeRule, refinedRule);
 
-		this._routeRules.push(refinedRule);
+		this._mergeRouteRule(this._routeRule, refinedRule);
 	}
 
 	// auth
@@ -682,7 +697,10 @@ export class Badak {
 		}
 
 		// load static files
-		if (!!this._staticRules && this._staticRules.length > 0) {
+		if (
+			!!this._staticRules
+			&& this._staticRules.length > 0
+		) {
 			const allCache: StaticCache[][] = await Promise.all<StaticCache[]>(
 				this._staticRules.map(async (staticRule: StaticRule): Promise<StaticCache[]> => {
 					return loadFolder(staticRule.uri, staticRule.path);
@@ -711,6 +729,7 @@ export class Badak {
 				const spaPathPrefix: string = this._spaRoot.endsWith('/')
 					? this._spaRoot
 					: this._spaRoot + '/';
+
 				const spaRoutingUrl: string = spaPathPrefix + '**';
 
 				await this.get(
@@ -769,10 +788,7 @@ export class Badak {
 						}
 					}
 
-					if (
-						(!this._routeRules || this._routeRules.length === 0)
-						&& this._staticRules === null
-					) {
+					if (this._staticRules === null) {
 						// no rule assigned
 						throw new Error('no rule');
 					}
@@ -801,182 +817,127 @@ export class Badak {
 					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
 					let param: TypedObject<unknown> | undefined;
 
-					const routeRuleLength: number = this._routeRules.length;
+					let checkTargetRule: RouteRule | undefined = this._routeRule;
 
-					let checkTargetRule: RouteRule | undefined;
+					// normal routing
+					const uriArr: string[] = [
+						'/', // start from root
+						...uriSanitized.split('/')
+					]
+						.filter((frag: string): boolean => {
+							return frag !== '';
+						});
 
-					// don't use for-in/for-of here, checkTargetRule is not flat flow
-					for (let parallelIter: number = 0; parallelIter < routeRuleLength; parallelIter++) {
-						checkTargetRule = this._routeRules[parallelIter];
+					// find target function
+					// use 'for' instead of 'forEach' to break
+					for (let depthIter: number = 0; depthIter < uriArr.length; depthIter++) {
+						let loopControl: LOOP_CONTROL | undefined;
+
+						const routeRuleKeyArr: string[] = Object.keys(checkTargetRule);
+
+						const uriFrag: string = uriArr[depthIter];
+
 
 						// normal routing
-						const uriArr: string[] = [
-							'/', // start from root
-							...uriSanitized.split('/')
-						]
-							.filter((frag: string): boolean => {
-								return frag !== '';
+						if (checkTargetRule[uriFrag] !== undefined) {
+							checkTargetRule = checkTargetRule[uriFrag] as RouteRule;
+
+							loopControl = LOOP_CONTROL.CONTINUE;
+						}
+
+						if (!loopControl) {
+							// colon routing
+							const colonParam: string | undefined = routeRuleKeyArr.find((_uriFrag: string): boolean => {
+								return _uriFrag.startsWith(':');
 							});
 
-						// find target function
-						// use 'for' instead of 'forEach' to break
-						for (let depthIter: number = 0; depthIter < uriArr.length; depthIter++) {
-							let loopControl: LOOP_CONTROL | undefined;
+							if (colonParam !== undefined) {
+								checkTargetRule = checkTargetRule[colonParam] as RouteRule;
 
-							const routeRuleKeyArr: string[] = Object.keys(checkTargetRule);
+								if (param === undefined) {
+									param = {};
+								}
 
-							const uriFrag: string = uriArr[depthIter];
+								// if (param.matcher === undefined) {
+								// 	param.matcher = [];
+								// }
 
-
-							// normal routing
-							if (checkTargetRule[uriFrag] !== undefined) {
-								checkTargetRule = checkTargetRule[uriFrag] as RouteRule;
+								// param.matcher.push(colonParam);
+								param[colonParam.replace(':', '')] = uriFrag;
 
 								loopControl = LOOP_CONTROL.CONTINUE;
 							}
+						}
 
-							if (!loopControl) {
-								// colon routing
-								const colonParam: string | undefined = routeRuleKeyArr.find((_uriFrag: string): boolean => {
-									return _uriFrag.startsWith(':');
-								});
+						if (!loopControl) {
+							// question routing
+							const questionKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
+								return !!routeRuleKey.match(/.+\?/);
+							});
 
-								if (colonParam !== undefined) {
-									checkTargetRule = checkTargetRule[colonParam] as RouteRule;
+							const targetQuestionKey: string | undefined = questionKeyArr.find((questionKey: string): boolean => {
+								const questionKeyIndex: number = questionKey.indexOf('?');
 
-									if (param === undefined) {
-										param = {};
-									}
+								const optionalCharacter: string = questionKey.substring(
+									questionKeyIndex - 1,
+									questionKeyIndex
+								);
 
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
+								const mandatoryKey: string = questionKey.substring(0, questionKeyIndex - 1);
+								const restKey: string = questionKey.substring(questionKeyIndex + 1);
 
-									// param.matcher.push(colonParam);
-									param[colonParam.replace(':', '')] = uriFrag;
+								return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
+							});
 
-									loopControl = LOOP_CONTROL.CONTINUE;
+							if (targetQuestionKey !== undefined) {
+								checkTargetRule = checkTargetRule[targetQuestionKey] as RouteRule;
+
+								if (param === undefined) {
+									param = {};
 								}
+
+								// if (param.matcher === undefined) {
+								// 	param.matcher = [];
+								// }
+
+								// param.matcher.push(targetQuestionKey);
+								param[targetQuestionKey] = uriFrag;
+
+								loopControl = LOOP_CONTROL.CONTINUE;
 							}
+						}
 
-							if (!loopControl) {
-								// question routing
-								const questionKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
-									return !!routeRuleKey.match(/.+\?/);
-								});
+						if (!loopControl) {
+							// plus routing
+							const plusKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
+								return routeRuleKey.includes('+');
+							});
 
-								const targetQuestionKey: string | undefined = questionKeyArr.find((questionKey: string): boolean => {
-									const questionKeyIndex: number = questionKey.indexOf('?');
+							const targetPlusKey: string | undefined = plusKeyArr.find((plusKey: string): boolean => {
+								return new RegExp(plusKey).test(uriFrag);
+							});
 
-									const optionalCharacter: string = questionKey.substring(
-										questionKeyIndex - 1,
-										questionKeyIndex
-									);
+							if (targetPlusKey !== undefined) {
+								checkTargetRule = checkTargetRule[targetPlusKey] as RouteRule;
 
-									const mandatoryKey: string = questionKey.substring(0, questionKeyIndex - 1);
-									const restKey: string = questionKey.substring(questionKeyIndex + 1);
-
-									return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
-								});
-
-								if (targetQuestionKey !== undefined) {
-									checkTargetRule = checkTargetRule[targetQuestionKey] as RouteRule;
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(targetQuestionKey);
-									param[targetQuestionKey] = uriFrag;
-
-									loopControl = LOOP_CONTROL.CONTINUE;
+								if (param === undefined) {
+									param = {};
 								}
+
+								// if (param.matcher === undefined) {
+								// 	param.matcher = [];
+								// }
+
+								// param.matcher.push(targetPlusKey);
+								param[targetPlusKey] = uriFrag;
+
+								loopControl = LOOP_CONTROL.CONTINUE;
 							}
+						}
 
-							if (!loopControl) {
-								// plus routing
-								const plusKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
-									return routeRuleKey.includes('+');
-								});
-
-								const targetPlusKey: string | undefined = plusKeyArr.find((plusKey: string): boolean => {
-									return new RegExp(plusKey).test(uriFrag);
-								});
-
-								if (targetPlusKey !== undefined) {
-									checkTargetRule = checkTargetRule[targetPlusKey] as RouteRule;
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(targetPlusKey);
-									param[targetPlusKey] = uriFrag;
-
-									loopControl = LOOP_CONTROL.CONTINUE;
-								}
-							}
-
-							if (!loopControl) {
-								// asterisk routing
-								if (routeRuleKeyArr.includes('*')) {
-									checkTargetRule = checkTargetRule['*'] as RouteRule;
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									param['*'] = uriFrag;
-
-									loopControl = LOOP_CONTROL.CONTINUE;
-								}
-							}
-
-							if (!loopControl) {
-								// partial asterisk routing
-								const targetAsteriskKey: string | undefined = routeRuleKeyArr
-									.filter((routeRuleKey: string): boolean => {
-										return /.\*./.test(routeRuleKey);
-									})
-									.find((asteriskKey: string): boolean => {
-										// replace '*' to '(.)*'
-										return new RegExp(
-											asteriskKey.replace('*', '(.)*')
-										).test(uriFrag);
-									});
-
-								if (targetAsteriskKey !== undefined) {
-									checkTargetRule = checkTargetRule[targetAsteriskKey] as RouteRule;
-
-									if (param === undefined) {
-										param = {};
-									}
-
-									// if (param.matcher === undefined) {
-									// 	param.matcher = [];
-									// }
-
-									// param.matcher.push(targetAsteriskKey);
-									param[targetAsteriskKey] = uriFrag;
-
-									loopControl = LOOP_CONTROL.CONTINUE;
-								}
-							}
-
-
-							// * / ** asterisk child routing
-							const childRouteRuleKeyArr: string[] = Object.keys(checkTargetRule);
-
-							if (depthIter === uriArr.length - 1 // for urls like '/something/'
-								&& childRouteRuleKeyArr.includes('*')) {
+						if (!loopControl) {
+							// asterisk routing
+							if (routeRuleKeyArr.includes('*')) {
 								checkTargetRule = checkTargetRule['*'] as RouteRule;
 
 								if (param === undefined) {
@@ -985,40 +946,88 @@ export class Badak {
 
 								param['*'] = uriFrag;
 
-								loopControl = LOOP_CONTROL.BREAK;
+								loopControl = LOOP_CONTROL.CONTINUE;
 							}
-							else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
-								checkTargetRule = checkTargetRule['**'] as RouteRule;
+						}
+
+						if (!loopControl) {
+							// partial asterisk routing
+							const targetAsteriskKey: string | undefined = routeRuleKeyArr
+								.filter((routeRuleKey: string): boolean => {
+									return /.\*./.test(routeRuleKey);
+								})
+								.find((asteriskKey: string): boolean => {
+									// replace '*' to '(.)*'
+									return new RegExp(
+										asteriskKey.replace(/.\*/, '.*')
+									).test(uriFrag);
+								});
+
+
+							if (targetAsteriskKey !== undefined) {
+								checkTargetRule = checkTargetRule[targetAsteriskKey] as RouteRule;
 
 								if (param === undefined) {
 									param = {};
 								}
 
-								param['**'] = uriFrag;
+								// if (param.matcher === undefined) {
+								// 	param.matcher = [];
+								// }
 
-								// ignore after uriFrag
-								loopControl = LOOP_CONTROL.BREAK;
-							}
+								// param.matcher.push(targetAsteriskKey);
+								param[targetAsteriskKey] = uriFrag;
 
-							// use if/else instead of switch to break for loop
-							if (
-								loopControl === LOOP_CONTROL.BREAK
-								|| uriFrag === '' // last frag with query string param
-							) {
-								break;
+								loopControl = LOOP_CONTROL.CONTINUE;
 							}
-							else if (loopControl === undefined) {
-								// not found
-								checkTargetRule = undefined;
-								break;
-							}
-							// loopControl === LoopControl.Continue : continue
 						}
 
-						if (checkTargetRule && checkTargetRule[method]) {
-							targetFncObj = checkTargetRule[method] as RouteFunctionObj;
+
+						// * / ** asterisk child routing
+						const childRouteRuleKeyArr: string[] = Object.keys(checkTargetRule);
+
+						if (depthIter === uriArr.length - 1 // for urls like '/something/'
+							&& childRouteRuleKeyArr.includes('*')) {
+							checkTargetRule = checkTargetRule['*'] as RouteRule;
+
+							if (param === undefined) {
+								param = {};
+							}
+
+							param['*'] = uriFrag;
+
+							loopControl = LOOP_CONTROL.BREAK;
+						}
+						else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
+							checkTargetRule = checkTargetRule['**'] as RouteRule;
+
+							if (param === undefined) {
+								param = {};
+							}
+
+							param['**'] = uriFrag;
+
+							// ignore after uriFrag
+							loopControl = LOOP_CONTROL.BREAK;
+						}
+
+						// use if/else instead of switch to break for loop
+						if (
+							loopControl === LOOP_CONTROL.BREAK
+							|| uriFrag === '' // last frag with query string param
+						) {
 							break;
 						}
+						else if (loopControl === undefined) {
+							// not found
+							checkTargetRule = undefined;
+							break;
+						}
+						// loopControl === LoopControl.Continue : continue
+					}
+
+					if (checkTargetRule && checkTargetRule[method]) {
+						targetFncObj = checkTargetRule[method] as RouteFunctionObj;
 					}
 
 					if (targetFncObj === undefined) {
@@ -1049,7 +1058,8 @@ export class Badak {
 							break;
 					}
 
-					if (this._authFnc
+					if (
+						this._authFnc
 						&& typeof this._authFnc === 'function'
 						&& (targetFncObj as RouteFunctionObj)?.option?.auth !== false
 					) {

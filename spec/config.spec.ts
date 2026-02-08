@@ -663,16 +663,15 @@ describe('config()', () => {
 
 					methods.forEach((testMethod: METHOD) => {
 						it('test ' + testMethod, async () => {
-							const routeRules: RouteRule[] = (app as unknown as TypedObject<RouteRule[]>)._routeRules;
+							const routeRule: RouteRule = (app as unknown as TypedObject<RouteRule>)._routeRule;
 
-							expect(routeRules).to.be.instanceOf(Array);
-							expect(routeRules).to.be.lengthOf(1);
+							expect(routeRule).to.be.a('object');
 
-							expect(routeRules[0]).to.be.a('object');
-							expect(routeRules[0]).to.have.property('/');
+							expect(routeRule).to.be.a('object');
+							expect(routeRule).to.have.property('/');
 
-							expect(routeRules[0]['/']).to.have.property(testUriRefined);
-							expect((routeRules[0]['/'] as RouteRule)[testUriRefined]).to.have.property(setMethod);
+							expect(routeRule['/']).to.have.property(testUriRefined);
+							expect((routeRule['/'] as RouteRule)[testUriRefined]).to.have.property(setMethod);
 
 							await getReqFnc(testMethod)
 								.expect(setMethod === testMethod ? 200 : 404);
