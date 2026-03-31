@@ -522,16 +522,18 @@ export class Badak {
 				const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
 
 				if (contentTypeInHeader) {
-					const contentTypeStrArr: string[] = contentTypeInHeader.split(';');
-					const contentType: string = contentTypeStrArr[0].trim();
+					const [contentType, boundaryStrPair] = contentTypeInHeader
+						.split(';')
+						.map((s: string): string => s.trim());
 
 					bodyStr = Buffer.concat(bodyBuffer).toString();
 
 
 					switch (contentType) {
 						case 'multipart/form-data': {
-							const boundaryStrArr: string[] = contentTypeStrArr[1].split('=');
-							const boundaryStr: string = boundaryStrArr[1].trim();
+							const [, boundaryStr] = boundaryStrPair
+								.split('=')
+								.map((s: string): string => s.trim());
 
 							if (!boundaryStr) {
 								throw new Error('invalid content-type');
