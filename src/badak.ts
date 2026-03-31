@@ -768,11 +768,10 @@ export class Badak {
 
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject): void => {
-			this._http = createServer((req: IncomingMessage, res: ServerResponse): void => {
+			this._http = createServer(async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
 				let responseBody: unknown;
 
-				// new Promise loop to catch error
-				(async (): Promise<void> => {
+				try {
 					// run before middleware functions in parallel
 					// before functions can't modify parameters
 					// use try {} to run route function
@@ -1098,82 +1097,84 @@ export class Badak {
 					else {
 						res.end();
 					}
-				})()
-					.catch(async (err: Error | TypedObject<unknown>): Promise<void> => {
-						if (this._config.catchErrorLog) {
-							console.error('badak catch error : %o', err);
-						}
+				}
+				catch (e) {
+					const err: Error | TypedObject<unknown> = e as Error | TypedObject<unknown>;
 
-						switch (err.message) {
-							case 'Unauthorized':
-								res.statusCode = 401; // Unauthorized, Unauthenticated
+					if (this._config.catchErrorLog) {
+						console.error('badak catch error : %o', err);
+					}
 
-								res.end();
-								break;
+					switch (err.message) {
+						case 'Unauthorized':
+							res.statusCode = 401; // Unauthorized, Unauthenticated
 
-							case 'no rule':
-								res.statusCode = 404; // not found
+							res.end();
+							break;
 
-								res.end();
-								break;
+						case 'no rule':
+							res.statusCode = 404; // not found
 
-							// internal errors
-							case 'parsing parameter failed':
-								res.statusCode = 500; // Internal Server Error
+							res.end();
+							break;
 
-								res.end();
-								break;
+						// internal errors
+						case 'parsing parameter failed':
+							res.statusCode = 500; // Internal Server Error
 
-							default:
-								res.statusCode = 500; // Internal Server Error
+							res.end();
+							break;
 
-								if (err) {
-									if (err instanceof Error) {
-										responseBody = err.message;
-										res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.TEXT_PLAIN);
-									}
-									else {
-										const contentType: CONTENT_TYPE = getContentType(err);
-										res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
+						default:
+							res.statusCode = 500; // Internal Server Error
 
-										switch (contentType) {
-											case CONTENT_TYPE.APPLICATION_JSON:
-												responseBody = JSON.stringify(err);
-												break;
-
-											default:
-												responseBody = err;
-										}
-									}
-
-									res.end(responseBody);
+							if (err) {
+								if (err instanceof Error) {
+									responseBody = err.message;
+									res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.TEXT_PLAIN);
 								}
 								else {
-									res.end();
-								}
-								break;
-						}
+									const contentType: CONTENT_TYPE = getContentType(err);
+									res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
 
-						if (!this._config.preventError) {
-							throw err;
-						}
-					})
-					.then(async (): Promise<void> => {
-						// run after middleware functions
-						try {
-							await Promise.all(
-								this._middlewaresAfter.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
-									return middlewareFnc(req, res, responseBody);
-								})
-							);
-						}
-						catch (err) {
-							// catch middleware exception
-							if (this._config.catchErrorLog) {
-								console.error('badak after() middleware failed :', err);
+									switch (contentType) {
+										case CONTENT_TYPE.APPLICATION_JSON:
+											responseBody = JSON.stringify(err);
+											break;
+
+										default:
+											responseBody = err;
+									}
+								}
+
+								res.end(responseBody);
 							}
+							else {
+								res.end();
+							}
+							break;
+					}
+
+					if (!this._config.preventError) {
+						throw err;
+					}
+				}
+				finally {
+					// run after middleware functions
+					try {
+						await Promise.all(
+							this._middlewaresAfter.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
+								return middlewareFnc(req, res, responseBody);
+							})
+						);
+					}
+					catch (err) {
+						// catch middleware exception
+						if (this._config.catchErrorLog) {
+							console.error('badak after() middleware failed :', err);
 						}
-					});
+					}
+				}
 			});
 
 			this._http.on('error', (err: Error): void => {
