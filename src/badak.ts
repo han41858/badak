@@ -658,6 +658,11 @@ export class Badak {
 														param[key] = oneStr.slice(cutStartIndex);
 														break;
 													}
+
+													case 'application/octet-stream': {
+														param[key] = one.subarray(cutStartIndex);
+														break;
+													}
 												}
 											}
 										}
@@ -1169,13 +1174,34 @@ export class Badak {
 						? await targetFncObj(param, req, res)
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
+
 					if (responseData) {
 						const contentType: CONTENT_TYPE = getContentType(responseData);
 						res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
 
+						function _convertBufferToBase64<T extends object> (value: T): T {
+							Object.entries(value).forEach(([key, innerValue]) => {
+								if (innerValue === undefined
+									|| innerValue === null) {
+									// do nothing
+								}
+								else if (innerValue instanceof Buffer) {
+									(value as TypedObject<string>)[key] = innerValue.toString('base64');
+								}
+								else if (typeof innerValue === 'object') {
+									// call recursively
+									(value as TypedObject<object>)[key] = _convertBufferToBase64(innerValue);
+								}
+							});
+
+							return value;
+						}
+
 						switch (contentType) {
 							case CONTENT_TYPE.APPLICATION_JSON:
-								responseBody = JSON.stringify(responseData);
+								responseBody = JSON.stringify(
+									_convertBufferToBase64(responseData)
+								);
 								break;
 
 							default:
