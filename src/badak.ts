@@ -528,107 +528,156 @@ export class Badak {
 
 					bodyStr = Buffer.concat(bodyBuffer).toString();
 
+					if (bodyStr !== undefined) {
+						switch (contentType) {
+							case 'multipart/form-data': {
+								const boundaryStrMatching: RegExpMatchArray | null = boundaryStrPair.match(/boundary\s*=\s*(.+)$/);
 
-					switch (contentType) {
-						case 'multipart/form-data': {
-							const [, boundaryStr] = boundaryStrPair
-								.split('=')
-								.map((s: string): string => s.trim());
+								if (
+									boundaryStrMatching !== null
+									&& boundaryStrMatching.length > 1
+								) {
+									const midBoundaryStr: string = '--' + boundaryStrMatching[1] + '\r\n';
+									const endBoundaryStr: string = '\r\n--' + boundaryStrMatching[1] + '--\r\n';
 
-							if (!boundaryStr) {
-								throw new Error('invalid content-type');
-							}
+									bodyStr
+										// remove starting boundary string
+										.replace(midBoundaryStr, '')
+										// remove end boundary string
+										.replace(endBoundaryStr, '')
+										.split(midBoundaryStr)
+										.forEach((one: string): void => {
+											const filenameMatching: RegExpMatchArray | null = one
+												.match(/filename\s*=\s*["']([^"']+)["']/);
 
-							bodyStr.split(boundaryStr)
-								.filter((one: string): boolean => {
-									return one.includes('Content-Disposition')
-										&& one.includes('form-data')
-										&& one.includes('name=');
-								})
-								.map((one: string): string => {
-									return one
-										.replace(/\r\n--/, '') // multipart/form-data has redundant '--', remove it
-										.replace(/\r\n/g, ''); // trim '\r\n'
-								})
-								.forEach((field: string): void => {
-									// prefix, key, value
-									const [, key, value] = field.split('"');
+											if (filenameMatching === null) {
+												const keyMatching: RegExpMatchArray | null = one
+													.match(/name\s*=\s*["']([^"']+)["']/);
+												const valueMatching: RegExpMatchArray | null = one
+													.match(/\r\n\r\n(.*)(\r\n)*$/);
 
-									if (!param) {
-										param = {} as TypedObject<unknown>;
-									}
+												if (
+													keyMatching !== null
+													&& keyMatching.length > 1
+													&& valueMatching !== null
+													&& valueMatching.length > 1
+												) {
+													const key: string = keyMatching[1];
+													const value: string = valueMatching[1];
 
-									if (key.endsWith('[]')) {
-										// array
-										const arrayName: string = key.replace(/\[]$/g, '');
 
-										if (param[arrayName]) {
-											(param[arrayName] as Array<unknown>).push(value);
-										}
-										else {
-											param[arrayName] = [value];
-										}
-									}
-									else {
-										param[key] = value;
-									}
-								});
+													if (!param) {
+														param = {} as TypedObject<unknown>;
+													}
 
-							break;
-						}
+													if (key.endsWith('[]')) {
+														// array
+														const arrayName: string = key.replace(/\[]$/g, '');
 
-						case CONTENT_TYPE.APPLICATION_JSON:
-							if (bodyStr) {
-								try {
-									param = JSON.parse(bodyStr);
-								}
-								catch (e: unknown) {
-									let errStr: string = 'parsing parameter failed';
-
-									if ((e as Error)?.message) {
-										errStr += `: ${ (e as Error).message }`;
-									}
-
-									throw new Error(errStr);
-								}
-							}
-							// no payload, but ok
-							break;
-
-						case CONTENT_TYPE.APPLICATION_WWW_FORM_URLENCODED:
-							if (bodyStr) {
-								bodyStr
-									.split('&')
-									.forEach((field: string): void => {
-										const [key, value] = field.split('=');
-
-										if (!param) {
-											param = {} as TypedObject<unknown>;
-										}
-
-										if (key.endsWith('[]')) {
-											// array
-											const arrayName: string = key.replace(/\[]$/g, '');
-
-											if (param[arrayName] !== undefined) {
-												(param[arrayName] as Array<unknown>).push(value);
+														if (param[arrayName]) {
+															(param[arrayName] as Array<unknown>).push(value);
+														}
+														else {
+															param[arrayName] = [value];
+														}
+													}
+													else {
+														param[key] = value;
+													}
+												}
 											}
 											else {
-												param[arrayName] = [value];
+												const keyMatching: RegExpMatchArray | null = one
+													.match(/name\s*=\s*["']([^"']+)["']/);
+												const fileContentTypeMatching: RegExpMatchArray | null = one
+													.match(/[cC]ontent-[tT]ype\s*:\s*(.+)(\r\n)*/); // file doesn't end with \r\n, skip $
+
+												if (
+													keyMatching !== null
+													&& keyMatching.length > 1
+													&& fileContentTypeMatching !== null
+													&& fileContentTypeMatching.length > 1
+												) {
+													const fileContentTypeStr: string = fileContentTypeMatching[0];
+
+													const key: string = keyMatching[1];
+													const fileContentType: string = fileContentTypeMatching[1];
+
+													switch (fileContentType.toLowerCase()) {
+														case 'text/plain': {
+															if (!param) {
+																param = {} as TypedObject<unknown>;
+															}
+
+															const fileContents: string = one.slice(
+																(fileContentTypeMatching.index as number) + fileContentTypeStr.length
+															);
+
+															param[key] = fileContents;
+														}
+															break;
+													}
+												}
+
 											}
-										}
-										else {
-											param[key] = value;
-										}
-									});
+										});
+								}
+								break;
 							}
 
-							// no payload, but ok
-							break;
-					}
+							case CONTENT_TYPE.APPLICATION_JSON:
+								if (bodyStr) {
+									try {
+										param = JSON.parse(bodyStr);
+									}
+									catch (e: unknown) {
+										let errStr: string = 'parsing parameter failed';
 
-					if (param) {
-						param = this._paramConverter(param);
+										if ((e as Error)?.message) {
+											errStr += `: ${ (e as Error).message }`;
+										}
+
+										throw new Error(errStr);
+									}
+								}
+								// no payload, but ok
+								break;
+
+							case CONTENT_TYPE.APPLICATION_WWW_FORM_URLENCODED:
+								if (bodyStr) {
+									bodyStr
+										.split('&')
+										.forEach((field: string): void => {
+											const [key, value] = field.split('=');
+
+											if (!param) {
+												param = {} as TypedObject<unknown>;
+											}
+
+											if (key.endsWith('[]')) {
+												// array
+												const arrayName: string = key.replace(/\[]$/g, '');
+
+												if (param[arrayName] !== undefined) {
+													(param[arrayName] as Array<unknown>).push(value);
+												}
+												else {
+													param[arrayName] = [value];
+												}
+											}
+											else {
+												param[key] = value;
+											}
+										});
+								}
+
+								// no payload, but ok
+								break;
+						}
+
+						if (param) {
+							param = this._paramConverter(param);
+						}
 					}
 
 					resolve(param);

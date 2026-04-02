@@ -1,4 +1,5 @@
 import { Server } from 'node:net';
+import { readFileSync } from 'node:fs';
 
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
@@ -395,15 +396,80 @@ describe('core', () => {
 			});
 		});
 
-		// http://derpturkey.com/node-multipart-form-data-explained/
-		// TODO: ok - POST request with file attached
-		// request(app)
-		// 	.post('/some/where')
-		// 	.field('someFormData', JSON.stringify(formData))
-		// 	.set('Content-Type',  'application/octet-stream')
-		// 	.attach('someFile', 'someFile.csv')
-		// 	.expect(400)
-		// 	.end(done);
+		describe('POST request with file attached', () => {
+			const testUri: string = '/file';
+
+			const firstName: string = 'Janghyun';
+			const lastName: string = 'Han';
+
+			const fileFieldName: string = 'fileAttached';
+
+			const fileName: string = 'postFormDataSample.txt';
+			let fileContents: string;
+
+			let testFncCalled: boolean = false;
+
+
+			beforeEach(async () => {
+				fileContents = readFileSync(`./spec/${ fileName }`).toString();
+
+				const testFnc = async <T> (param: T): Promise<T> => {
+					testFncCalled = true;
+
+					expect(param).to.be.a('object');
+					expect(param).to.have.property('firstName', firstName);
+					expect(param).to.have.property('lastName', lastName);
+					expect(param).to.have.property(fileFieldName, fileContents);
+
+					// returns param data
+					return param;
+				};
+
+				testFncCalled = false;
+
+				await app.route({
+					[testUri]: {
+						POST: testFnc
+					}
+				});
+
+				await app.listen(TestPort);
+			});
+
+			afterEach(async () => {
+				await app.stop();
+			});
+
+
+			it('multipart/form-data - text/plain', async () => {
+				const server: Server | undefined = app.getHttpServer();
+
+				if (server === undefined) {
+					throw new Error('spec failed');
+				}
+
+				await request(server)
+					.post(testUri)
+					.field({
+						firstName,
+						lastName
+					})
+					.attach(fileFieldName, `./spec/${ fileName }`)
+					.expect(200)
+					.then((res: SuperTestResponse) => {
+						expect(res).to.be.a('object');
+
+						expect(res.body).to.be.a('object');
+						expect(res.body).to.have.property('firstName', firstName);
+						expect(res.body).to.have.property('lastName', lastName);
+						expect(res.body).to.have.property(fileFieldName, fileContents);
+					});
+
+				expect(testFncCalled).to.be.true;
+			});
+
+			// TODO: Content-Type: application/octet-stream
+		});
 	});
 
 	describe('4-methods', () => {
