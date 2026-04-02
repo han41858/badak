@@ -505,11 +505,10 @@ export class Badak {
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
 	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | undefined> {
 		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
-			const bodyBuffer: Uint8Array[] = [];
-			let bodyStr: string | undefined;
+			const bodyBufferPool: Uint8Array[] = [];
 
 			req.on('data', (stream: Uint8Array): void => {
-				bodyBuffer.push(stream);
+				bodyBufferPool.push(stream);
 			});
 
 			req.on('error', (err: Error): void => {
@@ -517,6 +516,8 @@ export class Badak {
 			});
 
 			req.on('end', async (): Promise<void> => {
+				const bodyBuffer: Buffer = Buffer.concat(bodyBufferPool);
+
 				let param: TypedObject<unknown> | undefined;
 
 				const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
@@ -526,9 +527,7 @@ export class Badak {
 						.split(';')
 						.map((s: string): string => s.trim());
 
-					bodyStr = Buffer.concat(bodyBuffer).toString();
-
-					if (bodyStr !== undefined) {
+					if (bodyBuffer.byteLength > 0) {
 						switch (contentType) {
 							case 'multipart/form-data': {
 								const boundaryStrMatching: RegExpMatchArray | null = boundaryStrPair.match(/boundary\s*=\s*(.+)$/);
@@ -537,98 +536,140 @@ export class Badak {
 									boundaryStrMatching !== null
 									&& boundaryStrMatching.length > 1
 								) {
-									const midBoundaryStr: string = '--' + boundaryStrMatching[1] + '\r\n';
-									const endBoundaryStr: string = '\r\n--' + boundaryStrMatching[1] + '--\r\n';
+									const midBoundaryBuffer: Buffer = Buffer.from('--' + boundaryStrMatching[1] + '\r\n');
+									const endBoundaryBuffer: Buffer = Buffer.from('\r\n--' + boundaryStrMatching[1] + '--\r\n');
 
-									bodyStr
-										// remove starting boundary string
-										.replace(midBoundaryStr, '')
-										// remove end boundary string
-										.replace(endBoundaryStr, '')
-										.split(midBoundaryStr)
-										.forEach((one: string): void => {
-											const filenameMatching: RegExpMatchArray | null = one
-												.match(/filename\s*=\s*["']([^"']+)["']/);
+									const endBoundaryIndex: number = bodyBuffer.indexOf(endBoundaryBuffer);
 
-											if (filenameMatching === null) {
-												const keyMatching: RegExpMatchArray | null = one
-													.match(/name\s*=\s*["']([^"']+)["']/);
-												const valueMatching: RegExpMatchArray | null = one
-													.match(/\r\n\r\n(.*)(\r\n)*$/);
+									// remove end boundary
+									let partialBody: Buffer = Buffer.from(bodyBuffer).subarray(0, endBoundaryIndex);
 
-												if (
-													keyMatching !== null
-													&& keyMatching.length > 1
-													&& valueMatching !== null
-													&& valueMatching.length > 1
-												) {
-													const key: string = keyMatching[1];
-													const value: string = valueMatching[1];
+									const bodyBufferDivided: Buffer[] = [];
 
+									while (partialBody.byteLength > 0) {
+										const index: number = partialBody.indexOf(midBoundaryBuffer);
 
-													if (!param) {
-														param = {} as TypedObject<unknown>;
-													}
+										if (index >= 0) {
+											const nextIndex: number = partialBody
+												.subarray(index + midBoundaryBuffer.byteLength)
+												.indexOf(midBoundaryBuffer);
 
-													if (key.endsWith('[]')) {
-														// array
-														const arrayName: string = key.replace(/\[]$/g, '');
+											if (nextIndex >= 0) {
+												bodyBufferDivided.push(
+													partialBody.subarray(
+														index + midBoundaryBuffer.byteLength,
+														index + midBoundaryBuffer.byteLength + nextIndex
+													)
+												);
 
-														if (param[arrayName]) {
-															(param[arrayName] as Array<unknown>).push(value);
-														}
-														else {
-															param[arrayName] = [value];
-														}
-													}
-													else {
-														param[key] = value;
-													}
-												}
+												partialBody = partialBody.subarray(
+													nextIndex + midBoundaryBuffer.byteLength
+												);
 											}
 											else {
-												const keyMatching: RegExpMatchArray | null = one
-													.match(/name\s*=\s*["']([^"']+)["']/);
-												const fileContentTypeMatching: RegExpMatchArray | null = one
-													.match(/[cC]ontent-[tT]ype\s*:\s*(.+)(\r\n)*/); // file doesn't end with \r\n, skip $
+												// last
+												bodyBufferDivided.push(
+													partialBody.subarray(
+														index + midBoundaryBuffer.byteLength
+													)
+												);
 
-												if (
-													keyMatching !== null
-													&& keyMatching.length > 1
-													&& fileContentTypeMatching !== null
-													&& fileContentTypeMatching.length > 1
-												) {
-													const fileContentTypeStr: string = fileContentTypeMatching[0];
+												partialBody = partialBody.subarray(
+													index + midBoundaryBuffer.byteLength
+												);
+											}
+										}
+										else {
+											partialBody = Buffer.from('');
+										}
+									}
 
-													const key: string = keyMatching[1];
-													const fileContentType: string = fileContentTypeMatching[1];
 
-													switch (fileContentType.toLowerCase()) {
-														case 'text/plain': {
-															if (!param) {
-																param = {} as TypedObject<unknown>;
-															}
+									for (let i = 0; i < bodyBuffer.byteLength; i++) {
 
-															const fileContents: string = one.slice(
-																(fileContentTypeMatching.index as number) + fileContentTypeStr.length
-															);
+									}
 
-															param[key] = fileContents;
-														}
-															break;
-													}
+									bodyBufferDivided.forEach((one: Buffer): void => {
+										const oneStr: string = one.toString();
+
+										const filenameMatching: RegExpMatchArray | null = oneStr
+											.match(/filename\s*=\s*["']([^"']+)["']/);
+
+										if (filenameMatching === null) {
+											const keyMatching: RegExpMatchArray | null = oneStr
+												.match(/name\s*=\s*["']([^"']+)["']/);
+											const valueMatching: RegExpMatchArray | null = oneStr
+												.match(/\r\n\r\n(.*)(\r\n)*$/);
+
+											if (
+												keyMatching !== null
+												&& keyMatching.length > 1
+												&& valueMatching !== null
+												&& valueMatching.length > 1
+											) {
+												const key: string = keyMatching[1];
+												const value: string = valueMatching[1];
+
+
+												if (!param) {
+													param = {} as TypedObject<unknown>;
 												}
 
+												if (key.endsWith('[]')) {
+													// array
+													const arrayName: string = key.replace(/\[]$/g, '');
+
+													if (param[arrayName]) {
+														(param[arrayName] as Array<unknown>).push(value);
+													}
+													else {
+														param[arrayName] = [value];
+													}
+												}
+												else {
+													param[key] = value;
+												}
 											}
-										});
+										}
+										else {
+											const keyMatching: RegExpMatchArray | null = oneStr
+												.match(/name\s*=\s*["']([^"']+)["']/);
+											const fileContentTypeMatching: RegExpMatchArray | null = oneStr
+												.match(/[cC]ontent-[tT]ype\s*:\s*(.+)(\r\n)*/); // file doesn't end with \r\n, skip $
+
+											if (
+												keyMatching !== null
+												&& keyMatching.length > 1
+												&& fileContentTypeMatching !== null
+												&& fileContentTypeMatching.length > 1
+											) {
+												const fileContentTypeStr: string = fileContentTypeMatching[0];
+
+												const key: string = keyMatching[1];
+												const fileContentType: string = fileContentTypeMatching[1];
+												const cutStartIndex: number = (fileContentTypeMatching.index as number) + fileContentTypeStr.length;
+
+												if (!param) {
+													param = {} as TypedObject<unknown>;
+												}
+
+												switch (fileContentType.toLowerCase()) {
+													case 'text/plain': {
+														param[key] = oneStr.slice(cutStartIndex);
+														break;
+													}
+												}
+											}
+										}
+									});
 								}
 								break;
 							}
 
 							case CONTENT_TYPE.APPLICATION_JSON:
-								if (bodyStr) {
+								if (bodyBuffer.byteLength > 0) {
 									try {
-										param = JSON.parse(bodyStr);
+										param = JSON.parse(bodyBuffer.toString());
 									}
 									catch (e: unknown) {
 										let errStr: string = 'parsing parameter failed';
@@ -644,8 +685,9 @@ export class Badak {
 								break;
 
 							case CONTENT_TYPE.APPLICATION_WWW_FORM_URLENCODED:
-								if (bodyStr) {
-									bodyStr
+								if (bodyBuffer.byteLength > 0) {
+									bodyBuffer
+										.toString()
 										.split('&')
 										.forEach((field: string): void => {
 											const [key, value] = field.split('=');
