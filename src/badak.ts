@@ -1222,54 +1222,58 @@ export class Badak {
 						console.error('badak catch error : %o', err);
 					}
 
-					switch (err.message) {
-						case 'Unauthorized':
-							res.statusCode = 401; // Unauthorized, Unauthenticated
+					interface HttpResStatusCode {
+						code: number;
+						message: string;
+					}
 
-							res.end();
-							break;
+					const statusCodes: HttpResStatusCode[] = [
+						{ code: 400, message: 'Bad Request' },
+						{ code: 401, message: 'Unauthorized' },
+						{ code: 401, message: 'Unauthenticated' },
+						{ code: 403, message: 'Forbidden' },
+						{ code: 404, message: 'Not Found' },
+						{ code: 404, message: 'no rule' },
+						{ code: 405, message: 'Method Not Allowed' },
+						{ code: 406, message: 'Not Acceptable' },
+						{ code: 500, message: 'parsing parameter failed' }
+					];
 
-						case 'no rule':
-							res.statusCode = 404; // not found
+					const foundResult: HttpResStatusCode | undefined = statusCodes.find((def: HttpResStatusCode): boolean => {
+						return def.message == err.message;
+					});
 
-							res.end();
-							break;
+					if (foundResult) {
+						res.statusCode = foundResult.code;
+						res.end();
+					}
+					else {
+						res.statusCode = 500; // Internal Server Error
 
-						// internal errors
-						case 'parsing parameter failed':
-							res.statusCode = 500; // Internal Server Error
-
-							res.end();
-							break;
-
-						default:
-							res.statusCode = 500; // Internal Server Error
-
-							if (err) {
-								if (err instanceof Error) {
-									responseBody = err.message;
-									res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.TEXT_PLAIN);
-								}
-								else {
-									const contentType: CONTENT_TYPE = getContentType(err);
-									res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
-
-									switch (contentType) {
-										case CONTENT_TYPE.APPLICATION_JSON:
-											responseBody = JSON.stringify(err);
-											break;
-
-										default:
-											responseBody = err;
-									}
-								}
-
-								res.end(responseBody);
+						if (err) {
+							if (err instanceof Error) {
+								responseBody = err.message;
+								res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.TEXT_PLAIN);
 							}
 							else {
-								res.end();
+								const contentType: CONTENT_TYPE = getContentType(err);
+								res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
+
+								switch (contentType) {
+									case CONTENT_TYPE.APPLICATION_JSON:
+										responseBody = JSON.stringify(err);
+										break;
+
+									default:
+										responseBody = err;
+								}
 							}
-							break;
+
+							res.end(responseBody);
+						}
+						else {
+							res.end();
+						}
 					}
 
 					if (!this._config.preventError) {
