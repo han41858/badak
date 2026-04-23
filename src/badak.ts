@@ -1177,7 +1177,10 @@ export class Badak {
 
 					if (responseData) {
 						const contentType: CONTENT_TYPE = getContentType(responseData);
-						res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
+
+						if (!res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
+						}
 
 						function _convertBufferToBase64<T extends object> (value: T): T {
 							Object.entries(value).forEach(([key, innerValue]) => {
