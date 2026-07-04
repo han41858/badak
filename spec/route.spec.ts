@@ -1412,7 +1412,7 @@ describe('route()', () => {
 						.get('/abcde')
 						.expect(200);
 
-					expect(testFncRunCount).to.be.eql(outerCounter++);
+					expect(testFncRunCount).to.be.eql(outerCounter);
 				});
 			});
 		});

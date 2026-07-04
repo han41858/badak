@@ -584,11 +584,6 @@ export class Badak {
 										}
 									}
 
-
-									for (let i = 0; i < bodyBuffer.byteLength; i++) {
-
-									}
-
 									bodyBufferDivided.forEach((one: Buffer): void => {
 										const oneStr: string = one.toString();
 
@@ -683,7 +678,7 @@ export class Badak {
 											errStr += `: ${ (e as Error).message }`;
 										}
 
-										throw new Error(errStr);
+										throw new Error(errStr, { cause: e });
 									}
 								}
 								// no payload, but ok
@@ -1165,7 +1160,7 @@ export class Badak {
 							await this._authFnc(req, res);
 						}
 						catch (e: unknown) {
-							throw new Error('Unauthorized');
+							throw new Error('Unauthorized', { cause: e });
 						}
 					}
 
