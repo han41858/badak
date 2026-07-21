@@ -1,6 +1,6 @@
 {
 	"compilerOptions": {
-		"rootDir": ".",
+		"rootDir": "./src",
 		"types": ["node"],
 		"lib": ["ES2022"],
 		"target": "ES2022",
