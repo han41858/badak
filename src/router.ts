@@ -44,6 +44,25 @@ enum LOOP_CONTROL {
 	CONTINUE = 'C'
 }
 
+// '**' captures the rest of the path, so it is allowed only as the last uri fragment
+// e.g. '/files/**' is ok, '/files/**/edit' throws
+const checkDoubleAsteriskPosition = (rule: RouteRule): void => {
+	for (const [key, child] of Object.entries(rule)) {
+		if (Object.values(METHOD).includes(key as METHOD) || typeof child !== 'object' || child === null) {
+			continue;
+		}
+
+		if (
+			key === '**'
+			&& Object.keys(child).some((childKey: string): boolean => !Object.values(METHOD).includes(childKey as METHOD))
+		) {
+			throw new Error('invalid double asterisk route, \'**\' should be the last uri fragment');
+		}
+
+		checkDoubleAsteriskPosition(child as RouteRule);
+	}
+};
+
 // refine route rule, this function can be called recursively
 // defaultMethod : method for a route function assigned without method key
 export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: METHOD | undefined, isRoot: boolean = true): RouteRule => {
@@ -141,6 +160,10 @@ export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: 
 				}
 			}
 		});
+	}
+
+	if (isRoot) {
+		checkDoubleAsteriskPosition(refinedRuleObj);
 	}
 
 	return refinedRuleObj;
@@ -466,9 +489,19 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 				param = {};
 			}
 
-			param['**'] = decodeUriFrag(uriFrag);
+			// rest of the path after '**', each uri fragment is decoded and joined with '/'
+			// e.g. '/files/**' : '/files/a/b%20c' -> 'a/b c', '/files' -> ''
+			// uriFrag is consumed already if it matched above (e.g. 'files' of '/files/**')
+			const restStartIndex: number = loopControl === LOOP_CONTROL.CONTINUE
+				? depthIter + 1
+				: depthIter;
 
-			// ignore after uriFrag
+			param['**'] = uriArr
+				.slice(restStartIndex)
+				.map((restUriFrag: string): string => decodeUriFrag(restUriFrag))
+				.join('/');
+
+			// rest of the path is captured by '**'
 			loopControl = LOOP_CONTROL.BREAK;
 		}
 

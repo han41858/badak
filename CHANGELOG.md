@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+
+- The `**` param of `**` routing is the rest of the path, e.g. `{ '**': 'a/b/c' }` for `/files/a/b/c` of `/files/**`. It was the uri fragment before `**` (`'files'`). ([#52](https://github.com/han41858/badak/pull/52))
+  - each uri fragment is decoded and joined with `/`, so a malformed percent-encoding in the rest of the path responds `400`.
+  - matching range and priority are not changed.
+- A routing path with `**` not at the end (e.g. `/files/**/edit`) throws an error when it is registered. It was registered, but never matched. ([#52](https://github.com/han41858/badak/pull/52))
+
 ### Others
 
 - The TypeScript source (`src/`) and declaration maps (`.d.ts.map`) are published with the package. ([#51](https://github.com/han41858/badak/pull/51))

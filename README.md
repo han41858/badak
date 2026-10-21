@@ -405,6 +405,22 @@ If you specify the routing path as `/user1+`, you can match paths such as `/user
 
 If you specify a routing path as `/user1*`, you can match paths such as `/user`, `/user1`, and `/user11`.
 
+### `**` routing
+
+`**` matches the rest of the path, including `/`.
+The rest of the path is passed as `**` of the param: each uri fragment is decoded and joined with `/`.
+
+```typescript
+await app.get('/files/**', (param) => param);
+
+// GET /files/a/b%20c/d.txt -> { '**': 'a/b c/d.txt' }
+// GET /files/a/b?c=1       -> { '**': 'a/b', c: '1' }
+```
+
+- `**` should be the last uri fragment of the routing path. A path like `/files/**/edit` throws an error when it is registered.
+- `%2F` in a uri fragment is decoded to `/` too, so `/files/a%2Fb` and `/files/a/b` pass the same value.
+- A malformed percent-encoding in the rest of the path responds `400 Bad Request`.
+
 ## Routing Param
 
 ### query string
