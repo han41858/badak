@@ -4,14 +4,34 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { METHOD } from './constants.js';
 
 
-/** The independent sources of route parameters, query values and parsed request body. */
-export interface ParamContext {
-	params: Record<string, string>;
-	query: Record<string, unknown>;
-	body: unknown;
+/**
+ * Optional named type declarations for request data.
+ * These declarations do not validate untrusted HTTP input at runtime.
+ */
+export interface ParamTypes {
+	params?: object;
+	query?: object;
+	body?: unknown;
 }
 
-export type RouteFunction = (ctx: ParamContext, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
+/** The independent sources of route parameters, query values and parsed request body. */
+export interface ParamContext<T extends ParamTypes = {}> {
+	params: T extends { params: infer P } ? P : Record<string, string>;
+	query: T extends { query: infer Q } ? Q : Record<string, unknown>;
+	body: T extends { body: infer B } ? B : unknown;
+}
+
+export type RouteFunction<T extends ParamTypes = {}> = (
+	ctx: ParamContext<T>,
+	req: IncomingMessage,
+	res: ServerResponse
+) => unknown | Promise<unknown>;
+
+// Method-signature bivariance allows separately typed handlers in a heterogeneous route() tree.
+// Runtime dispatch only invokes the selected handler; declaring request types does not validate them.
+export type RouteHandler = {
+	handle(ctx: ParamContext<never>, req: IncomingMessage, res: ServerResponse): unknown | Promise<unknown>;
+}['handle'];
 export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, responseBody?: unknown) => void | Promise<void>;
 
 export interface TypedObject<T> {
@@ -20,7 +40,7 @@ export interface TypedObject<T> {
 
 export interface RouteRule {
 	// function can be assigned after config('defaultMethod', [method_type])
-	[uri: string]: RouteRule | RouteRuleSeed | RouteFunction;
+	[uri: string]: RouteRule | RouteRuleSeed | RouteHandler;
 }
 
 export interface RouteOption {
@@ -29,16 +49,16 @@ export interface RouteOption {
 }
 
 export interface RouteFunctionObj {
-	fnc: RouteFunction;
+	fnc: RouteHandler;
 	option?: RouteOption;
 }
 
 export interface RouteRuleSeed {
-	GET?: RouteFunction | RouteFunctionObj;
-	POST?: RouteFunction | RouteFunctionObj;
-	PUT?: RouteFunction | RouteFunctionObj;
-	PATCH?: RouteFunction | RouteFunctionObj;
-	DELETE?: RouteFunction | RouteFunctionObj;
+	GET?: RouteHandler | RouteFunctionObj;
+	POST?: RouteHandler | RouteFunctionObj;
+	PUT?: RouteHandler | RouteFunctionObj;
+	PATCH?: RouteHandler | RouteFunctionObj;
+	DELETE?: RouteHandler | RouteFunctionObj;
 }
 
 export interface BadakOption extends TypedObject<boolean | number | METHOD | undefined> {
