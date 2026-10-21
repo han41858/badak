@@ -1,4 +1,4 @@
-import { request as httpRequest } from 'node:http';
+import { Agent, request as httpRequest } from 'node:http';
 
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
@@ -37,7 +37,7 @@ describe('config()', () => {
 	});
 
 	describe('invalid value', () => {
-		const booleanKeys: string[] = ['parseNumber', 'parseDate'];
+		const booleanKeys: string[] = ['catchErrorLog', 'preventError', 'parseNumber', 'parseDate'];
 
 		booleanKeys.forEach((key: string): void => {
 			it(key + ' - undefined', () => {
@@ -747,11 +747,15 @@ describe('config()', () => {
 		};
 
 		describe('invalid value', () => {
-			[0, -1, NaN, '1000', true, null].forEach((value: unknown): void => {
+			[0, -1, NaN, 0.5, 1024.5, -Infinity, '1000', true, null].forEach((value: unknown): void => {
 				it(String(value), () => {
 					return promiseFail(
 						app.config('bodyLimit', value)
 					);
+				});
+
+				it(String(value) + ' - in constructor', () => {
+					expect(() => new Badak({ bodyLimit: value as number })).to.throw();
 				});
 			});
 		});
@@ -842,6 +846,49 @@ describe('config()', () => {
 				.expect(200);
 		});
 
+		it('same keep-alive connection works after rejecting large body', async () => {
+			await app.config('bodyLimit', 1024);
+			await listen();
+
+			const agent: Agent = new Agent({ keepAlive: true, maxSockets: 1 });
+			const sockets: Set<unknown> = new Set();
+
+			const send = (body: string): Promise<number | undefined> => {
+				return new Promise((resolve, reject): void => {
+					const req = httpRequest({
+						port: TestPort,
+						method: 'POST',
+						path: '/test',
+						agent,
+						headers: {
+							'content-type': 'application/json',
+							'content-length': Buffer.byteLength(body)
+						}
+					}, (res): void => {
+						sockets.add(res.socket);
+
+						res.resume();
+						res.on('end', (): void => resolve(res.statusCode));
+					});
+
+					req.on('error', reject);
+					req.end(body);
+				});
+			};
+
+			try {
+				// rejected by content-length before receiving body
+				expect(await send(jsonOfSize(1024 * 1024))).to.be.eql(413);
+				expect(await send(jsonOfSize(100))).to.be.eql(200);
+				expect(await send(jsonOfSize(100))).to.be.eql(200);
+
+				expect(sockets.size).to.be.eql(1);
+			}
+			finally {
+				agent.destroy();
+			}
+		});
+
 		it('server works after rejecting large body', async () => {
 			await app.config('bodyLimit', 1024);
 			await listen();
@@ -857,6 +904,31 @@ describe('config()', () => {
 				.set('Content-Type', 'application/json')
 				.send(jsonOfSize(100))
 				.expect(200);
+		});
+	});
+
+	describe('option validation', () => {
+		it('not defined key', () => {
+			expect(() => new Badak({ somethingNotDefinedKey: true })).to.throw();
+		});
+
+		it('invalid boolean value', () => {
+			expect(() => new Badak({ parseNumber: 'yes' as unknown as boolean })).to.throw();
+		});
+
+		it('undefined value is ignored', () => {
+			expect(() => new Badak({ bodyLimit: undefined })).not.to.throw();
+		});
+
+		it('catchErrorLog & preventError by config()', async () => {
+			await app.config('catchErrorLog', true);
+			await app.config('preventError', false);
+
+			// @ts-expect-error: private property
+			const config: BadakOption = app._config;
+
+			expect(config.catchErrorLog).to.be.true;
+			expect(config.preventError).to.be.false;
 		});
 	});
 });

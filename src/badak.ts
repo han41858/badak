@@ -86,7 +86,10 @@ export class Badak {
 	constructor (option?: Partial<BadakOption>) {
 		if (option) {
 			for (const [key, value] of Object.entries(option)) {
-				this._config[key] = value;
+				// undefined means not set (Partial<BadakOption>)
+				if (value !== undefined) {
+					this._setOption(key, value);
+				}
 			}
 		}
 	}
@@ -345,52 +348,62 @@ export class Badak {
 		this._middlewaresAfter.push(middleware);
 	}
 
+	// validate & set an option, shared by constructor and config()
+	private _setOption (key: string, value: unknown): void {
+		switch (key) {
+			// boolean keys
+			case 'catchErrorLog':
+			case 'preventError':
+			case 'parseNumber':
+			case 'parseDate':
+				if (typeof value !== 'boolean') {
+					throw new Error('invalid value');
+				}
+
+				this._config[key] = value;
+				break;
+
+			case 'bodyLimit':
+				// bytes, positive integer or Infinity (no limit)
+				// NaN or decimal is rejected, NaN disables every size comparison
+				if (
+					typeof value !== 'number'
+					|| value <= 0
+					|| (!Number.isInteger(value) && value !== Infinity)
+				) {
+					throw new Error('invalid value');
+				}
+
+				this._config.bodyLimit = value;
+				break;
+
+			case 'defaultMethod':
+				if (value !== null) {
+					if (typeof value !== 'string') {
+						throw new Error('invalid method parameter');
+					}
+
+					if (!Object.values(METHOD).some((method: string): boolean => {
+						return value.toUpperCase() === method;
+					})) {
+						throw new Error('not defined method');
+					}
+
+					this._config.defaultMethod = value.toUpperCase() as METHOD;
+				}
+				else {
+					// null is clearing
+					delete this._config[key];
+				}
+				break;
+
+			default:
+				throw new Error('not defined option');
+		}
+	}
+
 	async config (key: string, value: unknown): Promise<void> {
-		if (Object.keys(this._config).includes(key)) {
-			switch (key) {
-				// boolean keys
-				case 'parseNumber':
-				case 'parseDate':
-					if (typeof value !== 'boolean') {
-						throw new Error('invalid value');
-					}
-
-					this._config[key] = value;
-					break;
-
-				case 'bodyLimit':
-					// Infinity means no limit
-					if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
-						throw new Error('invalid value');
-					}
-
-					this._config.bodyLimit = value;
-					break;
-
-				case 'defaultMethod':
-					if (value !== null) {
-						if (typeof value !== 'string') {
-							throw new Error('invalid method parameter');
-						}
-
-						if (!Object.values(METHOD).some((method: string): boolean => {
-							return value.toUpperCase() === method;
-						})) {
-							throw new Error('not defined method');
-						}
-
-						this._config.defaultMethod = value.toUpperCase() as METHOD;
-					}
-					else {
-						// null is clearing
-						delete this._config[key];
-					}
-					break;
-			}
-		}
-		else {
-			throw new Error('not defined option');
-		}
+		this._setOption(key, value);
 	}
 
 	private _routeAbbrValidator (address: string, fnc: RouteFunction): void {
@@ -643,6 +656,9 @@ export class Badak {
 			const contentLength: number = Number(req.headers['content-length']);
 
 			if (contentLength > bodyLimit) {
+				// discard the body to keep the connection (keep-alive) usable
+				req.resume();
+
 				reject(new Error('Payload Too Large'));
 				return;
 			}
@@ -653,7 +669,7 @@ export class Badak {
 
 			req.on('data', (stream: Uint8Array): void => {
 				if (limitExceeded) {
-					// drop rest of the body
+					// discard rest of the body to keep the connection (keep-alive) usable
 					return;
 				}
 

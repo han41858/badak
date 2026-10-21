@@ -211,9 +211,10 @@ The default is `false`.
 
 #### `bodyLimit: number`
 
-The maximum size of the request body in bytes.
+The maximum size of the request body in bytes, a positive integer.
 If the request body is larger than this value, a `413 Payload Too Large` error occurs.
-This limit also applies to files uploaded with `multipart/form-data`.
+For `multipart/form-data`, the whole request body is counted, including part headers and boundaries,
+so increase this value if you accept file uploads.
 Specify `Infinity` to remove the limit.
 
 The default is `102400` (100KB).
