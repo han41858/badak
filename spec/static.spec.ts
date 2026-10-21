@@ -147,9 +147,9 @@ describe('static()', () => {
 									expect(res.text).to.be.a('string');
 									expect(res.text).to.be.eql(fileData);
 								}),
-							request(app.getHttpServer()).post(fullUri).expect(404),
-							request(app.getHttpServer()).put(fullUri).expect(404),
-							request(app.getHttpServer()).delete(fullUri).expect(404)
+							request(app.getHttpServer()).post(fullUri).expect(405).expect('Allow', 'GET, HEAD'),
+							request(app.getHttpServer()).put(fullUri).expect(405),
+							request(app.getHttpServer()).delete(fullUri).expect(405)
 						]);
 
 						if (i === 0) {
@@ -408,9 +408,9 @@ describe('static()', () => {
 
 						expect(!!res.body || !!res.text).to.be.ok;
 					});
-				await request(app.getHttpServer()).post(fullUri).expect(404);
-				await request(app.getHttpServer()).put(fullUri).expect(404);
-				await request(app.getHttpServer()).delete(fullUri).expect(404);
+				await request(app.getHttpServer()).post(fullUri).expect(405);
+				await request(app.getHttpServer()).put(fullUri).expect(405);
+				await request(app.getHttpServer()).delete(fullUri).expect(405);
 
 				// request twice to check cache working
 				await request(app.getHttpServer())
@@ -425,9 +425,9 @@ describe('static()', () => {
 						expect(!!res.body || !!res.text).to.be.ok;
 					});
 
-				await request(app.getHttpServer()).post(fullUri).expect(404);
-				await request(app.getHttpServer()).put(fullUri).expect(404);
-				await request(app.getHttpServer()).delete(fullUri).expect(404);
+				await request(app.getHttpServer()).post(fullUri).expect(405);
+				await request(app.getHttpServer()).put(fullUri).expect(405);
+				await request(app.getHttpServer()).delete(fullUri).expect(405);
 			});
 		});
 	});

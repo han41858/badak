@@ -680,7 +680,8 @@ describe('config()', () => {
 							expect((routeRule['/'] as RouteRule)[testUriRefined]).to.have.property(setMethod);
 
 							await getReqFnc(testMethod)
-								.expect(setMethod === testMethod ? 200 : 404);
+								// path exists for other method : 405
+								.expect(setMethod === testMethod ? 200 : 405);
 						});
 					});
 				});

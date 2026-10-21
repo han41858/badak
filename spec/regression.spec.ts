@@ -379,4 +379,42 @@ describe('regression', () => {
 			expect(res.status).not.to.be.eql(200);
 		});
 	});
+
+	describe('405 Method Not Allowed', () => {
+		it('Allow header lists available methods, HEAD after GET', async () => {
+			await app.get('/items', echoFnc);
+			await app.post('/items', echoFnc);
+			await app.delete('/items', echoFnc);
+			await app.listen(TestPort);
+
+			await request(app.getHttpServer())
+				.put('/items')
+				.expect(405)
+				.expect('Allow', 'GET, HEAD, POST, DELETE');
+		});
+
+		it('no GET, no HEAD', async () => {
+			await app.post('/items', echoFnc);
+			await app.listen(TestPort);
+
+			await request(app.getHttpServer())
+				.head('/items')
+				.expect(405)
+				.expect('Allow', 'POST');
+		});
+
+		it('not matched path is still 404', async () => {
+			await app.get('/users/:id', echoFnc);
+			await app.listen(TestPort);
+
+			// intermediate path without route function
+			await request(app.getHttpServer())
+				.get('/users')
+				.expect(404);
+
+			await request(app.getHttpServer())
+				.get('/nothing')
+				.expect(404);
+		});
+	});
 });

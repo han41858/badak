@@ -117,6 +117,10 @@ Stop the HTTP server.
 
 Register a routing function.
 
+If a request matches a registered path but no routing function is registered for its method,
+badak responds `405 Method Not Allowed` with the `Allow` header listing the available methods.
+If no path matches, badak responds `404 Not Found`.
+
 ### `get(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 Registers a routing function that responds to `GET` method requests.

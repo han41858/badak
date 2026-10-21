@@ -1115,6 +1115,24 @@ export class Badak {
 					}
 
 					if (targetFncObj === undefined) {
+						// path exists, but not for this method : 405 with allowed methods
+						const allowedMethods: string[] = checkTargetRule !== undefined
+							? Object.values(METHOD).filter((one: METHOD): boolean => {
+								return (checkTargetRule as RouteRule)[one] !== undefined;
+							})
+							: [];
+
+						if (allowedMethods.length > 0) {
+							// HEAD is handled by GET
+							if (allowedMethods.includes(METHOD.GET)) {
+								allowedMethods.splice(allowedMethods.indexOf(METHOD.GET) + 1, 0, 'HEAD');
+							}
+
+							res.setHeader('Allow', allowedMethods.join(', '));
+
+							throw new Error('Method Not Allowed');
+						}
+
 						throw new Error('no rule');
 					}
 

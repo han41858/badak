@@ -112,6 +112,10 @@ HTTP 서버를 정지합니다.
 
 라우팅 함수를 등록합니다.
 
+요청 경로와 일치하는 라우팅 규칙은 있지만 요청 메서드에 해당하는 라우팅 함수가 없으면,
+`405 Method Not Allowed`와 함께 사용할 수 있는 메서드 목록을 `Allow` 헤더로 응답합니다.
+일치하는 경로가 없으면 `404 Not Found`로 응답합니다.
+
 ### `get(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 `GET` 메서드 요청에 반응하는 라우팅 함수를 등록합니다.
