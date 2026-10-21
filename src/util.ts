@@ -8,6 +8,7 @@ import * as node_path from 'node:path';
 
 import { StaticCache } from './interfaces.js';
 import { CONTENT_TYPE } from './constants.js';
+import { HttpError } from './http-error.js';
 
 
 // only plain decimal format is converted : '5', '-1.5', '0.25'
@@ -68,7 +69,7 @@ export const decodeUriFrag = (uriFrag: string): string => {
 		return decodeURIComponent(uriFrag);
 	}
 	catch (e: unknown) {
-		throw new Error('Bad Request', { cause: e });
+		throw new HttpError(400, { cause: e });
 	}
 };
 
@@ -452,7 +453,7 @@ export const parseMultipart = (body: Buffer, boundary: string): MultipartPart[] 
 	let delimiter: MultipartDelimiter | undefined = findMultipartDelimiter(body, boundary, 0);
 
 	if (delimiter === undefined) {
-		throw new Error('Bad Request');
+		throw new HttpError(400);
 	}
 
 	while (!delimiter.isClose) {
@@ -461,7 +462,7 @@ export const parseMultipart = (body: Buffer, boundary: string): MultipartPart[] 
 
 		if (nextDelimiter === undefined) {
 			// no close delimiter
-			throw new Error('Bad Request');
+			throw new HttpError(400);
 		}
 
 		// CRLF before delimiter belongs to delimiter
@@ -469,7 +470,7 @@ export const parseMultipart = (body: Buffer, boundary: string): MultipartPart[] 
 		const headerEndIndex: number = part.indexOf(CRLF + CRLF);
 
 		if (headerEndIndex < 0) {
-			throw new Error('Bad Request');
+			throw new HttpError(400);
 		}
 
 		const headers: Record<string, string> = {};

@@ -16,7 +16,7 @@ import {
 	TypedObject
 } from './interfaces.js';
 import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, MAX_TIMER_DELAY, METHOD } from './constants.js';
-import { isHttpError } from './http-error.js';
+import { HttpError, isHttpError } from './http-error.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -572,7 +572,7 @@ export class Badak {
 
 						if (boundary === undefined) {
 							// boundary is mandatory for multipart/form-data
-							throw new Error('Bad Request');
+							throw new HttpError(400);
 						}
 
 						parseMultipart(bodyBuffer, boundary).forEach((part: MultipartPart): void => {
@@ -620,7 +620,7 @@ export class Badak {
 							}
 							catch (e: unknown) {
 								// malformed JSON is client's fault
-								throw new Error('Bad Request', { cause: e });
+								throw new HttpError(400, { cause: e });
 							}
 						}
 						// no payload, but ok
@@ -678,7 +678,7 @@ export class Badak {
 				// discard the body to keep the connection (keep-alive) usable
 				req.resume();
 
-				reject(new Error('Payload Too Large'));
+				reject(new HttpError(413));
 				return;
 			}
 
@@ -699,7 +699,7 @@ export class Badak {
 					limitExceeded = true;
 					bodyBufferPool.length = 0;
 
-					reject(new Error('Payload Too Large'));
+					reject(new HttpError(413));
 					return;
 				}
 
@@ -954,12 +954,12 @@ export class Badak {
 
 					if (this._staticRules === null) {
 						// no rule assigned
-						throw new Error('no rule');
+						throw new HttpError(404);
 					}
 
 
 					if (!req.method) {
-						throw new Error('no method');
+						throw new HttpError(400);
 					}
 
 					const method: string = req.method.toUpperCase();
@@ -1215,12 +1215,10 @@ export class Badak {
 								allowedMethods.splice(allowedMethods.indexOf(METHOD.GET) + 1, 0, 'HEAD');
 							}
 
-							res.setHeader('Allow', allowedMethods.join(', '));
-
-							throw new Error('Method Not Allowed');
+							throw new HttpError(405, { headers: { Allow: allowedMethods.join(', ') } });
 						}
 
-						throw new Error('no rule');
+						throw new HttpError(404);
 					}
 
 					// params are merged in this order, the latter wins for the same key :
