@@ -796,8 +796,9 @@ export class Badak {
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
 							res.setHeader(HEADER_KEY.CONTENT_TYPE, oneCache.mime);
-							res.write(oneCache.fileData);
-							res.end();
+							// explicit content-length for HEAD, same as GET
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, oneCache.fileData.byteLength);
+							res.end(oneCache.fileData);
 						},
 						{
 							auth: false
@@ -833,10 +834,13 @@ export class Badak {
 							};
 
 							res.setHeader(HEADER_KEY.CONTENT_TYPE, resFileObj.mime);
-							res.write(resFileObj.fileData);
+							// explicit content-length for HEAD, same as GET
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, resFileObj.fileData.byteLength);
+							res.end(resFileObj.fileData);
 						}
-
-						res.end();
+						else {
+							res.end();
+						}
 					},
 					{
 						auth: false
@@ -1240,6 +1244,15 @@ export class Badak {
 							default:
 								responseBody = responseData;
 
+						}
+
+						// explicit content-length, so that HEAD has the same headers as GET
+						// (Node.js sets it by itself for GET only, because HEAD has no body)
+						if (
+							!res.hasHeader(HEADER_KEY.CONTENT_LENGTH)
+							&& (typeof responseBody === 'string' || responseBody instanceof Uint8Array)
+						) {
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, Buffer.byteLength(responseBody));
 						}
 
 						res.end(responseBody);

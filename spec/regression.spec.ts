@@ -1,3 +1,4 @@
+import { IncomingMessage, ServerResponse } from 'node:http';
 import * as path from 'node:path';
 
 import { afterEach, beforeEach } from 'mocha';
@@ -367,6 +368,40 @@ describe('regression', () => {
 				.head('/static/test.html')
 				.expect(200)
 				.expect('content-type', 'text/html');
+		});
+
+		it('same content-type & content-length as GET', async () => {
+			await app.get('/data', (): TypedObject<string> => ({ msg: '한글' }));
+			await app.static('/static', path.join(__dirname, 'static'));
+			await app.listen(TestPort);
+
+			for (const uri of ['/data', '/static/test.html', '/static/test.png']) {
+				const getRes: SuperTestResponse = await request(app.getHttpServer()).get(uri).expect(200);
+				const headRes: SuperTestResponse = await request(app.getHttpServer()).head(uri).expect(200);
+
+				expect(getRes.headers['content-length']).to.be.a('string');
+				expect(headRes.headers['content-type']).to.be.eql(getRes.headers['content-type']);
+				expect(headRes.headers['content-length']).to.be.eql(getRes.headers['content-length']);
+			}
+		});
+
+		it('streaming route function', async () => {
+			await app.get('/stream', (param: unknown, req: IncomingMessage, res: ServerResponse): void => {
+				res.writeHead(200, { 'Content-Type': 'text/plain' });
+				res.write('a');
+
+				setTimeout((): void => {
+					res.end('b');
+				}, 20);
+			});
+
+			await app.listen(TestPort);
+
+			await request(app.getHttpServer())
+				.head('/stream')
+				.timeout(1000)
+				.expect(200)
+				.expect('content-type', 'text/plain');
 		});
 
 		it('not handled without GET route', async () => {
