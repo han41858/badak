@@ -1103,6 +1103,52 @@ describe('route()', () => {
 		});
 
 		// ab?cd - abc, abcd
+		describe('duplication check between different parents', () => {
+			it('colon routing in different parents, in different time', async () => {
+				await app.get('/users/:id', echoFnc);
+				await app.get('/posts/:postId', echoFnc);
+
+				await app.listen(TestPort);
+
+				const userRes: SuperTestResponse = await request(app.getHttpServer())
+					.get('/users/1')
+					.expect(200);
+
+				expect(userRes.body).to.be.eql({ id: '1' });
+
+				const postRes: SuperTestResponse = await request(app.getHttpServer())
+					.get('/posts/2')
+					.expect(200);
+
+				expect(postRes.body).to.be.eql({ postId: '2' });
+			});
+
+			it('colon routing in different parents, in same time', async () => {
+				await app.route({
+					users: {
+						':id': {
+							GET: echoFnc
+						}
+					},
+					posts: {
+						':postId': {
+							GET: echoFnc
+						}
+					}
+				});
+			});
+
+			it('asterisk routing in different parents', async () => {
+				await app.get('/a/*', emptyFnc);
+				await app.get('/b/*', emptyFnc);
+			});
+
+			it('colon routing in different depth', async () => {
+				await app.get('/:id', emptyFnc);
+				await app.get('/users/:name', emptyFnc);
+			});
+		});
+
 		describe('question routing', () => {
 			describe('error', () => {
 				it('start with \'?\'', () => {
