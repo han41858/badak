@@ -1,4 +1,5 @@
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 
 const getUserList = async (): Promise<{ list: string[] }> => {
 	return {
@@ -6,8 +7,8 @@ const getUserList = async (): Promise<{ list: string[] }> => {
 	};
 };
 
-const addUser = async (param: unknown): Promise<{ result: string }> => {
-	console.log('addUser()', param);
+const addUser = async ({ body }: ParamContext): Promise<{ result: string }> => {
+	console.log('addUser()', body);
 
 	return {
 		result: 'ok'
