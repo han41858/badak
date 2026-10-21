@@ -4,8 +4,14 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { METHOD } from './constants.js';
 
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type RouteFunction = (param: any, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
+/** The independent sources of route parameters, query values and parsed request body. */
+export interface ParamContext {
+	params: Record<string, string>;
+	query: Record<string, unknown>;
+	body: unknown;
+}
+
+export type RouteFunction = (ctx: ParamContext, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
 export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, responseBody?: unknown) => void | Promise<void>;
 
 export interface TypedObject<T> {
