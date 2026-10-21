@@ -1138,7 +1138,8 @@ export class Badak {
 								queryStr !== undefined
 								&& queryStr !== ''
 							) {
-								param = querystring.parse(queryStr);
+								// merge with route param (e.g. colon routing), same rule as POST/PUT body
+								param = Object.assign(param ?? {}, querystring.parse(queryStr));
 							}
 							break;
 						}

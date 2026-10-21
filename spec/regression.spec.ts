@@ -74,4 +74,27 @@ describe('regression', () => {
 			expect(res.body).to.be.eql({ a: 1 } as TypedObject<unknown>);
 		});
 	});
+
+	describe('GET query string should keep route param', () => {
+		beforeEach(async () => {
+			await app.get('/users/:id', echoFnc);
+			await app.listen(TestPort);
+		});
+
+		it('colon param + query string', async () => {
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.get('/users/7?sort=name')
+				.expect(200);
+
+			expect(res.body).to.be.eql({ id: '7', sort: 'name' });
+		});
+
+		it('colon param without query string', async () => {
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.get('/users/7')
+				.expect(200);
+
+			expect(res.body).to.be.eql({ id: '7' });
+		});
+	});
 });
