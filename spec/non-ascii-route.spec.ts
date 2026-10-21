@@ -9,9 +9,9 @@ import { agent as request } from 'supertest';
 import { Badak } from '../src/badak';
 import { HttpError } from '../src/http-error';
 import { RouteFunction, RouteRule, TypedObject } from '../src/interfaces';
-import { compileRouteSegment, normalizeLiteral, tokenizeRequestPath } from '../src/route-segment';
+import { canonicalRouteKey, compileRouteSegment, normalizeLiteral, tokenizeRequestPath } from '../src/route-segment';
 import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule } from '../src/router';
-import { promiseFail, TestPort } from './test-util';
+import { TestPort } from './test-util';
 
 
 // percent-encoding of a string, for request paths
@@ -187,22 +187,9 @@ describe('non-ASCII & percent-encoded routing', () => {
 
 					expect(encodedUri === undefined, url).to.be.eql(decodedUri === undefined);
 
-					// param keys of '?', '+', '*' keep the original representation of the route key
-					expect(Object.values(encodedParam ?? {}), url).to.be.eql(Object.values(decodedParam ?? {}));
+					// route keys are canonical, param keys of '?', '+', '*' are the same too
+					expect(encodedParam, url).to.be.eql(decodedParam);
 				});
-			});
-		});
-
-		([
-			['/한글', '/%ED%95%9C%EA%B8%80'],
-			['/a/한글', '/a/%ED%95%9C%EA%B8%80'],
-			['/%ED%95%9C%EA%B8%80', '/%ed%95%9c%ea%b8%80'],
-			['/colou?r', '/col%6Fu?r'],
-			['/ab+c', '/a%62+c']
-		] as [string, string][]).forEach(([a, b]: [string, string]): void => {
-			it(`same path in different spellings is rejected in both orders : ${ a }, ${ b }`, () => {
-				expect(() => build([a, b])).to.throw('duplicated');
-				expect(() => build([b, a])).to.throw('duplicated');
 			});
 		});
 
@@ -215,20 +202,249 @@ describe('non-ASCII & percent-encoded routing', () => {
 			expect(match(routeRule, '/a/x')[0]).to.be.eql('/a/*');
 		});
 
-		it('rejected in one route() call', () => {
-			return promiseFail(
-				new Badak().route({
-					'/한글': { GET: fncOf('a') },
-					'/%ED%95%9C%EA%B8%80': { POST: fncOf('b') }
-				})
-			);
+	});
+
+	describe('canonicalRouteKey()', () => {
+		([
+			['한글', '한글'],
+			['%ED%95%9C%EA%B8%80', '한글'],
+			['%ed%95%9c%ea%b8%80', '한글'],
+			['%2a', '%2A'],
+			['%2A', '%2A'],
+			['a%2Fb', 'a%2Fb'],
+			['a%3fb', 'a%3Fb'],
+			['%3Aid', '%3Aid'],
+			['100%25', '100%25'],
+			['a%20b', 'a%20b'],
+			['col%6Fu?r', 'colou?r'],
+			['%EC%83%89%EA%B9%94?', '색깔?'],
+			['colou%3F?r', 'colou%3F?r'],
+			['a%62+c', 'ab+c'],
+			['%EC%82%AC%EC%A7%84*', '사진*'],
+			[':%69d', ':id'],
+			[':id', ':id'],
+			['*', '*'],
+			['**', '**']
+		] as [string, string][]).forEach(([routeKey, canonical]: [string, string]): void => {
+			it(`${ routeKey } -> ${ canonical }`, () => {
+				expect(canonicalRouteKey(routeKey)).to.be.eql(canonical);
+
+				// idempotent, and the same interpretation
+				expect(canonicalRouteKey(canonical)).to.be.eql(canonical);
+				expect(compileRouteSegment(canonical).kind).to.be.eql(compileRouteSegment(routeKey).kind);
+			});
+		});
+	});
+
+	describe('the same path in different spellings is one node', () => {
+		const spellings: string[][] = [
+			['/한글', '/%ED%95%9C%EA%B8%80', '/%ed%95%9c%ea%b8%80'],
+			['/a/한글/:id', '/a/%ED%95%9C%EA%B8%80/:id', '/a/%ed%95%9c%ea%b8%80/:%69d'],
+			['/colou?r', '/col%6Fu?r', '/c%6Flou?r'],
+			['/ab+c', '/a%62+c', '/%61b+c'],
+			['/사진*', '/%EC%82%AC%EC%A7%84*', '/%EC%82%AC진*'],
+			['/한글/**', '/%ED%95%9C%EA%B8%80/**', '/%ed%95%9c%ea%b8%80/**']
+		];
+
+		const methods: ('GET' | 'POST' | 'PUT')[] = ['GET', 'POST', 'PUT'];
+
+		const urlOf = (uri: string): string => {
+			return uri
+				.replace('/:id', '/7')
+				.replace('/:%69d', '/7')
+				.replace(/\?/g, '')
+				.replace(/\+/g, '')
+				.replace(/\*\*$/, 'x/y')
+				.replace(/\*$/, '첩')
+				.split('/')
+				.map((frag: string): string => enc(decodeURIComponent(frag)))
+				.join('/');
+		};
+
+		const permutations = <T>(arr: T[]): T[][] => {
+			if (arr.length <= 1) {
+				return [arr];
+			}
+
+			return arr.flatMap((one: T, i: number): T[][] => {
+				return permutations([...arr.slice(0, i), ...arr.slice(i + 1)])
+					.map((rest: T[]): T[] => [one, ...rest]);
+			});
+		};
+
+		spellings.forEach((uris: string[]): void => {
+			describe(uris.join(', '), () => {
+				// different methods in different spellings, all registration orders
+				const registrations: [string, 'GET' | 'POST' | 'PUT'][] = uris.map((uri: string, i: number): [string, 'GET' | 'POST' | 'PUT'] => [uri, methods[i]]);
+
+				it('get() / post() / put() : merged into one node, in all registration orders', () => {
+					let firstTree: string | undefined;
+
+					permutations(registrations).forEach((order: [string, 'GET' | 'POST' | 'PUT'][]): void => {
+						const routeRule: RouteRule = {};
+
+						order.forEach(([uri, method]: [string, 'GET' | 'POST' | 'PUT']): void => {
+							const refined: RouteRule = refineRouteRule({ [uri]: { [method]: fncOf(method) } }, undefined);
+
+							checkUriDuplication(routeRule, refined);
+							mergeRouteRule(routeRule, refined);
+						});
+
+						const url: string = urlOf(uris[0]);
+
+						methods.forEach((method: string): void => {
+							const { targetFncObj } = findRouteFunction(findRoute(routeRule, url).rule, method);
+
+							expect((targetFncObj as RouteFunction | undefined)?.name, `${ method } ${ url }, order : ${ JSON.stringify(order) }`).to.be.eql(method);
+						});
+
+						// the same tree regardless of the order
+						// keys sorted, insertion order of method keys depends on the registration order
+						const tree: string = JSON.stringify(routeRule, (key: string, value: unknown): unknown => {
+							if (typeof value === 'function') {
+								return value.name;
+							}
+
+							return typeof value === 'object' && value !== null
+								? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+								: value;
+						});
+
+						if (firstTree === undefined) {
+							firstTree = tree;
+						}
+
+						expect(tree).to.be.eql(firstTree);
+					});
+				});
+
+				it('route() with one rule object', async () => {
+					const app: Badak = new Badak({ catchErrorLog: false });
+
+					await app.route(Object.fromEntries(
+						registrations.map(([uri, method]: [string, string]): [string, RouteRule] => [uri, { [method]: fncOf(method) }])
+					));
+
+					await app.listen(TestPort);
+
+					try {
+						for (const method of methods) {
+							await request(app.getHttpServer())[method.toLowerCase() as 'get' | 'post' | 'put'](urlOf(uris[0]))
+								.expect(200)
+								.then((res): void => {
+									expect(res.body.uri).to.be.eql(method);
+								});
+						}
+					}
+					finally {
+						await app.stop();
+					}
+				});
+			});
 		});
 
-		it('same spelling for other methods is merged as before', async () => {
-			const app: Badak = new Badak();
+		it('route() with nested rule objects', async () => {
+			const app: Badak = new Badak({ catchErrorLog: false });
 
-			await app.get('/한글', fncOf('get'));
-			await app.post('/한글', fncOf('post'));
+			await app.route({
+				'/x': {
+					'한글': { GET: fncOf('GET') },
+					'%ED%95%9C%EA%B8%80': { POST: fncOf('POST') }
+				},
+				'/%78/%ed%95%9c%ea%b8%80': { PUT: fncOf('PUT') }
+			});
+
+			await app.listen(TestPort);
+
+			try {
+				for (const method of methods) {
+					await request(app.getHttpServer())[method.toLowerCase() as 'get' | 'post' | 'put'](`/x/${ enc('한글') }`)
+						.expect(200)
+						.then((res): void => {
+							expect(res.body.uri).to.be.eql(method);
+						});
+				}
+
+				// allowed methods of the merged node
+				await request(app.getHttpServer())
+					.delete(`/x/${ enc('한글') }`)
+					.expect(405)
+					.expect('allow', 'GET, HEAD, POST, PUT');
+			}
+			finally {
+				await app.stop();
+			}
+		});
+
+		it('route() : abbreviated path and nested object for the same node are merged', async () => {
+			const app: Badak = new Badak({ catchErrorLog: false });
+
+			// GET was lost until 3.0.0, '/b' node replaced the node made by '/b/c'
+			await app.route({
+				'/b/c': { GET: fncOf('GET') },
+				'/b': { c: { POST: fncOf('POST') } }
+			});
+
+			await app.listen(TestPort);
+
+			try {
+				await request(app.getHttpServer()).get('/b/c').expect(200, { uri: 'GET' });
+				await request(app.getHttpServer()).post('/b/c').expect(200, { uri: 'POST' });
+			}
+			finally {
+				await app.stop();
+			}
+		});
+
+		describe('the same path & method : the latter wins, same as the same spelling', () => {
+			[
+				['/한글', '/한글'],
+				['/한글', '/%ED%95%9C%EA%B8%80'],
+				['/%ED%95%9C%EA%B8%80', '/한글']
+			].forEach(([first, second]: string[]): void => {
+				it(`get('${ first }') then get('${ second }')`, async () => {
+					const app: Badak = new Badak({ catchErrorLog: false });
+
+					await app.get(first, fncOf('first'));
+					await app.get(second, fncOf('second'));
+					await app.listen(TestPort);
+
+					try {
+						await request(app.getHttpServer())
+							.get(`/${ enc('한글') }`)
+							.expect(200, { uri: 'second' });
+					}
+					finally {
+						await app.stop();
+					}
+				});
+			});
+
+			it('in one route() rule object', async () => {
+				const app: Badak = new Badak({ catchErrorLog: false });
+
+				await app.route({
+					'/한글': { GET: fncOf('first') },
+					'/%ED%95%9C%EA%B8%80': { GET: fncOf('second') }
+				});
+
+				await app.listen(TestPort);
+
+				try {
+					await request(app.getHttpServer())
+						.get(`/${ enc('한글') }`)
+						.expect(200, { uri: 'second' });
+				}
+				finally {
+					await app.stop();
+				}
+			});
+		});
+
+		it('different spellings don\'t break duplication check of other routes', () => {
+			expect(() => build(['/%ED%95%9C%EA%B8%80', '/한?글'])).to.throw('duplicated question routing');
+			expect(() => build(['/a%62+c', '/abbc'])).to.throw('duplicated plus routing');
+			expect(() => build(['/:id', '/:%6Eame'])).to.throw('duplicated colon routing');
 		});
 	});
 

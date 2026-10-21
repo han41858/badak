@@ -211,6 +211,61 @@ export const compileRouteSegment = (routeKey: string): RouteSegment => {
 	return segment;
 };
 
+// characters kept percent-encoded in canonical route keys, so that they stay literal
+// '%' : escape, '/' : separator, ':' '?' '+' '*' : routing syntax, ' ' and control characters : not allowed raw
+const KEEP_ENCODED: RegExp = /[%/:?+*\s\p{Cc}]/u;
+
+const encodeChar = (char: string): string => {
+	return Array.from(new TextEncoder().encode(char))
+		.map((byte: number): string => '%' + byte.toString(16).toUpperCase().padStart(2, '0'))
+		.join('');
+};
+
+/**
+ * canonical representation of a route key, used as the key of the route tree
+ * route keys of the same meaning become the same key, so that they are merged into one node
+ * e.g. '한글' and '%ED%95%9C%EA%B8%80' -> '한글', '%2a' -> '%2A', 'col%6Fu?r' -> 'colou?r', ':%69d' -> ':id'
+ * routing syntax is kept, literal characters are decoded except characters in KEEP_ENCODED
+ */
+export const canonicalRouteKey = (routeKey: string): string => {
+	if (routeKey === '*' || routeKey === '**') {
+		return routeKey;
+	}
+
+	if (routeKey.startsWith(':')) {
+		// param name, decoded (e.g. ':%69d' -> ':id'), unencoded characters are kept as they are
+		return ':' + normalizeLiteral(routeKey.slice(1));
+	}
+
+	let syntaxChars: string = '';
+
+	switch (compileRouteSegment(routeKey).kind) {
+		case 'question':
+			syntaxChars = '?';
+			break;
+
+		case 'plus':
+			syntaxChars = '+';
+			break;
+
+		case 'partialAsterisk':
+			syntaxChars = '*';
+			break;
+	}
+
+	return splitRouteKey(routeKey, syntaxChars)
+		.map((part: RawPart): string => {
+			if ('syntax' in part) {
+				return part.syntax;
+			}
+
+			return KEEP_ENCODED.test(part.literal)
+				? encodeChar(part.literal)
+				: part.literal;
+		})
+		.join('');
+};
+
 const isMethodKey = (key: string): boolean => Object.values(METHOD).includes(key as METHOD);
 
 // normal route keys of a node by literal, for request matching
@@ -231,7 +286,7 @@ export const findNormalRouteKey = (node: RouteRule, uriFrag: string): string | u
 			const segment: RouteSegment = compileRouteSegment(key);
 
 			if (segment.kind === 'normal') {
-				// different spellings of the same literal are rejected on registration
+				// route keys are canonical, the same literal is one key
 				index.set(segment.literal, key);
 			}
 		}

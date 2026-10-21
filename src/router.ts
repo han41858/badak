@@ -3,6 +3,7 @@ import { METHOD } from './constants.js';
 import { isValidBodyLimit, sift } from './util.js';
 import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from './question-pattern.js';
 import {
+	canonicalRouteKey,
 	compileRouteSegment,
 	findNormalRouteKey,
 	invalidateNormalRouteIndex,
@@ -146,13 +147,20 @@ export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: 
 				targetObj[method] = rule[method] as RouteRuleSeed;
 			}
 			else {
+				// the key of the route tree : canonical representation of the uri fragment,
+				// so that the same path in different spellings (e.g. '한글', '%ED%95%9C%EA%B8%80') is one node
+				// the root marker '/' is kept
+				const routeKey: string = isRoot && i === 0
+					? uriFrag
+					: canonicalRouteKey(uriFrag);
+
 				if (i < arr.length - 1) {
 					// unzip abbreviation path
-					if (!targetObj[uriFrag]) {
-						targetObj[uriFrag] = {};
+					if (!targetObj[routeKey]) {
+						targetObj[routeKey] = {};
 					}
 
-					targetObj = targetObj[uriFrag] as RouteRule;
+					targetObj = targetObj[routeKey] as RouteRule;
 				}
 				else {
 					interface AnyRuleObj {
@@ -162,18 +170,29 @@ export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: 
 					// last uri frag
 					const ruleAsAny: AnyRuleObj = rule as AnyRuleObj;
 
+					let childRule: RouteRule | undefined;
+
 					if (typeof value === 'object') {
-						targetObj[uriFrag] = refineRouteRule(value, defaultMethod, false);
+						childRule = refineRouteRule(value, defaultMethod, false);
 					}
 					else if (typeof ruleAsAny[uri] === 'function') {
 						if (defaultMethod) {
-							targetObj[uriFrag] = {
+							childRule = {
 								[defaultMethod]: ruleAsAny[uri]
 							};
 						}
 						else {
 							throw new Error('invalid rule or defaultMethod not set');
 						}
+					}
+
+					if (childRule !== undefined) {
+						// merge with the node made by other keys of the same rule object,
+						// e.g. { '/a/b': { GET }, '/a': { b: { POST } } }, { '/한글': { GET }, '/%ED%95%9C%EA%B8%80': { POST } }
+						// the same path & method : the latter wins, same as registering again
+						targetObj[routeKey] = typeof targetObj[routeKey] === 'object'
+							? mergeRouteRule(targetObj[routeKey] as RouteRule, childRule)
+							: childRule;
 					}
 				}
 			}
@@ -219,21 +238,14 @@ const checkSiblingUriKeys = (targetKeys: string[]): void => {
 		targetKeys.map((key: string): [string, RouteSegment] => [key, compileRouteSegment(key)])
 	);
 
-	// literal of normal uri fragments, decoded : '한글' and '%ED%95%9C%EA%B8%80' are the same
+	// literal of normal uri fragments, decoded
+	// keys are canonical (refineRouteRule), the same path in different spellings is already one key
 	const normalLiterals: Map<string, string> = new Map();
 
 	for (const [key, segment] of segments) {
-		if (segment.kind !== 'normal') {
-			continue;
+		if (segment.kind === 'normal') {
+			normalLiterals.set(segment.literal, key);
 		}
-
-		const sameLiteralKey: string | undefined = normalLiterals.get(segment.literal);
-
-		if (sameLiteralKey !== undefined) {
-			throw new Error(`duplicated routing, same path in different spellings : ${ sameLiteralKey }, ${ key }`);
-		}
-
-		normalLiterals.set(segment.literal, key);
 	}
 
 	// colon routing

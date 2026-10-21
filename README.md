@@ -476,7 +476,8 @@ Routing paths can have non-ASCII characters, e.g. `/사용자/:id`.
   So `%2F` is a `/` character in a uri fragment, not a path separator: `/files/:id` passes `{ id: 'a/b' }` for `/files/a%2Fb`, and doesn't match `/files/a/b`.
 - A malformed percent-encoding in the request path responds `400 Bad Request`.
 - Percent-encoded characters in routing paths are decoded for matching, so `/한글` and `/%ED%95%9C%EA%B8%80` are the same path.
-  They can't be registered together, `duplicated routing` is thrown.
+  They are one routing node: routing functions of different methods are merged (e.g. `GET /한글` and `POST /%ED%95%9C%EA%B8%80`),
+  and the same method registered again replaces the previous one, same as registering the same spelling again.
 - Percent-encoded characters in routing paths are always literal, not routing syntax.
   For example, `/%2A` matches only `/*` (or `/%2A`), `/colou%3Fr` matches only `/colou%3Fr`, and `/%3Aid` matches only `/:id`.
 - A malformed percent-encoding in a routing path (e.g. `/100%`) throws an error when it is registered. Use `%25` for `%`.
