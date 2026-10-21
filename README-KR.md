@@ -142,6 +142,9 @@ HTTP 서버를 정지합니다.
 
 정적 파일로 제공할 주소와 파일 경로를 연결합니다.
 
+`Content-Type`은 파일 확장자로 결정합니다.
+텍스트 파일(`text/*`)과 JavaScript 파일은 `charset=utf-8`로 응답하므로 UTF-8로 저장해야 합니다.
+
 ### `setSPARoot(uri: string, path: string): Promise<void>`
 
 SPA 앱으로 사용할 주소와 파일 경로를 연결합니다.

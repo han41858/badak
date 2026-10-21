@@ -245,6 +245,14 @@ const signatureMap: Signature[] = [
 	{ type: CONTENT_TYPE.APPLICATION_PDF, sign: [0x25, 0x50, 0x44, 0x46] }
 ];
 
+// add charset=utf-8 to text types for Content-Type header, like Express (serve-static)
+// JSON is always UTF-8 (RFC 8259) and has no charset parameter
+export const toContentTypeHeader = (mime: string): string => {
+	return mime.startsWith('text/') || mime === CONTENT_TYPE.APPLICATION_JAVASCRIPT
+		? `${ mime }; charset=utf-8`
+		: mime;
+};
+
 // MIME type by file extension, e.g. 'app.min.js' -> 'js'
 export const getContentTypeByFileName = (fileName: string): CONTENT_TYPE | undefined => {
 	const extension: string = node_path.extname(fileName).slice(1).toLowerCase();
