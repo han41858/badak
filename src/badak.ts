@@ -1,6 +1,7 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import * as node_path from 'node:path';
 import * as querystring from 'node:querystring';
+import { Readable } from 'node:stream';
 
 import {
 	BadakOption,
@@ -772,6 +773,84 @@ export class Badak {
 		this._spaRoot = uri;
 	}
 
+	// send Readable stream returned by route function
+	// resolves when the response is finished or closed
+	// rejects only if the stream fails before sending the response headers, to respond with an error status code
+	private async _sendStream (req: IncomingMessage, res: ServerResponse, stream: Readable): Promise<void> {
+		if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
+			res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.APPLICATION_OCTET_STREAM);
+		}
+
+		// HEAD has no body, don't read the stream
+		if (req.method === 'HEAD') {
+			stream.destroy();
+			res.end();
+			return;
+		}
+
+		return new Promise<void>((resolve, reject): void => {
+			let settled: boolean = false;
+
+			const settle = (err?: unknown): void => {
+				if (settled) {
+					return;
+				}
+
+				settled = true;
+
+				if (err === undefined) {
+					resolve();
+				}
+				else {
+					reject(err);
+				}
+			};
+
+			stream.on('error', (err: Error): void => {
+				stream.unpipe(res);
+
+				// release resources, a stream with autoDestroy: false is not destroyed by itself
+				stream.destroy();
+
+				if (settled) {
+					// the response is finished or closed already, don't touch it
+					if (this._config.catchErrorLog) {
+						console.error('badak stream failed after response :', err);
+					}
+
+					return;
+				}
+
+				if (res.headersSent) {
+					// some data is sent already, close the connection so that the client can know the response is incomplete
+					if (this._config.catchErrorLog) {
+						console.error('badak stream failed while sending response :', err);
+					}
+
+					res.destroy(err);
+					settle();
+				}
+				else {
+					// respond with an error status code
+					settle(err);
+				}
+			});
+
+			res.on('finish', (): void => settle());
+
+			res.on('close', (): void => {
+				// client aborted, stop reading the stream
+				if (!res.writableFinished) {
+					stream.destroy();
+				}
+
+				settle();
+			});
+
+			stream.pipe(res);
+		});
+	}
+
 	async listen (port: number): Promise<void> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
@@ -1217,6 +1296,9 @@ export class Badak {
 					if (isResponseStarted(res)) {
 						// route function started (res.writeHead(), res.write()) or ended (res.end()) response by itself,
 						// ignore returned value and leave ending the response to the route function (e.g. streaming)
+					}
+					else if (responseData instanceof Readable) {
+						await this._sendStream(req, res, responseData);
 					}
 					else if (responseData) {
 						const contentType: CONTENT_TYPE = getContentType(responseData);

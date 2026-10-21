@@ -222,6 +222,21 @@ export type RouteFunction = (param: any, req: IncomingMessage, res: ServerRespon
 Register a routing function to respond to HTTP requests.
 The value returned by the routing function is returned as an HTTP response.
 
+If the routing function returns a `Readable` stream, badak pipes it to the response.
+`Content-Type` is `application/octet-stream` unless the routing function sets it.
+
+```typescript
+import { createReadStream } from 'node:fs';
+
+app.get('/download', (param, req, res) => {
+	res.setHeader('Content-Type', 'application/pdf');
+	return createReadStream('/path/to/file.pdf');
+});
+```
+
+If the stream fails before sending data, badak responds `500 Internal Server Error`.
+If it fails while sending data, the connection is closed so that the client can know the response is incomplete.
+
 ### `BadakOption`
 
 Specifies how the badak app should behave.
