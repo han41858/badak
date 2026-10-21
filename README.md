@@ -296,4 +296,9 @@ If the same key exists, the latter wins.
 PATCH /users/7?name=a  with body { "name": "b" }  # { id: '7', name: 'b' }
 ```
 
+> **Warning** : the query string and the request body can override route params.
+> For example, `PATCH /users/7?id=8` with body `{ "id": 9 }` passes `{ id: 9 }` to the route function `/users/:id`.
+> Don't trust a key that can come from the client as the route param.
+> Name route params so that they don't collide with query and body keys (e.g. `/users/:userId`).
+
 If the request body is not an object (e.g. a JSON array), it is passed as it is, without route params and the query string.
