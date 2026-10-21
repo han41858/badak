@@ -7,6 +7,7 @@ import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 import { RouteFunction } from '../src/interfaces';
 import { promiseFail, TestPort } from './test-util';
 
@@ -40,9 +41,10 @@ describe('core', () => {
 			const str: string = 'string_value';
 
 			beforeEach(async () => {
-				const testFnc = (param: {
+				const testFnc = (ctx: ParamContext): void  => {
+					const param = ctx.body as {
 					str: string;
-				}): void => {
+				};
 					expect(param).to.be.a('object');
 					expect(param.str).to.be.eql(str);
 				};
@@ -104,9 +106,10 @@ describe('core', () => {
 			const strArr: string[] = ['str1', 'str2', 'str3'];
 
 			beforeEach(async () => {
-				const testFnc = (param: {
+				const testFnc = (ctx: ParamContext): void  => {
+					const param = ctx.body as {
 					strArr: string[];
-				}): void => {
+				};
 					expect(param).to.be.a('object');
 
 					expect(param.strArr).to.be.instanceOf(Array);
@@ -174,9 +177,10 @@ describe('core', () => {
 			const strArr: (string | undefined)[] = ['str1', 'str2', undefined];
 
 			beforeEach(async () => {
-				const testFnc = (param: {
+				const testFnc = (ctx: ParamContext): void  => {
+					const param = ctx.body as {
 					strArr: (string | undefined)[];
-				}): void => {
+				};
 					expect(param).to.be.a('object');
 
 					expect(param.strArr).to.be.instanceOf(Array);
@@ -222,9 +226,10 @@ describe('core', () => {
 			const strArr: (string | null)[] = ['str1', 'str2', null];
 
 			beforeEach(async () => {
-				const testFnc = (param: {
+				const testFnc = (ctx: ParamContext): void  => {
+					const param = ctx.body as {
 					strArr: (string | null)[];
-				}): void => {
+				};
 					expect(param).to.be.a('object');
 
 					expect(param.strArr).to.be.instanceOf(Array);
@@ -299,7 +304,8 @@ describe('core', () => {
 
 
 			beforeEach(async () => {
-				const testFnc = async <T> (param: T): Promise<T> => {
+				const testFnc = async <T> (ctx: ParamContext): Promise<T> => {
+					const param = ctx.body as T;
 					testFncCalled = true;
 
 					expect(param).to.be.a('object');
@@ -414,7 +420,8 @@ describe('core', () => {
 			beforeEach(async () => {
 				fileContents = readFileSync(`./spec/${ fileName }`).toString();
 
-				const testFnc = async <T> (param: T): Promise<T> => {
+				const testFnc = async <T> (ctx: ParamContext): Promise<T> => {
+					const param = ctx.body as T;
 					testFncCalled = true;
 
 					expect(param).to.be.a('object');
@@ -514,7 +521,8 @@ describe('core', () => {
 				receivedParam = undefined;
 				pngFileData = readFileSync(pngFilePath);
 
-				await app.post('/upload', (param: Record<string, unknown>): void => {
+				await app.post('/upload', (ctx: ParamContext): void  => {
+					const param = ctx.body as Record<string, unknown>;
 					receivedParam = param;
 				});
 
@@ -980,7 +988,8 @@ describe('core', () => {
 		describe('with connections', () => {
 			// response is started but never ended, like SSE
 			const openEndlessRequest = async (): Promise<ClientRequest> => {
-				await app.get('/endless', (param: unknown, req: IncomingMessage, res: ServerResponse): void => {
+				await app.get('/endless', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): void => {
+
 					res.writeHead(200, { 'Content-Type': 'text/event-stream' });
 					res.write('data: 1\n\n');
 				});

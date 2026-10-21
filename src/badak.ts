@@ -4,6 +4,7 @@ import * as querystring from 'node:querystring';
 
 import {
 	BadakOption,
+	ParamContext,
 	MiddlewareFunction,
 	RouteFunction,
 	RouteFunctionObj,
@@ -428,8 +429,7 @@ export class Badak {
 					const { path: uriSanitized, queryStr } = splitUrl(req.url as string);
 
 					const { rule: matchedRule, param: routeParam } = findRoute(this._routeRule, uriSanitized);
-					let param: TypedObject<unknown> | undefined = routeParam;
-
+					const params: Record<string, string> = (routeParam ?? {}) as Record<string, string>;
 					const { targetFncObj, allowedMethods } = findRouteFunction(matchedRule, method);
 
 					if (targetFncObj === undefined) {
@@ -470,53 +470,31 @@ export class Badak {
 						}
 					}
 
-					// params are merged in this order, the latter wins for the same key :
-					// route param (e.g. colon routing) -> query string -> request body
+					// Keep route params, query string and request body separate.
+					// Route params are always strings; parseNumber/parseDate apply to query and body.
+					const query: Record<string, unknown> = queryStr !== undefined && queryStr !== ''
+						? convertParam({ ...querystring.parse(queryStr) }, this._config)
+						: {};
 
-					// query string, for every method
-					if (
-						queryStr !== undefined
-						&& queryStr !== ''
-					) {
-						// convert by parseNumber & parseDate options, same as request body
-						param = Object.assign(
-							param ?? {},
-							convertParam({ ...querystring.parse(queryStr) }, this._config)
-						);
-					}
+					let body: unknown;
 
-					// request body
 					switch (method) {
 						case METHOD.PUT:
 						case METHOD.POST:
 						case METHOD.PATCH: {
-							// bodyLimit of the route option overrides the app option
 							const bodyLimit: number = (targetFncObj as RouteFunctionObj)?.option?.bodyLimit
 								?? this._config.bodyLimit;
 
-							const bodyParam: TypedObject<unknown> | undefined = await parseRequestBody(req, bodyLimit, this._config);
-
-							if (bodyParam !== undefined) {
-								if (
-									param !== undefined
-									&& typeof bodyParam === 'object'
-									&& bodyParam !== null
-									&& !Array.isArray(bodyParam)
-								) {
-									param = Object.assign(param, bodyParam);
-								}
-								else {
-									// array or primitive JSON body can't be merged, passed as it is
-									param = bodyParam;
-								}
-							}
+							body = await parseRequestBody(req, bodyLimit, this._config);
 							break;
 						}
 					}
 
+					const ctx: ParamContext = { params, query, body };
+
 					const responseData: unknown = typeof targetFncObj === 'function'
-						? await targetFncObj(param, req, res)
-						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
+						? await targetFncObj(ctx, req, res)
+						: await (targetFncObj as RouteFunctionObj).fnc(ctx, req, res);
 
 
 					await sendRouteResult(req, res, responseData, this._config.catchErrorLog, setResponseBody);

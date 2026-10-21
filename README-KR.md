@@ -235,7 +235,7 @@ export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, res
 ### `RouteFunction`
 
 ```typescript
-export type RouteFunction = (param: any, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
+export type RouteFunction = (ctx: ParamContext, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
 ```
 
 HTTP 요청에 반응할 라우팅 함수를 등록합니다.
@@ -256,7 +256,7 @@ JSON으로 직렬화할 수 없는 값(순환 참조, `BigInt` 등)을 반환하
 ```typescript
 import { createReadStream } from 'node:fs';
 
-app.get('/download', (param, req, res) => {
+app.get('/download', (_ctx, req, res) => {
 	res.setHeader('Content-Type', 'application/pdf');
 	return createReadStream('/path/to/file.pdf');
 });
@@ -319,14 +319,14 @@ app.route({
 인자로 전달되는 문자열 형태의 숫자를 `number` 타입으로 변환합니다.
 `5`, `-1.5` 같은 일반 10진수만 변환합니다.
 `007`(앞자리 0), `1e3`, `0x10`, ` 5`(공백 포함), 안전한 정수 범위를 넘는 정수는 문자열로 두므로 우편번호나 ID 같은 값이 바뀌지 않습니다.
-`GET` 요청의 쿼리 문자열과 `POST`/`PUT` 요청의 본문에 적용되며, `:id` 같은 라우트 파라미터에는 적용되지 않습니다.
+모든 HTTP 메서드의 쿼리 문자열과 `POST`/`PUT`/`PATCH` 요청의 본문에 적용되며, `:id` 같은 라우트 파라미터에는 적용되지 않습니다.
 
 기본값은 `false` 입니다.
 
 #### `parseDate: boolean`
 
 인자로 전달되는 문자열 형태의 날짜를 `Date` 타입으로 변환합니다.
-`GET` 요청의 쿼리 문자열과 `POST`/`PUT` 요청의 본문에 적용되며, `:id` 같은 라우트 파라미터에는 적용되지 않습니다.
+모든 HTTP 메서드의 쿼리 문자열과 `POST`/`PUT`/`PATCH` 요청의 본문에 적용되며, `:id` 같은 라우트 파라미터에는 적용되지 않습니다.
 
 기본값은 `false` 입니다.
 
@@ -380,13 +380,13 @@ await app.route({
 
 ### `:` 라우팅
 
-`/:userId`로 라우팅 경로를 지정하고 `/user1`로 HTTP 요청을 보내면, 요청이 매칭되며 라우팅 함수의 인자로 `{ userId: 'user1' }`이 전달됩니다.
+`/:userId`로 라우팅 경로를 지정하고 `/user1`로 HTTP 요청을 보내면, 요청이 매칭되며 라우팅 함수의 `ctx.params`에 `{ userId: 'user1' }`이 전달됩니다.
 
 ### `?` 라우팅
 
 `?`는 바로 앞 문자 하나를 선택적으로 만듭니다.
 `/users?`로 라우팅 경로를 지정하면 `/user`와 `/users` 경로를 매칭할 수 있습니다.
-매칭된 경로 조각은 라우팅 경로를 키로 하여 라우팅 함수 인자로 전달됩니다(예: `{ 'users?': 'user' }`).
+매칭된 경로 조각은 `ctx.params`에 라우팅 패턴을 키로 하여 전달됩니다(예: `{ 'users?': 'user' }`).
 
 - 다른 문자는 정규식에서 특별한 의미가 있는 문자(예: `.`, `(`, `)`, `[`, `]`)를 포함해 모두 문자 그대로 취급합니다. `/a.c?`는 `/a.c`와 `/a.`에 매칭되며, `/abc`에는 매칭되지 않습니다.
 - `??`나, 한 경로 조각에서 `?`를 `+` 또는 `*`와 함께 쓰는 경로(예: `/ab?c+`)는 등록할 때 에러가 발생합니다.
@@ -400,10 +400,10 @@ await app.route({
 
 ### `*` 라우팅
 
-`*`는 경로 조각을 정확히 하나 매칭하며, 그 경로 조각은 라우팅 함수 인자의 `*`로 전달됩니다.
+`*`는 경로 조각을 정확히 하나 매칭하며, 값은 `ctx.params['*']`로 전달됩니다.
 
 ```typescript
-await app.get('/img/*', (param) => param);
+await app.get('/img/*', ({ params }) => params);
 
 // GET /img/a.png -> { '*': 'a.png' }
 // GET /img, /img/, /img/a/b -> 404
@@ -416,13 +416,13 @@ await app.get('/img/*', (param) => param);
 ### `**` 라우팅
 
 `**`는 `/`를 포함한 나머지 경로 전체를 매칭합니다.
-나머지 경로는 라우팅 함수 인자의 `**`로 전달되며, 각 경로 조각을 디코딩한 뒤 `/`로 연결한 문자열입니다.
+나머지 경로는 `ctx.params['**']`로 전달되며, 각 경로 조각을 디코딩한 뒤 `/`로 연결한 문자열입니다.
 
 ```typescript
-await app.get('/files/**', (param) => param);
+await app.get('/files/**', ({ params, query }) => ({ params, query }));
 
-// GET /files/a/b%20c/d.txt -> { '**': 'a/b c/d.txt' }
-// GET /files/a/b?c=1       -> { '**': 'a/b', c: '1' }
+// GET /files/a/b%20c/d.txt -> { params: { '**': 'a/b c/d.txt' }, query: {} }
+// GET /files/a/b?c=1       -> { params: { '**': 'a/b' }, query: { c: '1' } }
 ```
 
 - `**`는 라우팅 경로의 마지막 조각에만 사용할 수 있습니다. `/files/**/edit` 같은 경로는 등록할 때 에러가 발생합니다.
@@ -474,31 +474,32 @@ await app.get('/api/users/:id', userFnc);
 
 ## 라우팅 인자
 
+라우팅 함수의 첫 번째 인자인 `ParamContext`는 요청 데이터를 출처별로 구분합니다. 동일한 키가 있어도 서로 덮어쓰지 않습니다.
+
 ### 쿼리 스트링
 
-모든 메서드에서 쿼리 스트링 인자를 파싱해서 라우팅 함수로 전달합니다.
+모든 HTTP 메서드에서 쿼리 문자열을 `ctx.query`에 전달합니다. 쿼리가 없으면 `{}`입니다.
 
-아래 예제는 모두 `/path` 경로와 매칭되며 전달되는 인자는 각각 이렇습니다.
-
-```bash
-/path?          # undefined
-/path?key       # { key: '' }
-/path?key=      # { key: '' }
-/path?key=value # { key: 'value' }
+```text
+GET /path?             → query: {}
+GET /path?key          → query: { key: '' }
+GET /path?key=         → query: { key: '' }
+GET /path?key=value    → query: { key: 'value' }
 ```
 
-### 인자 병합
+### 경로 파라미터와 본문
 
-라우트 파라미터(`:id` 등), 쿼리 스트링, 요청 본문(`POST`, `PUT`, `PATCH`)은 이 순서대로 하나의 객체로 합쳐집니다.
-같은 키가 있으면 뒤의 값이 우선합니다.
+`ctx.params`는 디코딩된 경로 캡처만 포함하며 값은 항상 문자열입니다. `ctx.body`는 POST·PUT·PATCH에서 파싱되며 객체, 배열, JSON 원시값 또는 `undefined`입니다.
 
-```bash
-PATCH /users/7?name=a  본문 { "name": "b" }  # { id: '7', name: 'b' }
+```typescript
+await app.patch('/users/:id', (ctx) => ctx);
+
+// PATCH /users/7?id=8, JSON 본문 { "id": 9 }
+// {
+//   params: { id: '7' },
+//   query: { id: '8' },
+//   body: { id: 9 }
+// }
 ```
 
-> **주의** : 쿼리 스트링과 요청 본문은 라우트 파라미터를 덮어쓸 수 있습니다.
-> 예를 들어 `/users/:id` 라우팅 함수에 `PATCH /users/7?id=8`, 본문 `{ "id": 9 }`로 요청하면 `{ id: 9 }`가 전달됩니다.
-> 클라이언트가 보낼 수 있는 키를 라우트 파라미터로 믿고 사용하면 안 됩니다.
-> 쿼리 스트링이나 요청 본문의 키와 겹치지 않도록 라우트 파라미터 이름을 지정하세요(예: `/users/:userId`).
-
-요청 본문이 객체가 아니면(JSON 배열 등) 라우트 파라미터와 쿼리 스트링 없이 본문을 그대로 전달합니다.
+`parseNumber`와 `parseDate`는 query와 body의 문자열에만 적용하며 경로 캡처에는 적용하지 않습니다. Node.js의 `req`, `res`는 두 번째와 세 번째 인자로 그대로 전달됩니다.

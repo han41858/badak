@@ -6,6 +6,8 @@ These changes break backward compatibility and are planned for 4.0.0.
 
 ### Breaking changes
 
+- Routing functions receive a `ParamContext` first argument (`{ params, query, body }`) instead of one merged `param` object. `params` and `query` are always objects; `body` is `undefined` when missing. Route captures remain strings, and the `parseNumber` / `parseDate` options continue to affect query and body only. Existing route callbacks must be migrated. ([#59](https://github.com/han41858/badak/pull/59))
+
 - `?` routing is defined as "`?` makes the character just before it optional", and the duplication check and request matching use the same interpretation. ([#57](https://github.com/han41858/badak/pull/57))
   - `?` routing paths that can match the same uri fragment throw `duplicated question routing` when they are registered, regardless of the registration order.
   - other characters are literal. They were interpreted as a regular expression before.
@@ -50,6 +52,11 @@ Cases that differ from 3.0.0 :
 
 | If you ... | then |
 |---|---|
+| access route captures from `param.id` | use `ctx.params.id` or destructure `{ params }` |
+| read query values from `param.sort` | use `ctx.query.sort` |
+| read parsed request body from `param.name` | use `ctx.body` (typed `unknown`, narrow or validate before use) |
+| expect JSON array / primitive body to be passed directly as first argument | access the original value through `ctx.body` |
+| rely on query/body values overriding route captures | read each independently from `ctx.params`, `ctx.query`, `ctx.body` |
 | register `?` routing paths that match the same uri fragment | remove one of them, or merge them into one routing function |
 | use regular expression syntax in `?` routing paths (e.g. `(cd)?`, `[bc]`, `.`) | register each path separately, or use `:` routing and check the value in the routing function |
 | use `??`, or `?` with `+` or `*` in one uri fragment | split the routing path into simple patterns |

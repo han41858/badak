@@ -8,6 +8,7 @@ import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 import { TestPort } from './test-util';
 
 
@@ -90,7 +91,8 @@ describe('charset of Content-Type', () => {
 	});
 
 	it('Content-Type set by route function is kept', async () => {
-		await app.get('/custom', (param: unknown, req: IncomingMessage, res: ServerResponse): string => {
+		await app.get('/custom', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): string => {
+
 			res.setHeader('Content-Type', 'text/plain; charset=euc-kr');
 			return 'abc';
 		});

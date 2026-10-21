@@ -75,7 +75,7 @@ describe('parseNumber', () => {
 				.get('/test?zip=007&n=5')
 				.expect(200);
 
-			expect(queryRes.body).to.be.eql({ zip: '007', n: 5 });
+			expect(queryRes.body).to.be.eql({ params: {}, query: { zip: '007', n: 5 } });
 
 			const bodyRes: SuperTestResponse = await request(app.getHttpServer())
 				.post('/test')
@@ -83,9 +83,13 @@ describe('parseNumber', () => {
 				.expect(200);
 
 			expect(bodyRes.body).to.be.eql({
-				id: '12345678901234567890',
+				params: {},
+				query: {},
+				body: {
+					id: '12345678901234567890',
 				price: 1.5,
-				code: '0x10'
+					code: '0x10'
+				}
 			});
 		});
 	});

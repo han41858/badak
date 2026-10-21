@@ -3,6 +3,7 @@ import { expect } from 'chai';
 import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 import { RouteFunction, RouteRule } from '../src/interfaces';
 import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from '../src/question-pattern';
 import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule } from '../src/router';
@@ -372,7 +373,7 @@ describe('? routing', () => {
 		});
 
 		it('param has the matched uri fragment', async () => {
-			await app.get('/colou?r', (param: unknown): unknown => param);
+			await app.get('/colou?r', (ctx: ParamContext): unknown => ctx.params);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
