@@ -60,6 +60,14 @@ export const convertDateStr = (param: string): string | Date => {
 
 // response is started (headersSent) or completed (writableEnded) already,
 // status code & headers can't be changed
+// bytes, positive integer or Infinity (no limit)
+// NaN or decimal is rejected, NaN disables every size comparison
+export const isValidBodyLimit = (value: unknown): value is number => {
+	return typeof value === 'number'
+		&& value > 0
+		&& (Number.isInteger(value) || value === Infinity);
+};
+
 export const isResponseStarted = (res: ServerResponse): boolean => {
 	return res.headersSent || res.writableEnded;
 };

@@ -343,6 +343,7 @@ If the request body is larger than this value, a `413 Payload Too Large` error o
 For `multipart/form-data`, the whole request body is counted, including part headers and boundaries,
 so increase this value if you accept file uploads.
 Specify `Infinity` to remove the limit.
+To allow a larger body for specific routes only (e.g. file uploads), use `bodyLimit` of `RouteOption`.
 
 The default is `102400` (100KB).
 
@@ -355,6 +356,30 @@ Determines the behavior of routing functions.
 If specified as `false`, the `auth()` function will not be executed when this routing function is executed.
 
 The default is `true`.
+
+#### `bodyLimit: number`
+
+The maximum size of the request body in bytes for this routing function, used instead of `bodyLimit` of the app option.
+The value is the same as `bodyLimit` of the app option: a positive integer, or `Infinity` to remove the limit.
+It applies to `POST`, `PUT` and `PATCH`, whose request body is parsed.
+
+```typescript
+const app: Badak = new Badak({ bodyLimit: 100 * 1024 }); // 100KB for other routes
+
+await app.post('/upload', uploadFnc, { bodyLimit: 10 * 1024 * 1024 }); // 10MB
+
+await app.route({
+	'/avatar': {
+		PUT: {
+			fnc: avatarFnc,
+			option: { bodyLimit: 1024 * 1024 }
+		}
+	}
+});
+```
+
+Note that the request body is received before the `auth()` function is executed,
+so a route with a large limit receives the body up to its limit even for unauthenticated requests.
 
 ## Special Routing
 

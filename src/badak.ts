@@ -36,6 +36,7 @@ import {
 	isFolder,
 	isNotModified,
 	isResponseStarted,
+	isValidBodyLimit,
 	loadFolder,
 	MultipartPart,
 	parseMultipart,
@@ -68,6 +69,25 @@ const checkStaticOption = (option: unknown): void => {
 		&& (typeof cacheControl !== 'string' || cacheControl.trim() === '' || /[\r\n]/.test(cacheControl))
 	) {
 		throw new Error(`invalid cacheControl : ${ String(cacheControl) }`);
+	}
+};
+
+// only bodyLimit is validated, other keys are not checked to keep the behavior of 2.0
+const checkRouteFunctionObj = (value: unknown): void => {
+	if (typeof value !== 'object' || value === null) {
+		// route function, checked by itself
+		return;
+	}
+
+	const option: unknown = (value as RouteFunctionObj).option;
+
+	if (
+		typeof option === 'object'
+		&& option !== null
+		&& (option as RouteOption).bodyLimit !== undefined
+		&& !isValidBodyLimit((option as RouteOption).bodyLimit)
+	) {
+		throw new Error(`invalid bodyLimit : ${ String((option as RouteOption).bodyLimit) }`);
 	}
 };
 
@@ -191,6 +211,8 @@ export class Badak {
 
 				if (Object.values(METHOD).includes(uriFrag as METHOD)) {
 					const method: METHOD = uriFrag as METHOD; // re-assign for readability
+
+					checkRouteFunctionObj(rule[method]);
 
 					targetObj[method] = rule[method] as RouteRuleSeed;
 				}
@@ -403,13 +425,7 @@ export class Badak {
 				break;
 
 			case 'bodyLimit':
-				// bytes, positive integer or Infinity (no limit)
-				// NaN or decimal is rejected, NaN disables every size comparison
-				if (
-					typeof value !== 'number'
-					|| value <= 0
-					|| (!Number.isInteger(value) && value !== Infinity)
-				) {
+				if (!isValidBodyLimit(value)) {
 					throw new Error('invalid value');
 				}
 
@@ -701,10 +717,8 @@ export class Badak {
 
 	// for POST, PUT
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | undefined> {
+	private async _paramParser (req: IncomingMessage, bodyLimit: number): Promise<TypedObject<unknown> | undefined> {
 		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
-			const bodyLimit: number = this._config.bodyLimit;
-
 			// reject before receiving body if declared size is over the limit
 			const contentLength: number = Number(req.headers['content-length']);
 
@@ -1298,7 +1312,11 @@ export class Badak {
 						case METHOD.PUT:
 						case METHOD.POST:
 						case METHOD.PATCH: {
-							const bodyParam: TypedObject<unknown> | undefined = await this._paramParser(req);
+							// bodyLimit of the route option overrides the app option
+							const bodyLimit: number = (targetFncObj as RouteFunctionObj)?.option?.bodyLimit
+								?? this._config.bodyLimit;
+
+							const bodyParam: TypedObject<unknown> | undefined = await this._paramParser(req, bodyLimit);
 
 							if (bodyParam !== undefined) {
 								if (

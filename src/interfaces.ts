@@ -18,7 +18,8 @@ export interface RouteRule {
 }
 
 export interface RouteOption {
-	auth: boolean;
+	auth?: boolean; // default true, if false, auth() function is not executed for this route
+	bodyLimit?: number; // max request body size in bytes for this route, overrides bodyLimit of the app option
 }
 
 export interface RouteFunctionObj {

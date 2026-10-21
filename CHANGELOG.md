@@ -5,6 +5,8 @@
 ### Added
 
 - Static files have `ETag` and `Last-Modified`, and respond `304 Not Modified` for `If-None-Match` and `If-Modified-Since`. `Cache-Control` is `no-cache` by default, and can be changed with the `cacheControl` option of `static()` and `setSPARoot()`.
+- `bodyLimit` of `RouteOption` to set the request body size limit for each routing function, e.g. `app.post('/upload', fnc, { bodyLimit: 10 * 1024 * 1024 })`.
+- `auth` of `RouteOption` is optional in the type, so that `{ bodyLimit }` can be passed alone.
 
 ## 2.0.0 (2026-10-21)
 

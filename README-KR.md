@@ -334,6 +334,7 @@ app.route({
 `multipart/form-data`는 파트 헤더와 구분자를 포함한 요청 본문 전체 크기로 계산하므로,
 파일 업로드를 받는다면 이 값을 늘려야 합니다.
 제한을 없애려면 `Infinity`를 지정합니다.
+파일 업로드처럼 특정 라우트에서만 더 큰 본문을 허용하려면 `RouteOption`의 `bodyLimit`를 사용합니다.
 
 기본값은 `102400`(100KB) 입니다.
 
@@ -346,6 +347,29 @@ app.route({
 `false`로 지정하면 이 라우팅 함수가 실행될 때 `auth()` 함수를 실행하지 않습니다.
 
 기본값은 `true` 입니다.
+
+#### `bodyLimit: number`
+
+이 라우팅 함수의 요청 본문 최대 크기를 바이트 단위로 지정하며, 앱 옵션의 `bodyLimit` 대신 사용합니다.
+값은 앱 옵션의 `bodyLimit`와 같습니다. 양의 정수를 지정하거나, 제한을 없애려면 `Infinity`를 지정합니다.
+요청 본문을 파싱하는 `POST`, `PUT`, `PATCH`에 적용됩니다.
+
+```typescript
+const app: Badak = new Badak({ bodyLimit: 100 * 1024 }); // 다른 라우트는 100KB
+
+await app.post('/upload', uploadFnc, { bodyLimit: 10 * 1024 * 1024 }); // 10MB
+
+await app.route({
+	'/avatar': {
+		PUT: {
+			fnc: avatarFnc,
+			option: { bodyLimit: 1024 * 1024 }
+		}
+	}
+});
+```
+
+요청 본문은 `auth()` 함수를 실행하기 전에 받으므로, 한도가 큰 라우트는 인증되지 않은 요청이어도 그 한도까지 본문을 받습니다.
 
 ## 특수 라우팅
 
