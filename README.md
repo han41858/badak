@@ -391,7 +391,7 @@ Special routing can be used on the routes of the `route()`, `get()`, `post()`, `
 ### `:` routing
 
 If you specify a routing path with `/:userId` and send an HTTP request to `/user1`,
-the request is matched and `{ userId: 'user1' }` is passed as an argument to the routing function.
+the request is matched and `ctx.params` contains `{ userId: 'user1' }`.
 
 ### `?` routing
 
@@ -482,21 +482,6 @@ Routing paths can have non-ASCII characters, e.g. `/사용자/:id`.
   For example, `/%2A` matches only `/*` (or `/%2A`), `/colou%3Fr` matches only `/colou%3Fr`, and `/%3Aid` matches only `/:id`.
 - A malformed percent-encoding in a routing path (e.g. `/100%`) throws an error when it is registered. Use `%25` for `%`.
 - Static file names are literal. Files like `한글.txt`, `a+b.txt` and `100%.txt` are served with their names.
-
-### ParamContext (4.0.0)
-
-The first route-function argument is now `ParamContext = { params, query, body }`, replacing the merged `param` object.
-`params` contains decoded route captures as strings, `query` contains parsed query-string values, and `body` contains the parsed request body or `undefined` when absent. `params` and `query` default to `{}`. Options `parseNumber` and `parseDate` apply to query and body values, not path captures.
-
-```typescript
-await app.patch('/users/:id', ({ params, query, body }) => {
-  // PATCH /users/7?id=8 with JSON { "id": 9 }
-  // params.id === '7', query.id === '8', (body as { id: number }).id === 9
-  return { params, query, body };
-});
-```
-
-Existing route callbacks must be migrated. The raw Node.js `req` and `res` remain the second and third arguments.
 
 ## Routing parameters
 
