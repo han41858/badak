@@ -54,3 +54,21 @@ void app.post<{ bdy: User }>('/typo', ({ body }) => body);
 void app.get<{ params: number }>('/wrong', ({ params }) => params);
 // @ts-expect-error: declared type must be consistent with the callback
 void app.post<{ body: User }>('/wrong-handler', (ctx: ParamContext<{ body: number }>) => ctx.body);
+
+// Inline handlers in route() get the default ParamContext as the contextual type, not never.
+void app.route({
+	'/inline/:id': {
+		GET: ({ params, query, body }) => params.id + String(query.page) + String(body),
+		POST: { fnc: ({ params }) => params.id, option: { auth: false } }
+	}
+});
+// @ts-expect-error: body is unknown in an inline route() handler
+void app.route({ '/inline-body': { POST: ({ body }) => body.name } });
+
+// Separately typed handlers with interface params and query are accepted in route().
+const byId: RouteFunction<{ params: IdParams, query: PageQuery }> = ({ params, query }) => params.id + String(query.page);
+void app.route({ '/typed/:id': { GET: byId, PUT: handler } });
+
+// A handler with an incompatible context is rejected in route().
+// @ts-expect-error: the first parameter is not a ParamContext
+void app.route({ '/not-context': { GET: (ctx: string) => ctx } });

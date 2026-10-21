@@ -7,5 +7,9 @@
 	"include": [
 		"src",
 		"spec/types"
+	],
+	// override "exclude" of tsconfig.json, which excludes "spec"
+	"exclude": [
+		"node_modules"
 	]
 }

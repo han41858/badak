@@ -29,8 +29,10 @@ export type RouteFunction<T extends ParamTypes = ParamTypes> = (
 
 // Method-signature bivariance allows separately typed handlers in a heterogeneous route() tree.
 // Runtime dispatch only invokes the selected handler; declaring request types does not validate them.
+// The default ParamContext (not never) is the contextual type of inline handlers in route(),
+// e.g. { GET: ({ params }) => params.id }, ParamContext<never> would make params, query and body never.
 export type RouteHandler = {
-	handle(ctx: ParamContext<never>, req: IncomingMessage, res: ServerResponse): unknown | Promise<unknown>;
+	handle(ctx: ParamContext, req: IncomingMessage, res: ServerResponse): unknown | Promise<unknown>;
 }['handle'];
 export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, responseBody?: unknown) => void | Promise<void>;
 
