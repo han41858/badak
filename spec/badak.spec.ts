@@ -988,8 +988,8 @@ describe('core', () => {
 		describe('with connections', () => {
 			// response is started but never ended, like SSE
 			const openEndlessRequest = async (): Promise<ClientRequest> => {
-				await app.get('/endless', (ctx: ParamContext): void  => {
-					const param = ctx.body as unknown, req: IncomingMessage, res: ServerResponse;
+				await app.get('/endless', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): void => {
+
 					res.writeHead(200, { 'Content-Type': 'text/event-stream' });
 					res.write('data: 1\n\n');
 				});
