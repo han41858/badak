@@ -1,6 +1,6 @@
 {
 	"name": "badak",
-	"version": "1.0.11",
+	"version": "2.0.0",
 	"description": "node.js Server framework based on Promise and TypeScript",
 	"type": "commonjs",
 	"exports": {
@@ -22,6 +22,7 @@
 	],
 	"scripts": {
 		"prebuild": "rimraf ./build",
+		"prepack": "yarn build",
 		"build:cjs": "tsx ./scripts/create-package-json.ts cjs",
 		"build:esm": "tsx ./scripts/create-package-json.ts esm",
 		"build": "yarn build:cjs&&yarn build:esm",
