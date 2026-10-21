@@ -258,3 +258,148 @@ export function sift<T> (arr: T[]): T[] {
 		return acc;
 	}, []);
 }
+
+
+export interface MultipartPart {
+	name: string;
+	filename?: string;
+	contentType?: string;
+	data: Buffer;
+}
+
+// get boundary parameter from content-type header, quoted or not
+// e.g. 'multipart/form-data; boundary=abc', 'multipart/form-data; charset=utf-8; boundary="abc"'
+export const getMultipartBoundary = (contentTypeHeader: string): string | undefined => {
+	const matching: RegExpMatchArray | null = contentTypeHeader.match(/;\s*boundary\s*=\s*(?:"([^"]+)"|([^;\s]+))/i);
+
+	return matching !== null
+		? matching[1] ?? matching[2]
+		: undefined;
+};
+
+// get parameter from header value, e.g. name from 'form-data; name="a"; filename="b.txt"'
+const getHeaderParam = (headerValue: string, paramName: string): string | undefined => {
+	const matching: RegExpMatchArray | null = headerValue.match(
+		new RegExp(`(?:^|;)\\s*${ paramName }\\s*=\\s*(?:"([^"]*)"|([^;\\s]+))`, 'i')
+	);
+
+	return matching !== null
+		? matching[1] ?? matching[2]
+		: undefined;
+};
+
+interface MultipartDelimiter {
+	index: number; // index of '--boundary'
+	isClose: boolean; // '--boundary--'
+	nextIndex: number; // part body starts here (after CRLF), only for not close delimiter
+}
+
+// find delimiter line (RFC 2046) from fromIndex
+// delimiter should be at the beginning of a line,
+// and followed by '--' (close delimiter) or optional whitespaces (transport padding) & CRLF
+// returns undefined if not found
+const findMultipartDelimiter = (body: Buffer, boundary: string, fromIndex: number): MultipartDelimiter | undefined => {
+	const dashBoundary: Buffer = Buffer.from('--' + boundary);
+
+	let index: number = body.indexOf(dashBoundary, fromIndex);
+
+	while (index >= 0) {
+		const isLineStart: boolean = index === 0
+			|| (index >= 2 && body[index - 2] === 0x0D && body[index - 1] === 0x0A); // CR LF
+
+		if (isLineStart) {
+			let cursor: number = index + dashBoundary.byteLength;
+
+			if (body[cursor] === 0x2D && body[cursor + 1] === 0x2D) { // '--'
+				return {
+					index,
+					isClose: true,
+					nextIndex: -1
+				};
+			}
+
+			// skip transport padding
+			while (body[cursor] === 0x20 || body[cursor] === 0x09) { // SP, HTAB
+				cursor++;
+			}
+
+			if (body[cursor] === 0x0D && body[cursor + 1] === 0x0A) {
+				return {
+					index,
+					isClose: false,
+					nextIndex: cursor + 2
+				};
+			}
+		}
+
+		// not a delimiter, just same bytes in content
+		index = body.indexOf(dashBoundary, index + 1);
+	}
+
+	return undefined;
+};
+
+// parse multipart/form-data body (RFC 7578), works on Buffer to keep binary data
+// preamble before the first delimiter and epilogue after the close delimiter are ignored (RFC 2046)
+// throws 'Bad Request' on malformed body
+export const parseMultipart = (body: Buffer, boundary: string): MultipartPart[] => {
+	const CRLF: string = '\r\n';
+
+	const parts: MultipartPart[] = [];
+
+	let delimiter: MultipartDelimiter | undefined = findMultipartDelimiter(body, boundary, 0);
+
+	if (delimiter === undefined) {
+		throw new Error('Bad Request');
+	}
+
+	while (!delimiter.isClose) {
+		const partStartIndex: number = delimiter.nextIndex;
+		const nextDelimiter: MultipartDelimiter | undefined = findMultipartDelimiter(body, boundary, partStartIndex);
+
+		if (nextDelimiter === undefined) {
+			// no close delimiter
+			throw new Error('Bad Request');
+		}
+
+		// CRLF before delimiter belongs to delimiter
+		const part: Buffer = body.subarray(partStartIndex, Math.max(partStartIndex, nextDelimiter.index - CRLF.length));
+		const headerEndIndex: number = part.indexOf(CRLF + CRLF);
+
+		if (headerEndIndex < 0) {
+			throw new Error('Bad Request');
+		}
+
+		const headers: Record<string, string> = {};
+
+		part.subarray(0, headerEndIndex)
+			.toString()
+			.split(CRLF)
+			.forEach((line: string): void => {
+				const colonIndex: number = line.indexOf(':');
+
+				if (colonIndex > 0) {
+					headers[line.slice(0, colonIndex).trim().toLowerCase()] = line.slice(colonIndex + 1).trim();
+				}
+			});
+
+		const disposition: string | undefined = headers['content-disposition'];
+		const name: string | undefined = disposition !== undefined
+			? getHeaderParam(disposition, 'name')
+			: undefined;
+
+		// part without name can't be a parameter, skip it
+		if (name !== undefined) {
+			parts.push({
+				name,
+				filename: getHeaderParam(disposition as string, 'filename'),
+				contentType: headers['content-type'],
+				data: part.subarray(headerEndIndex + (CRLF + CRLF).length)
+			});
+		}
+
+		delimiter = nextDelimiter;
+	}
+
+	return parts;
+};

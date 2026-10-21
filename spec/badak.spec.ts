@@ -502,6 +502,145 @@ describe('core', () => {
 				expect(testFncCalled).to.be.true;
 			});
 		});
+
+		describe('multipart/form-data parsing', () => {
+			let receivedParam: Record<string, unknown> | undefined;
+
+			const pngFilePath: string = './spec/static/test.png';
+			let pngFileData: Buffer;
+
+			beforeEach(async () => {
+				receivedParam = undefined;
+				pngFileData = readFileSync(pngFilePath);
+
+				await app.post('/upload', (param: Record<string, unknown>): void => {
+					receivedParam = param;
+				});
+
+				await app.listen(TestPort);
+			});
+
+			it('multiline and non-ASCII field values', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.field('multiline', 'line1\r\nline2\nline3')
+					.field('korean', '한글 값')
+					.field('last', 'v')
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({
+					multiline: 'line1\r\nline2\nline3',
+					korean: '한글 값',
+					last: 'v'
+				});
+			});
+
+			it('array field', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.field('list[]', 'a')
+					.field('list[]', 'b')
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ list: ['a', 'b'] });
+			});
+
+			it('image file is passed as Buffer without corruption', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.attach('image', pngFilePath, { contentType: 'image/png' })
+					.expect(200);
+
+				expect(receivedParam).to.have.property('image');
+
+				const image: unknown = (receivedParam as Record<string, unknown>).image;
+
+				expect(Buffer.isBuffer(image)).to.be.true;
+				expect((image as Buffer).equals(pngFileData)).to.be.true;
+			});
+
+			it('text/plain file content is kept exactly', async () => {
+				const contents: string = 'hello\r\nworld';
+
+				await request(app.getHttpServer())
+					.post('/upload')
+					.attach('text', Buffer.from(contents), { filename: 'a.txt', contentType: 'text/plain' })
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ text: contents });
+			});
+
+			it('quoted boundary', async () => {
+				const boundary: string = 'my boundary';
+
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', `multipart/form-data; boundary="${ boundary }"`)
+					.send([
+						`--${ boundary }`,
+						'Content-Disposition: form-data; name="a"',
+						'',
+						'1',
+						`--${ boundary }--`,
+						''
+					].join('\r\n'))
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ a: '1' });
+			});
+
+			it('boundary-like bytes in content are not a delimiter', async () => {
+				const contents: string = 'line\r\n--abcNOT_A_DELIMITER\r\nmore';
+
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send([
+						'--abc',
+						'Content-Disposition: form-data; name="file"; filename="a.txt"',
+						'Content-Type: text/plain',
+						'',
+						contents,
+						'--abc--',
+						''
+					].join('\r\n'))
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ file: contents });
+			});
+
+			it('transport padding after boundary', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send('--abc  \r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--abc--\r\n')
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ a: '1' });
+			});
+
+			it('preamble and epilogue are ignored', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send('preamble\r\n--abc\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--abc--\r\nepilogue')
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ a: '1' });
+			});
+
+			it('malformed body responds 400', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send('--abc\r\nContent-Disposition: form-data; name="a"\r\n\r\nno close delimiter')
+					.timeout(500)
+					.expect(400);
+			});
+		});
 	});
 
 	describe('4-methods', () => {
