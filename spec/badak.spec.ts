@@ -1,4 +1,5 @@
 import { Server } from 'node:net';
+import { Agent, ClientRequest, IncomingMessage, request as httpRequest, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 
 import { afterEach, beforeEach } from 'mocha';
@@ -958,12 +959,124 @@ describe('core', () => {
 					app.stop()
 				);
 			});
+
+			[-1, NaN, '1000', 1.5, -Infinity, 2 ** 31, Number.MAX_SAFE_INTEGER].forEach((timeout: unknown): void => {
+				it(`invalid timeout : ${ String(timeout) }`, async () => {
+					await app.listen(TestPort);
+
+					await promiseFail(
+						app.stop(timeout as number)
+					);
+				});
+			});
 		});
 
 		it('ok', async () => {
 			await app.listen(TestPort);
 
 			await app.stop();
+		});
+
+		describe('with connections', () => {
+			// response is started but never ended, like SSE
+			const openEndlessRequest = async (): Promise<ClientRequest> => {
+				await app.get('/endless', (param: unknown, req: IncomingMessage, res: ServerResponse): void => {
+					res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+					res.write('data: 1\n\n');
+				});
+
+				await app.listen(TestPort);
+
+				return new Promise((resolve): void => {
+					const req: ClientRequest = httpRequest({ port: TestPort, path: '/endless' }, (res: IncomingMessage): void => {
+						res.resume();
+						resolve(req);
+					});
+
+					req.on('error', (): void => {
+						// closed by server
+					});
+
+					req.end();
+				});
+			};
+
+			it('idle keep-alive connection doesn\'t block', async () => {
+				await app.get('/test', (): string => 'ok');
+				await app.listen(TestPort);
+
+				const agent: Agent = new Agent({ keepAlive: true });
+
+				try {
+					await new Promise<void>((resolve): void => {
+						httpRequest({ port: TestPort, path: '/test', agent }, (res: IncomingMessage): void => {
+							res.resume();
+							res.on('end', resolve);
+						}).end();
+					});
+
+					const start: number = Date.now();
+					await app.stop();
+
+					expect(Date.now() - start).to.be.below(500);
+					expect(app.isRunning()).to.be.false;
+				}
+				finally {
+					agent.destroy();
+				}
+			});
+
+			it('waits for in-flight request without timeout', async () => {
+				const req: ClientRequest = await openEndlessRequest();
+
+				let stopped: boolean = false;
+				const stopPromise: Promise<void> = app.stop().then((): void => {
+					stopped = true;
+				});
+
+				await new Promise((resolve) => setTimeout(resolve, 200));
+				expect(stopped).to.be.false;
+
+				// client closes the connection
+				req.destroy();
+				await stopPromise;
+
+				expect(stopped).to.be.true;
+				expect(app.isRunning()).to.be.false;
+			});
+
+			[2 ** 31 - 1, Infinity].forEach((timeout: number): void => {
+				it(`timeout ${ timeout } waits, not closes immediately`, async () => {
+					const req: ClientRequest = await openEndlessRequest();
+
+					let stopped: boolean = false;
+					const stopPromise: Promise<void> = app.stop(timeout).then((): void => {
+						stopped = true;
+					});
+
+					await new Promise((resolve) => setTimeout(resolve, 200));
+					expect(stopped).to.be.false;
+
+					req.destroy();
+					await stopPromise;
+
+					expect(stopped).to.be.true;
+				});
+			});
+
+			it('closes remaining connections after timeout', async () => {
+				const req: ClientRequest = await openEndlessRequest();
+
+				const start: number = Date.now();
+				await app.stop(100);
+				const elapsed: number = Date.now() - start;
+
+				expect(elapsed).to.be.at.least(90);
+				expect(elapsed).to.be.below(500);
+				expect(app.isRunning()).to.be.false;
+
+				req.destroy();
+			});
 		});
 	});
 });

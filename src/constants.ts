@@ -7,6 +7,10 @@ export enum METHOD {
 	DELETE = 'DELETE'
 }
 
+// max delay of Node.js timers (2^31 - 1 ms, about 24.8 days)
+// a larger delay is set to 1ms with TimeoutOverflowWarning
+export const MAX_TIMER_DELAY: number = 2 ** 31 - 1;
+
 // default max request body size in bytes : 100KB
 export const DEFAULT_BODY_LIMIT: number = 100 * 1024;
 
