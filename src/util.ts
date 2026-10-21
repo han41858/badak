@@ -42,6 +42,16 @@ export const convertDateStr = (param: string): string | Date => {
 	return result;
 };
 
+// decode percent-encoded uri fragment, malformed encoding is client's fault
+export const decodeUriFrag = (uriFrag: string): string => {
+	try {
+		return decodeURIComponent(uriFrag);
+	}
+	catch (e: unknown) {
+		throw new Error('Bad Request', { cause: e });
+	}
+};
+
 export const checkAbsoluteUri = async (uri: string): Promise<void> => {
 	if (!uri) {
 		throw new Error('no uri');
