@@ -405,7 +405,9 @@ The matched uri fragment is passed as the param with the routing path as the key
 
 ### `+` routing
 
+`+` makes the character just before it repeat 1 or more times, other characters are literal.
 If you specify the routing path as `/user1+`, you can match paths such as `/user1` and `/user11`.
+`++`, and `+` with `*` in the same uri fragment, throw an error when they are registered.
 
 ### `*` routing
 
@@ -418,8 +420,9 @@ await app.get('/img/*', (param) => param);
 // GET /img, /img/, /img/a/b -> 404
 ```
 
-`*` in a uri fragment matches any characters in the uri fragment.
+`*` in a uri fragment matches any characters in the uri fragment, together with the character just before it. Other characters are literal.
 If you specify a routing path as `/user1*`, you can match paths such as `/user`, `/user1`, and `/user11`.
+Only one `*` can be used in a uri fragment, and it should follow a character (`/*abc` throws an error).
 
 ### `**` routing
 
@@ -464,6 +467,20 @@ await app.get('/api/users/:id', userFnc);
 ```
 
 If the path matches a route fully but no routing function is registered for the method, badak responds `405 Method Not Allowed` without using `**`.
+
+### Non-ASCII and percent-encoded paths
+
+Routing paths can have non-ASCII characters, e.g. `/사용자/:id`.
+
+- The request path is split by `/` first, then each uri fragment is decoded separately.
+  So `%2F` is a `/` character in a uri fragment, not a path separator: `/files/:id` passes `{ id: 'a/b' }` for `/files/a%2Fb`, and doesn't match `/files/a/b`.
+- A malformed percent-encoding in the request path responds `400 Bad Request`.
+- Percent-encoded characters in routing paths are decoded for matching, so `/한글` and `/%ED%95%9C%EA%B8%80` are the same path.
+  They can't be registered together, `duplicated routing` is thrown.
+- Percent-encoded characters in routing paths are always literal, not routing syntax.
+  For example, `/%2A` matches only `/*` (or `/%2A`), `/colou%3Fr` matches only `/colou%3Fr`, and `/%3Aid` matches only `/:id`.
+- A malformed percent-encoding in a routing path (e.g. `/100%`) throws an error when it is registered. Use `%25` for `%`.
+- Static file names are literal. Files like `한글.txt`, `a+b.txt` and `100%.txt` are served with their names.
 
 ## Routing Param
 

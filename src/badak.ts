@@ -23,6 +23,7 @@ import { HttpError, isHttpError } from './http-error.js';
 import { convertParam, parseRequestBody } from './body-parser.js';
 import { sendErrorResponse, sendRouteResult } from './response.js';
 import { checkStaticOption, loadStaticRule, sendStaticFile } from './static.js';
+import { encodeLiteralPath } from './route-segment.js';
 import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl } from './router.js';
 import {
 	checkAbsolutePath,
@@ -334,12 +335,20 @@ export class Badak {
 				})
 			);
 
-			allCache.forEach((oneCacheSet: StaticCache[]): void => {
+			allCache.forEach((oneCacheSet: StaticCache[], ruleIndex: number): void => {
+				// uri of the static rule is a routing path given by the user, kept as it is
+				const ruleUri: string = this._staticRules[ruleIndex].uri;
+
 				oneCacheSet.forEach((oneCache: StaticCache): void => {
 					this._staticCache.push(oneCache);
 
+					// file names are literal, not routing syntax, e.g. 'a+b.txt', '한글.txt', '100%.txt'
+					const routeUri: string = oneCache.uri.startsWith(ruleUri)
+						? ruleUri + encodeLiteralPath(oneCache.uri.slice(ruleUri.length))
+						: encodeLiteralPath(oneCache.uri);
+
 					this.get(
-						oneCache.uri,
+						routeUri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
 							sendStaticFile(req, res, oneCache);
 						},

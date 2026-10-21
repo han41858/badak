@@ -1,7 +1,14 @@
 import { RouteFunction, RouteFunctionObj, RouteOption, RouteRule, RouteRuleSeed, TypedObject } from './interfaces.js';
 import { METHOD } from './constants.js';
-import { decodeUriFrag, isValidBodyLimit, sift } from './util.js';
+import { isValidBodyLimit, sift } from './util.js';
 import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from './question-pattern.js';
+import {
+	compileRouteSegment,
+	findNormalRouteKey,
+	invalidateNormalRouteIndex,
+	RouteSegment,
+	tokenizeRequestPath
+} from './route-segment.js';
 
 
 // only bodyLimit is validated, other keys are not checked to keep the behavior of 2.0
@@ -39,6 +46,8 @@ export const checkRouteFunctionObj = (value: unknown): void => {
  *     }
  * }
  */
+
+const isMethodKey = (key: string): boolean => Object.values(METHOD).includes(key as METHOD);
 
 enum LOOP_CONTROL {
 	CONTINUE = 'C'
@@ -116,13 +125,17 @@ export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: 
 				throw new Error('invalid question route');
 			}
 
-			if (isQuestionPattern(uriFrag)) {
-				// throws for '??', or '?' with '+' or '*'
-				parseQuestionPattern(uriFrag);
-			}
-
 			if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
 				throw new Error('invalid plus route');
+			}
+
+			if (!Object.values(METHOD).includes(uriFrag as METHOD)) {
+				// throws for malformed percent-encoding, and invalid syntax ('??', '++', ...)
+				const segment: RouteSegment = compileRouteSegment(uriFrag);
+
+				if (segment.kind === 'question') {
+					parseQuestionPattern(uriFrag);
+				}
 			}
 
 			if (Object.values(METHOD).includes(uriFrag as METHOD)) {
@@ -176,8 +189,6 @@ export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: 
 
 // check uri duplication among sibling uri fragments (same parent), call recursively
 export const checkUriDuplication = (currentRouteRule: RouteRule, newRouteRule: RouteRule): void => {
-	const isMethodKey = (key: string): boolean => Object.values(METHOD).includes(key as METHOD);
-
 	checkSiblingUriKeys(
 		sift([
 			...Object.keys(currentRouteRule),
@@ -204,6 +215,27 @@ export const checkUriDuplication = (currentRouteRule: RouteRule, newRouteRule: R
 };
 
 const checkSiblingUriKeys = (targetKeys: string[]): void => {
+	const segments: Map<string, RouteSegment> = new Map(
+		targetKeys.map((key: string): [string, RouteSegment] => [key, compileRouteSegment(key)])
+	);
+
+	// literal of normal uri fragments, decoded : '한글' and '%ED%95%9C%EA%B8%80' are the same
+	const normalLiterals: Map<string, string> = new Map();
+
+	for (const [key, segment] of segments) {
+		if (segment.kind !== 'normal') {
+			continue;
+		}
+
+		const sameLiteralKey: string | undefined = normalLiterals.get(segment.literal);
+
+		if (sameLiteralKey !== undefined) {
+			throw new Error(`duplicated routing, same path in different spellings : ${ sameLiteralKey }, ${ key }`);
+		}
+
+		normalLiterals.set(segment.literal, key);
+	}
+
 	// colon routing
 	const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
 	if (colonRouteArr.length > 1) {
@@ -213,11 +245,9 @@ const checkSiblingUriKeys = (targetKeys: string[]): void => {
 	// question routing, same pattern interpretation as request matching
 	const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => isQuestionPattern(uri));
 	if (questionRouteArr.length > 0) {
-		const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
-
-		// question pattern and other uri fragments (as literal strings)
+		// question pattern and normal uri fragments (literal)
 		const matchingResult: string | undefined = questionRouteArr.find((pattern: string): boolean => {
-			return targetUris.some((uri: string): boolean => matchQuestionPattern(pattern, uri));
+			return [...normalLiterals.keys()].some((literal: string): boolean => matchQuestionPattern(pattern, literal));
 		});
 
 		if (matchingResult !== undefined) {
@@ -234,24 +264,31 @@ const checkSiblingUriKeys = (targetKeys: string[]): void => {
 		}
 	}
 
-	// plus routing
-	const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('+'));
+	// plus routing, compare with normal uri fragments and the shortest uri fragments of other plus routes
+	const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => segments.get(uri)?.kind === 'plus');
 	if (plusRouteArr.length > 0) {
 		plusRouteArr.forEach((plusUri: string): void => {
-			// same as request matching, match whole uri fragment
-			const plusRegExp: RegExp = new RegExp(`^(?:${ plusUri })$`);
+			const { regExp } = segments.get(plusUri) as { kind: 'plus', regExp: RegExp };
 
 			const isDuplicated: boolean = targetKeys
-				.filter((uri: string): boolean => {
+				.filter((uri: string): boolean => uri !== plusUri)
+				.map((uri: string): string | undefined => {
+					const segment: RouteSegment = segments.get(uri) as RouteSegment;
+
 					// other special routings are checked by themselves
-					return uri !== plusUri
-						&& !uri.startsWith(':')
-						&& !uri.includes('?')
-						&& !uri.includes('*');
+					switch (segment.kind) {
+						case 'normal':
+							return segment.literal;
+
+						case 'plus':
+							// shortest matching uri fragment : 'abc+' -> 'abc'
+							return segment.shortest;
+
+						default:
+							return undefined;
+					}
 				})
-				// for other plus uri, compare with its shortest matching uri : 'abc+' -> 'abc'
-				.map((uri: string): string => uri.replace(/\+/g, ''))
-				.some((uri: string): boolean => plusRegExp.test(uri));
+				.some((literal: string | undefined): boolean => literal !== undefined && regExp.test(literal));
 
 			if (isDuplicated) {
 				throw new Error('duplicated plus routing');
@@ -259,7 +296,7 @@ const checkSiblingUriKeys = (targetKeys: string[]): void => {
 		});
 	}
 
-	// asterisk routing
+	// asterisk routing, encoded '*' (%2A) is literal
 	const asteriskRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('*'));
 
 	if (asteriskRouteArr.length > 1) {
@@ -268,6 +305,9 @@ const checkSiblingUriKeys = (targetKeys: string[]): void => {
 };
 
 export const mergeRouteRule = (a: RouteRule, b: RouteRule): RouteRule => {
+	// keys of a can be changed
+	invalidateNormalRouteIndex(a);
+
 	Object.entries(b).forEach(([key, value]) => {
 		if (a[key] === undefined) {
 			a[key] = {};
@@ -320,7 +360,7 @@ const hasRouteFunction = (rule: RouteRule): boolean => {
 export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatch => {
 	let param: TypedObject<unknown> | undefined;
 
-	// '**' fallback candidate, the rest of the path is decoded only when it is used
+	// '**' fallback candidate
 	let fallback: {
 		rule: RouteRule;
 		param: TypedObject<unknown> | undefined;
@@ -345,14 +385,9 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 
 	let checkTargetRule: RouteRule | undefined = routeRule;
 
-	// normal routing
-	const uriArr: string[] = [
-		'/', // start from root
-		...uriSanitized.split('/')
-	]
-		.filter((frag: string): boolean => {
-			return frag !== '';
-		});
+	// uri fragments are decoded separately after split by real '/', '%2F' is a '/' in a uri fragment
+	// throws HttpError(400) for malformed percent-encoding
+	const uriArr: string[] = tokenizeRequestPath(uriSanitized);
 
 	// find target function
 	// use 'for' instead of 'forEach' to break
@@ -366,9 +401,11 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 		const uriFrag: string = uriArr[depthIter];
 
 
-		// normal routing, '**' is not a normal uri fragment
-		if (uriFrag !== '**' && checkTargetRule[uriFrag] !== undefined) {
-			checkTargetRule = checkTargetRule[uriFrag] as RouteRule;
+		// normal routing, compared with the literal of route keys (e.g. '%ED%95%9C' and '한' are the same)
+		const normalRouteKey: string | undefined = findNormalRouteKey(checkTargetRule, uriFrag);
+
+		if (normalRouteKey !== undefined) {
+			checkTargetRule = checkTargetRule[normalRouteKey] as RouteRule;
 
 			loopControl = LOOP_CONTROL.CONTINUE;
 		}
@@ -391,7 +428,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 				// }
 
 				// param.matcher.push(colonParam);
-				param[colonParam.replace(':', '')] = decodeUriFrag(uriFrag);
+				param[colonParam.replace(':', '')] = uriFrag;
 
 				loopControl = LOOP_CONTROL.CONTINUE;
 			}
@@ -416,7 +453,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 				// }
 
 				// param.matcher.push(targetQuestionKey);
-				param[targetQuestionKey] = decodeUriFrag(uriFrag);
+				param[targetQuestionKey] = uriFrag;
 
 				loopControl = LOOP_CONTROL.CONTINUE;
 			}
@@ -424,13 +461,13 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 
 		if (!loopControl) {
 			// plus routing
-			const plusKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
-				return routeRuleKey.includes('+');
-			});
+			// other characters are literal, compared with the decoded uri fragment
+			const targetPlusKey: string | undefined = routeRuleKeyArr.find((routeRuleKey: string): boolean => {
+				const segment: RouteSegment | undefined = isMethodKey(routeRuleKey)
+					? undefined
+					: compileRouteSegment(routeRuleKey);
 
-			const targetPlusKey: string | undefined = plusKeyArr.find((plusKey: string): boolean => {
-				// anchor to match whole uri fragment
-				return new RegExp(`^(?:${ plusKey })$`).test(uriFrag);
+				return segment?.kind === 'plus' && segment.regExp.test(uriFrag);
 			});
 
 			if (targetPlusKey !== undefined) {
@@ -445,7 +482,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 				// }
 
 				// param.matcher.push(targetPlusKey);
-				param[targetPlusKey] = decodeUriFrag(uriFrag);
+				param[targetPlusKey] = uriFrag;
 
 				loopControl = LOOP_CONTROL.CONTINUE;
 			}
@@ -460,7 +497,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 					param = {};
 				}
 
-				param['*'] = decodeUriFrag(uriFrag);
+				param['*'] = uriFrag;
 
 				loopControl = LOOP_CONTROL.CONTINUE;
 			}
@@ -468,17 +505,14 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 
 		if (!loopControl) {
 			// partial asterisk routing
-			const targetAsteriskKey: string | undefined = routeRuleKeyArr
-				.filter((routeRuleKey: string): boolean => {
-					// 'ab*cd', 'user1*', not '**'
-					return routeRuleKey !== '**' && /.\*/.test(routeRuleKey);
-				})
-				.find((asteriskKey: string): boolean => {
-					// replace 'b*' to '.*', anchor to match whole uri fragment
-					return new RegExp(
-						`^(?:${ asteriskKey.replace(/.\*/, '.*') })$`
-					).test(uriFrag);
-				});
+			// 'ab*cd', 'user1*', not '*' and '**', other characters are literal
+			const targetAsteriskKey: string | undefined = routeRuleKeyArr.find((routeRuleKey: string): boolean => {
+				const segment: RouteSegment | undefined = isMethodKey(routeRuleKey)
+					? undefined
+					: compileRouteSegment(routeRuleKey);
+
+				return segment?.kind === 'partialAsterisk' && segment.regExp.test(uriFrag);
+			});
 
 
 			if (targetAsteriskKey !== undefined) {
@@ -493,7 +527,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 				// }
 
 				// param.matcher.push(targetAsteriskKey);
-				param[targetAsteriskKey] = decodeUriFrag(uriFrag);
+				param[targetAsteriskKey] = uriFrag;
 
 				loopControl = LOOP_CONTROL.CONTINUE;
 			}
@@ -529,8 +563,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 				// e.g. '/files/**' : '/files/a/b%20c' -> 'a/b c', '/files' -> ''
 				'**': uriArr
 					.slice(fallback.restStartIndex)
-					.map((restUriFrag: string): string => decodeUriFrag(restUriFrag))
-					.join('/')
+						.join('/')
 			}
 		};
 	}

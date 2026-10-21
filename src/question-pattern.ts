@@ -1,9 +1,13 @@
 // '?' routing pattern : '?' makes the character just before it optional, e.g. 'colou?r' matches 'color' and 'colour'
 // other characters are literal, regular expression meta characters (e.g. '.', '(', ')') are not special
-// characters are compared by Unicode code point, so '?' after an emoji makes the whole emoji optional
+// percent-encoded characters are decoded and literal, e.g. '%3F' is a literal '?', '%ED%95%9C?' makes '한' optional
+// characters are compared by Unicode code point, with decoded request uri fragments
 //
 // matching and duplication check use the same token sequence,
 // and both run in O(pattern length x string length) without expanding all strings of a pattern (2^n for n '?')
+
+import { RawPart, splitRouteKey } from './route-segment.js';
+
 
 export interface QuestionToken {
 	char: string; // one Unicode code point
@@ -35,8 +39,9 @@ export const parseQuestionPattern = (pattern: string): QuestionToken[] => {
 
 	const tokens: QuestionToken[] = [];
 
-	for (const char of pattern) {
-		if (char === '?') {
+	// throws for malformed percent-encoding
+	splitRouteKey(pattern, '?').forEach((part: RawPart): void => {
+		if ('syntax' in part) {
 			const last: QuestionToken | undefined = tokens[tokens.length - 1];
 
 			if (last === undefined || last.optional) {
@@ -46,9 +51,9 @@ export const parseQuestionPattern = (pattern: string): QuestionToken[] => {
 			last.optional = true;
 		}
 		else {
-			tokens.push({ char, optional: false });
+			tokens.push({ char: part.literal, optional: false });
 		}
-	}
+	});
 
 	tokenCache.set(pattern, tokens);
 
