@@ -97,4 +97,41 @@ describe('regression', () => {
 			expect(res.body).to.be.eql({ id: '7' });
 		});
 	});
+
+	describe('url decoding', () => {
+		beforeEach(async () => {
+			await app.post('/form', echoFnc);
+			await app.get('/users/:name', echoFnc);
+			await app.listen(TestPort);
+		});
+
+		it('application/x-www-form-urlencoded body is decoded', async () => {
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.post('/form')
+				.set('Content-Type', 'application/x-www-form-urlencoded')
+				.send('name=Hong+Gil%20Dong&expr=a%26b%3Dc&list[]=%ED%95%9C&list[]=b')
+				.expect(200);
+
+			expect(res.body).to.be.eql({
+				name: 'Hong Gil Dong',
+				expr: 'a&b=c',
+				list: ['한', 'b']
+			});
+		});
+
+		it('colon param is decoded', async () => {
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.get('/users/' + encodeURIComponent('홍 길동'))
+				.expect(200);
+
+			expect(res.body).to.be.eql({ name: '홍 길동' });
+		});
+
+		it('malformed percent-encoding in route param responds 400', async () => {
+			await request(app.getHttpServer())
+				.get('/users/%E0%A4%A')
+				.timeout(500)
+				.expect(400);
+		});
+	});
 });

@@ -20,6 +20,7 @@ import {
 	checkAbsoluteUri,
 	convertDateStr,
 	convertNumberStr,
+	decodeUriFrag,
 	getContentType,
 	isExistFile,
 	isFolder,
@@ -672,12 +673,9 @@ export class Badak {
 
 					case CONTENT_TYPE.APPLICATION_WWW_FORM_URLENCODED:
 						if (bodyBuffer.byteLength > 0) {
-							bodyBuffer
-								.toString()
-								.split('&')
-								.forEach((field: string): void => {
-									const [key, value] = field.split('=');
-
+							// URLSearchParams decodes '+' and percent-encoding
+							new URLSearchParams(bodyBuffer.toString())
+								.forEach((value: string, key: string): void => {
 									if (!param) {
 										param = {} as TypedObject<unknown>;
 									}
@@ -960,7 +958,7 @@ export class Badak {
 								// }
 
 								// param.matcher.push(colonParam);
-								param[colonParam.replace(':', '')] = uriFrag;
+								param[colonParam.replace(':', '')] = decodeUriFrag(uriFrag);
 
 								loopControl = LOOP_CONTROL.CONTINUE;
 							}
@@ -998,7 +996,7 @@ export class Badak {
 								// }
 
 								// param.matcher.push(targetQuestionKey);
-								param[targetQuestionKey] = uriFrag;
+								param[targetQuestionKey] = decodeUriFrag(uriFrag);
 
 								loopControl = LOOP_CONTROL.CONTINUE;
 							}
@@ -1026,7 +1024,7 @@ export class Badak {
 								// }
 
 								// param.matcher.push(targetPlusKey);
-								param[targetPlusKey] = uriFrag;
+								param[targetPlusKey] = decodeUriFrag(uriFrag);
 
 								loopControl = LOOP_CONTROL.CONTINUE;
 							}
@@ -1041,7 +1039,7 @@ export class Badak {
 									param = {};
 								}
 
-								param['*'] = uriFrag;
+								param['*'] = decodeUriFrag(uriFrag);
 
 								loopControl = LOOP_CONTROL.CONTINUE;
 							}
@@ -1073,7 +1071,7 @@ export class Badak {
 								// }
 
 								// param.matcher.push(targetAsteriskKey);
-								param[targetAsteriskKey] = uriFrag;
+								param[targetAsteriskKey] = decodeUriFrag(uriFrag);
 
 								loopControl = LOOP_CONTROL.CONTINUE;
 							}
@@ -1091,7 +1089,7 @@ export class Badak {
 								param = {};
 							}
 
-							param['*'] = uriFrag;
+							param['*'] = decodeUriFrag(uriFrag);
 
 							loopControl = LOOP_CONTROL.BREAK;
 						}
@@ -1102,7 +1100,7 @@ export class Badak {
 								param = {};
 							}
 
-							param['**'] = uriFrag;
+							param['**'] = decodeUriFrag(uriFrag);
 
 							// ignore after uriFrag
 							loopControl = LOOP_CONTROL.BREAK;
