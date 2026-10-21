@@ -371,7 +371,7 @@ describe('route()', () => {
 			const lastName: string = 'Han';
 
 			const rootPostFnc = async <T> (ctx: ParamContext): Promise<T> => {
-			const param = ctx.body as T;
+				const param = ctx.body as T;
 				fncRunFlag = true;
 
 				// return param data;
@@ -922,7 +922,7 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (ctx: ParamContext): Promise<void> => {
-			const param = ctx.params as ReqParam;
+					const param = ctx.params as ReqParam;
 					expect(param).to.be.a('object');
 
 					expect(param['id']).to.be.a('string');
@@ -959,7 +959,7 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (ctx: ParamContext): Promise<ReturnObj> => {
-			const param = ctx.params as ReqParam;
+					const param = ctx.params as ReqParam;
 					expect(param).to.be.a('object');
 					expect(param['id']).to.be.eql(testId);
 
@@ -1002,7 +1002,7 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (ctx: ParamContext): Promise<void> => {
-			const param = ctx.params as ReqParam;
+					const param = ctx.params as ReqParam;
 					expect(param).to.be.a('object');
 
 					expect(param).to.have.property('firstName', firstName);
@@ -1043,7 +1043,7 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (ctx: ParamContext): Promise<ReturnObj> => {
-			const param = ctx.params as ReqParam;
+					const param = ctx.params as ReqParam;
 					fncRunFlag = true;
 
 					return {
@@ -1087,7 +1087,7 @@ describe('route()', () => {
 				let fncRunFlag: boolean = false;
 
 				const testFnc = async (ctx: ParamContext): Promise<void> => {
-			const param = ctx.body as ReqParam;
+					const param = ctx.body as ReqParam;
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('firstName', firstName);
 					expect(param).to.have.property('lastName', lastName);
@@ -1340,7 +1340,7 @@ describe('route()', () => {
 					let testFncRunFlag: boolean = false;
 
 					const testFnc = async (ctx: ParamContext): Promise<void> => {
-			const param = ctx.params as TypedObject<string>;
+						const param = ctx.params as TypedObject<string>;
 						testFncRunFlag = true;
 
 						expect(param).to.be.a('object');
@@ -1643,7 +1643,7 @@ describe('route()', () => {
 
 					let testFncRunCount: number = 0;
 					const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.params as TypedObject<string>;
+						const param = ctx.params as TypedObject<string>;
 						expect(param).to.be.a('object');
 						expect(param[testUri]).to.be.a('string');
 						expect(new RegExp(testUri).test(param[testUri])).to.be.true;
@@ -1818,7 +1818,7 @@ describe('route()', () => {
 
 			describe('**', () => {
 				const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.params as unknown, req: IncomingMessage;
+					const param = ctx.params as unknown, req: IncomingMessage;
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('**');
 
@@ -1852,7 +1852,7 @@ describe('route()', () => {
 
 			describe('*', () => {
 				const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.params as unknown, req: IncomingMessage;
+					const param = ctx.params as unknown, req: IncomingMessage;
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('*');
 
@@ -1929,7 +1929,7 @@ describe('route()', () => {
 				const testFrag: string = 'ab*cd';
 
 				const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.params as TypedObject<string>, req: IncomingMessage;
+					const param = ctx.params as TypedObject<string>, req: IncomingMessage;
 					expect(param).to.be.a('object');
 
 					const regExpKey: string = param[testFrag].replace('*', '(\\w)*');
@@ -1976,7 +1976,7 @@ describe('route()', () => {
 				const testFrag: string = 'user1*';
 
 				const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.params as TypedObject<string>, req: IncomingMessage;
+					const param = ctx.params as TypedObject<string>, req: IncomingMessage;
 					expect(param).to.be.a('object');
 					expect(param[testFrag]).to.be.a('string');
 
