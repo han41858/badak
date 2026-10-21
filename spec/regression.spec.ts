@@ -389,8 +389,8 @@ describe('regression', () => {
 		});
 
 		it('streaming route function', async () => {
-			await app.get('/stream', (ctx: ParamContext): void  => {
-				const param = ctx.body as unknown, req: IncomingMessage, res: ServerResponse;
+			await app.get('/stream', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): void => {
+
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
 				res.write('a');
 
