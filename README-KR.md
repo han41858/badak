@@ -76,6 +76,11 @@ const appWithLog: Badak = new Badak({
 라우팅 함수가 실행되기 전에 실행할 미들웨어 함수를 등록합니다.
 미들웨어 함수는 여러개를 지정할 수 있으며, 지정한 순서와 관계없이 병렬로 실행됩니다.
 
+미들웨어 함수에서 에러가 발생하면(거부된 Promise를 반환하는 경우 포함) 라우팅 함수는 실행되지 않으며,
+라우팅 함수에서 에러가 발생했을 때와 같은 방식으로 에러 상태 코드로 응답합니다.
+예를 들어 `throw new Error('Forbidden')`은 `403 Forbidden`으로, 그 외의 에러는 `500 Internal Server Error`로 응답합니다.
+미들웨어 함수가 직접 응답한 경우(`res.end()` 등)에도 라우팅 함수는 실행되지 않습니다.
+
 ### `after(fnc: MiddlewareFunction): Promise<void>`
 
 라우팅 함수가 실행된 후에 실행할 미들웨어 함수를 등록합니다.

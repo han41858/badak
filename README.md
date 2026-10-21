@@ -79,6 +79,11 @@ Registers a middleware function to run **before** the routing function is execut
 Multiple middleware functions can be specified,
 and they are executed in parallel regardless of the order in which they are specified.
 
+If a middleware function throws an error (or returns a rejected Promise), the routing function is not executed
+and badak responds with an error status code, in the same way as an error thrown in the routing function.
+For example, `throw new Error('Forbidden')` responds `403 Forbidden`, and other errors respond `500 Internal Server Error`.
+If a middleware function responds by itself (e.g. `res.end()`), the routing function is not executed either.
+
 ### `after(fnc: MiddlewareFunction): Promise<void>`
 
 Registers a middleware function to run **after** the routing function is executed.

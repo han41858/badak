@@ -369,22 +369,99 @@ describe('middleware', () => {
 				expect(afterFncRunFlag).to.be.true;
 			});
 
-			it('beforeFnc throw error, bug response is ok', async () => {
-				await app.before(() => {
-					throw new Error('dev error in before function');
+			describe('beforeFnc throw error, route function is not executed', () => {
+				let throwTestRouteRunFlag: boolean = false;
+				let afterResponseBody: unknown;
+
+				beforeEach(async () => {
+					throwTestRouteRunFlag = false;
+					afterResponseBody = undefined;
+
+					await app.after((req: IncomingMessage, res: ServerResponse, responseBody?: unknown): void => {
+						afterResponseBody = responseBody;
+					});
+
+					await app.route({
+						test: {
+							GET: () => {
+								throwTestRouteRunFlag = true;
+								return 'route';
+							}
+						}
+					});
 				});
 
-				await app.route({
-					test: {
-						GET: emptyFnc
-					}
+				it('Error responds 500', async () => {
+					await app.before(() => {
+						throw new Error('dev error in before function');
+					});
+
+					await app.listen(port);
+
+					const res = await request(app.getHttpServer())
+						.get('/test')
+						.expect(500);
+
+					expect(res.text).to.be.eql('Internal Server Error');
+					expect(throwTestRouteRunFlag).to.be.false;
+
+					// after() still runs
+					expect(afterResponseBody).to.be.eql('Internal Server Error');
 				});
 
-				await app.listen(port);
+				it('async rejection responds 500', async () => {
+					await app.before(async (): Promise<void> => {
+						throw new Error('dev error in async before function');
+					});
 
-				await request(app.getHttpServer())
-					.get('/test')
-					.expect(200);
+					await app.listen(port);
+
+					await request(app.getHttpServer())
+						.get('/test')
+						.expect(500);
+
+					expect(throwTestRouteRunFlag).to.be.false;
+				});
+
+				[
+					['Unauthorized', 401],
+					['Forbidden', 403]
+				].forEach(([message, code]: (string | number)[]): void => {
+					it(`Error('${ message }') responds ${ code }`, async () => {
+						await app.before(() => {
+							throw new Error(message as string);
+						});
+
+						await app.listen(port);
+
+						await request(app.getHttpServer())
+							.get('/test')
+							.expect(code as number);
+
+						expect(throwTestRouteRunFlag).to.be.false;
+					});
+				});
+
+				it('one of multiple before() throws', async () => {
+					let otherBeforeRunFlag: boolean = false;
+
+					await app.before(() => {
+						otherBeforeRunFlag = true;
+					});
+
+					await app.before(() => {
+						throw new Error('Forbidden');
+					});
+
+					await app.listen(port);
+
+					await request(app.getHttpServer())
+						.get('/test')
+						.expect(403);
+
+					expect(otherBeforeRunFlag).to.be.true;
+					expect(throwTestRouteRunFlag).to.be.false;
+				});
 			});
 		});
 	});
