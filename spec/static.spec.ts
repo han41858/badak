@@ -332,7 +332,10 @@ describe('static()', () => {
 			['site.webmanifest', '{}', CONTENT_TYPE.APPLICATION_MANIFEST_JSON],
 			['UPPER.HTML', '<html></html>', CONTENT_TYPE.TEXT_HTML],
 			// extension wins over short signature : 'BM' is the signature of bitmap
-			['bm.txt', 'BM is not a bitmap', CONTENT_TYPE.TEXT_PLAIN]
+			['bm.txt', 'BM is not a bitmap', CONTENT_TYPE.TEXT_PLAIN],
+			// unknown extension or no extension : binary
+			['data.unknownext', 'some data', CONTENT_TYPE.APPLICATION_OCTET_STREAM],
+			['LICENSE', 'MIT License', CONTENT_TYPE.APPLICATION_OCTET_STREAM]
 		];
 
 		beforeEach(() => {
@@ -345,6 +348,19 @@ describe('static()', () => {
 
 		afterEach(() => {
 			fs.rmSync(tempDir, { recursive: true, force: true });
+		});
+
+		it('unknown extension with known signature : by signature', async () => {
+			// PNG signature
+			fs.writeFileSync(path.join(tempDir, 'image.unknownext'), Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]));
+
+			await app.static('/static', tempDir);
+			await app.listen(TestPort);
+
+			await request(app.getHttpServer())
+				.get('/static/image.unknownext')
+				.expect(200)
+				.expect(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.IMAGE_PNG);
 		});
 
 		files.forEach(([fileName, , mime]: [string, string, string]): void => {
