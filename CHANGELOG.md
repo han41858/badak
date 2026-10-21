@@ -8,6 +8,16 @@
 - `bodyLimit` of `RouteOption` to set the request body size limit for each routing function, e.g. `app.post('/upload', fnc, { bodyLimit: 10 * 1024 * 1024 })`.
 - `auth` of `RouteOption` is optional in the type, so that `{ bodyLimit }` can be passed alone.
 
+### Changed
+
+- The `auth()` function is executed before the request body is received. It was executed after the request body was received and parsed. ([#46](https://github.com/han41858/badak/pull/46))
+  - an unauthenticated request is rejected without receiving its body, so a route with a large `bodyLimit` doesn't receive it.
+  - for an unauthenticated request, `auth()` responds first (e.g. `401`) instead of `413` for a large body or `400` for a malformed body.
+
+### Fixed
+
+- A request hung if `before()` or `auth()` read the request body. It responds `500` now. ([#46](https://github.com/han41858/badak/pull/46))
+
 ## 2.0.0 (2026-10-21)
 
 This release fixes many bugs found in request handling, routing and packaging,

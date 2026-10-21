@@ -72,9 +72,12 @@ const appWithLog: Badak = new Badak({
 ### `auth(fnc: MiddlewareFunction): Promise<void>`
 
 인증용 미들웨어 함수를 지정합니다. 인증 함수는 하나만 지정할 수 있습니다.
-인증 미들웨어로 등록된 함수는 `before()` 이후에, 라우팅 함수가 실행되기 전에 실행됩니다.
+인증 미들웨어로 등록된 함수는 `before()` 이후에, 요청 본문을 받고 라우팅 함수를 실행하기 전에 실행됩니다.
+그래서 `bodyLimit`가 큰 라우트라도 인증되지 않은 요청은 본문을 받지 않고 거절합니다.
 인증 미들웨어 함수에서 오류가 발생하면 `401 Unauthorized` 에러가 발생합니다.
 `HttpError`를 던지면 그 상태 코드로 응답합니다(예: `throw new HttpError(403)`).
+
+이 함수나 `before()`에서 요청 본문(`req`)을 읽지 마세요. 본문을 이미 읽었으면 badak은 `500 Internal Server Error`로 응답합니다.
 
 ### `before(fnc: MiddlewareFunction): Promise<void>`
 
@@ -369,7 +372,7 @@ await app.route({
 });
 ```
 
-요청 본문은 `auth()` 함수를 실행하기 전에 받으므로, 한도가 큰 라우트는 인증되지 않은 요청이어도 그 한도까지 본문을 받습니다.
+`auth()` 함수는 요청 본문을 받기 전에 실행되므로, 인증되지 않은 요청은 이 한도까지 본문을 받지 않고 거절합니다.
 
 ## 특수 라우팅
 

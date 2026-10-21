@@ -719,6 +719,12 @@ export class Badak {
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
 	private async _paramParser (req: IncomingMessage, bodyLimit: number): Promise<TypedObject<unknown> | undefined> {
 		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
+			// the body is read by a middleware function already, 'end' event is not emitted again
+			if (req.readableEnded) {
+				reject(new Error('request body is read before badak parses it, don\'t read it in before() or auth()'));
+				return;
+			}
+
 			// reject before receiving body if declared size is over the limit
 			const contentLength: number = Number(req.headers['content-length']);
 
@@ -1292,6 +1298,33 @@ export class Badak {
 						throw new HttpError(404);
 					}
 
+					if (
+						this._authFnc
+						&& typeof this._authFnc === 'function'
+						&& (targetFncObj as RouteFunctionObj)?.option?.auth !== false
+					) {
+						// before receiving the request body, so that unauthenticated requests are not received up to bodyLimit
+						// the unread body is discarded by Node.js after the response
+						// can be normal or async function
+						try {
+							await this._authFnc(req, res);
+						}
+						catch (e: unknown) {
+							// HttpError keeps its own status code, e.g. 403
+							if (isHttpError(e)) {
+								throw e;
+							}
+
+							// general Error from auth function is logged (e.g. DB failure in auth), responds 401
+							throw new Error('Unauthorized', { cause: e });
+						}
+
+						if (isResponseStarted(res)) {
+							// auth function responded already (e.g. 401), skip route function
+							return;
+						}
+					}
+
 					// params are merged in this order, the latter wins for the same key :
 					// route param (e.g. colon routing) -> query string -> request body
 
@@ -1335,32 +1368,6 @@ export class Badak {
 							break;
 						}
 					}
-
-					if (
-						this._authFnc
-						&& typeof this._authFnc === 'function'
-						&& (targetFncObj as RouteFunctionObj)?.option?.auth !== false
-					) {
-						// can be normal or async function
-						try {
-							await this._authFnc(req, res);
-						}
-						catch (e: unknown) {
-							// HttpError keeps its own status code, e.g. 403
-							if (isHttpError(e)) {
-								throw e;
-							}
-
-							// general Error from auth function is logged (e.g. DB failure in auth), responds 401
-							throw new Error('Unauthorized', { cause: e });
-						}
-
-						if (isResponseStarted(res)) {
-							// auth function responded already (e.g. 401), skip route function
-							return;
-						}
-					}
-
 
 					const responseData: unknown = typeof targetFncObj === 'function'
 						? await targetFncObj(param, req, res)

@@ -74,9 +74,12 @@ const appWithLog: Badak = new Badak({
 ### `auth(fnc: MiddlewareFunction): Promise<void>`
 
 Set a middleware function for authentication. Only one authentication function can be specified.
-The registered function is executed after `before()` and before the routing function is executed.
+The registered function is executed after `before()`, and before the request body is received and the routing function is executed.
+So an unauthenticated request is rejected without receiving its body, even for a route with a large `bodyLimit`.
 If an error occurs in this middleware function, a `401 Unauthorized` error occurs.
 If the error is an `HttpError`, its status code is used instead (e.g. `throw new HttpError(403)`).
+
+Don't read the request body (`req`) in this function or in `before()`, badak responds `500 Internal Server Error` if the body is read already.
 
 ### `before(fnc: MiddlewareFunction): Promise<void>`
 
@@ -378,8 +381,8 @@ await app.route({
 });
 ```
 
-Note that the request body is received before the `auth()` function is executed,
-so a route with a large limit receives the body up to its limit even for unauthenticated requests.
+The `auth()` function is executed before the request body is received,
+so an unauthenticated request is rejected without receiving the body up to this limit.
 
 ## Special Routing
 
