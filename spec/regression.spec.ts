@@ -6,6 +6,7 @@ import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 import { TypedObject } from '../src/interfaces';
 import { echoFnc, TestPort } from './test-util';
 
@@ -146,7 +147,8 @@ describe('regression', () => {
 				parseDate: true
 			});
 
-			await app.post('/test', (param: TypedObject<unknown>): TypedObject<string> => {
+			await app.post('/test', (ctx: ParamContext): TypedObject<string>  => {
+			const param = ctx.body as TypedObject<unknown>;
 				return Object.fromEntries(
 					Object.entries(param).map(([key, value]) => {
 						return [key, value instanceof Date ? 'date' : typeof value];
@@ -215,7 +217,8 @@ describe('regression', () => {
 			return value instanceof Date ? 'date' : typeof value;
 		};
 
-		const typeFnc = (param: TypedObject<unknown>): TypedObject<string> => {
+		const typeFnc = (ctx: ParamContext): TypedObject<string>  => {
+			const param = ctx.body as TypedObject<unknown>;
 			return Object.fromEntries(
 				Object.entries(param).map(([key, value]) => [key, typeOf(value)])
 			);
@@ -386,7 +389,8 @@ describe('regression', () => {
 		});
 
 		it('streaming route function', async () => {
-			await app.get('/stream', (param: unknown, req: IncomingMessage, res: ServerResponse): void => {
+			await app.get('/stream', (ctx: ParamContext): void  => {
+			const param = ctx.body as unknown, req: IncomingMessage, res: ServerResponse;
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
 				res.write('a');
 
