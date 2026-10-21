@@ -252,7 +252,7 @@ export interface SerializedBody {
 }
 
 // make a value sendable by res.end()
-// string : as it is (text), Buffer & Uint8Array : as it is (binary), others : JSON
+// string : as it is (text), Buffer & Uint8Array : as it is (binary), others : JSON (Buffer in it as base64)
 // returns undefined if it can't be serialized (e.g. circular reference, BigInt, function, symbol)
 export const serializeBody = (value: unknown): SerializedBody | undefined => {
 	if (typeof value === 'string') {
@@ -274,7 +274,14 @@ export const serializeBody = (value: unknown): SerializedBody | undefined => {
 	}
 
 	try {
-		const json: string | undefined = JSON.stringify(value);
+		// Buffer in object : base64 string, without modifying the original object
+		const json: string | undefined = JSON.stringify(value, function (this: Record<string, unknown>, key: string, converted: unknown): unknown {
+			const original: unknown = this[key];
+
+			return Buffer.isBuffer(original)
+				? original.toString('base64')
+				: converted;
+		});
 
 		return json !== undefined
 			? {

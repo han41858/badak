@@ -215,6 +215,15 @@ export type RouteFunction = (param: any, req: IncomingMessage, res: ServerRespon
 HTTP 요청에 반응할 라우팅 함수를 등록합니다.
 라우팅 함수가 반환한 값은 HTTP 응답으로 반환됩니다.
 
+| 반환값 | 응답 |
+|---|---|
+| `string` | 텍스트 (`text/plain; charset=utf-8`) |
+| `Buffer` | 바이너리, `Content-Type`은 파일 시그니처로 판별 |
+| 객체, 배열, 숫자, 불리언, `null` | JSON (`application/json`), 객체 안의 `Buffer`는 base64 |
+| `undefined` (반환값 없음) | 빈 본문 |
+
+JSON으로 직렬화할 수 없는 값(순환 참조, `BigInt` 등)을 반환하면 `500 Internal Server Error`로 응답합니다.
+
 라우팅 함수가 `Readable` 스트림을 반환하면 badak이 응답으로 pipe합니다.
 라우팅 함수가 `Content-Type`을 지정하지 않으면 `application/octet-stream`으로 응답합니다.
 

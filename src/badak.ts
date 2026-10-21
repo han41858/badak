@@ -23,7 +23,6 @@ import {
 	convertDateStr,
 	convertNumberStr,
 	decodeUriFrag,
-	getContentType,
 	getMultipartBoundary,
 	isExistFile,
 	isFolder,
@@ -1301,42 +1300,21 @@ export class Badak {
 					else if (responseData instanceof Readable) {
 						await this._sendStream(req, res, responseData);
 					}
-					else if (responseData) {
-						const contentType: CONTENT_TYPE = getContentType(responseData);
+					else if (responseData !== undefined) {
+						// string as text, Buffer as binary, others (object, array, number, boolean, null) as JSON
+						// only undefined (no return value) responds an empty body
+						const serialized: SerializedBody | undefined = serializeBody(responseData);
+
+						if (serialized === undefined) {
+							// e.g. circular reference, BigInt
+							throw new Error('returned value of route function can\'t be serialized', { cause: responseData });
+						}
 
 						if (!res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(contentType));
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
 						}
 
-						function _convertBufferToBase64<T extends object> (value: T): T {
-							Object.entries(value).forEach(([key, innerValue]) => {
-								if (innerValue === undefined
-									|| innerValue === null) {
-									// do nothing
-								}
-								else if (innerValue instanceof Buffer) {
-									(value as TypedObject<string>)[key] = innerValue.toString('base64');
-								}
-								else if (typeof innerValue === 'object') {
-									// call recursively
-									(value as TypedObject<object>)[key] = _convertBufferToBase64(innerValue);
-								}
-							});
-
-							return value;
-						}
-
-						switch (contentType) {
-							case CONTENT_TYPE.APPLICATION_JSON:
-								responseBody = JSON.stringify(
-									_convertBufferToBase64(responseData)
-								);
-								break;
-
-							default:
-								responseBody = responseData;
-
-						}
+						responseBody = serialized.body;
 
 						// explicit content-length, so that HEAD has the same headers as GET
 						// (Node.js sets it by itself for GET only, because HEAD has no body)

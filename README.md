@@ -222,6 +222,15 @@ export type RouteFunction = (param: any, req: IncomingMessage, res: ServerRespon
 Register a routing function to respond to HTTP requests.
 The value returned by the routing function is returned as an HTTP response.
 
+| returned value | response |
+|---|---|
+| `string` | text (`text/plain; charset=utf-8`) |
+| `Buffer` | binary, `Content-Type` by its signature |
+| object, array, number, boolean, `null` | JSON (`application/json`), `Buffer` in an object as base64 |
+| `undefined` (no return value) | empty body |
+
+A value that can't be serialized to JSON (e.g. circular reference, `BigInt`) responds `500 Internal Server Error`.
+
 If the routing function returns a `Readable` stream, badak pipes it to the response.
 `Content-Type` is `application/octet-stream` unless the routing function sets it.
 
