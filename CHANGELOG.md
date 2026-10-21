@@ -32,7 +32,10 @@ Several fixes change existing behavior, see [Breaking changes](#breaking-changes
 
 #### Request params
 
-- The query string is parsed for every method, not only `GET`. Route params, the query string and the request body are merged in this order, and the latter wins for the same key. ([#30](https://github.com/han41858/badak/pull/30))
+- Route params, the query string and the request body are merged into one object in this order, and the latter wins for the same key. ([#18](https://github.com/han41858/badak/pull/18), [#30](https://github.com/han41858/badak/pull/30))
+  - the query string is parsed for every method, not only `GET`.
+  - in 1.0.11, the `GET` query string replaced route params (e.g. `/users/7?sort=name` passed `{ sort: 'name' }` without `id`), and the query string of other methods was ignored.
+  - e.g. `PATCH /users/7?id=8` with body `{ "id": 9 }` passes `{ id: 9 }` to `/users/:id`.
 - A request body that is not an object (e.g. a JSON array) is passed as it is. It was merged into route params as `{ '0': ..., '1': ... }` before. ([#30](https://github.com/han41858/badak/pull/30))
 - `application/x-www-form-urlencoded` body and route params are URL-decoded (`+`, `%20`). ([#18](https://github.com/han41858/badak/pull/18))
 - A route param with malformed percent-encoding responds `400`. ([#18](https://github.com/han41858/badak/pull/18))
@@ -72,7 +75,6 @@ Several fixes change existing behavior, see [Breaking changes](#breaking-changes
 - Static files: `app.min.js` was served as `text/plain`, file signature was preferred to the extension. ([#28](https://github.com/han41858/badak/pull/28))
 - A route with `*` at the end (e.g. `user1*`) never matched. ([#20](https://github.com/han41858/badak/pull/20))
 - Duplicated `+` routes (e.g. `ab+c` and `abbc`) were not detected, and `ab+c` and `ac` were detected as duplicated. ([#21](https://github.com/han41858/badak/pull/21))
-- `GET` query string replaced route params. ([#18](https://github.com/han41858/badak/pull/18))
 - `parseNumber` result was overwritten when `parseDate` was also set. ([#18](https://github.com/han41858/badak/pull/18))
 - `config('catchErrorLog' | 'preventError', value)` was ignored. ([#25](https://github.com/han41858/badak/pull/25))
 - Static files had no `Content-Length`, they were sent with chunked encoding. ([#30](https://github.com/han41858/badak/pull/30))
@@ -86,6 +88,7 @@ Several fixes change existing behavior, see [Breaking changes](#breaking-changes
 
 - Only `build/` is published to npm. The package was 3.0MB with tests and a logo source file, it is about 0.3MB now. ([#19](https://github.com/han41858/badak/pull/19))
 - CI with GitHub Actions: lint, test and build with Node.js 22 and 24. ([#24](https://github.com/han41858/badak/pull/24))
+- `npm pack` and `npm publish` build the package automatically (`prepack` script), so a stale or missing `build/` is not published.
 
 ### Migration
 
