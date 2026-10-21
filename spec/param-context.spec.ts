@@ -1,5 +1,4 @@
 import { afterEach, beforeEach } from 'mocha';
-import { expect } from 'chai';
 import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
