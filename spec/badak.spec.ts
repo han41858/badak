@@ -42,7 +42,7 @@ describe('core', () => {
 
 			beforeEach(async () => {
 				const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.body as {
+					const param = ctx.body as {
 					str: string;
 				};
 					expect(param).to.be.a('object');
@@ -107,7 +107,7 @@ describe('core', () => {
 
 			beforeEach(async () => {
 				const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.body as {
+					const param = ctx.body as {
 					strArr: string[];
 				};
 					expect(param).to.be.a('object');
@@ -178,7 +178,7 @@ describe('core', () => {
 
 			beforeEach(async () => {
 				const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.body as {
+					const param = ctx.body as {
 					strArr: (string | undefined)[];
 				};
 					expect(param).to.be.a('object');
@@ -227,7 +227,7 @@ describe('core', () => {
 
 			beforeEach(async () => {
 				const testFnc = (ctx: ParamContext): void  => {
-			const param = ctx.body as {
+					const param = ctx.body as {
 					strArr: (string | null)[];
 				};
 					expect(param).to.be.a('object');
@@ -305,7 +305,7 @@ describe('core', () => {
 
 			beforeEach(async () => {
 				const testFnc = async <T> (ctx: ParamContext): Promise<T> => {
-			const param = ctx.body as T;
+					const param = ctx.body as T;
 					testFncCalled = true;
 
 					expect(param).to.be.a('object');
@@ -421,7 +421,7 @@ describe('core', () => {
 				fileContents = readFileSync(`./spec/${ fileName }`).toString();
 
 				const testFnc = async <T> (ctx: ParamContext): Promise<T> => {
-			const param = ctx.body as T;
+					const param = ctx.body as T;
 					testFncCalled = true;
 
 					expect(param).to.be.a('object');
@@ -522,7 +522,7 @@ describe('core', () => {
 				pngFileData = readFileSync(pngFilePath);
 
 				await app.post('/upload', (ctx: ParamContext): void  => {
-			const param = ctx.body as Record<string, unknown>;
+					const param = ctx.body as Record<string, unknown>;
 					receivedParam = param;
 				});
 
@@ -989,7 +989,7 @@ describe('core', () => {
 			// response is started but never ended, like SSE
 			const openEndlessRequest = async (): Promise<ClientRequest> => {
 				await app.get('/endless', (ctx: ParamContext): void  => {
-			const param = ctx.body as unknown, req: IncomingMessage, res: ServerResponse;
+					const param = ctx.body as unknown, req: IncomingMessage, res: ServerResponse;
 					res.writeHead(200, { 'Content-Type': 'text/event-stream' });
 					res.write('data: 1\n\n');
 				});
