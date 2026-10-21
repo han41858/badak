@@ -4,6 +4,11 @@
 
 These changes break backward compatibility and are planned for 4.0.0.
 
+### TypeScript improvements
+
+- Route handlers support one named generic type argument, e.g. `app.post<{ body: User }>()`, `app.get<{ params: IdParams; query: PageQuery }>()`. Typed callbacks also work inside `route()` objects. These declarations do not validate requests at runtime. ([PR pending](https://github.com/han41858/badak/pulls))
+- Consumer-facing strict TypeScript compile checks run with `yarn test:types` in CI.
+
 ### Breaking changes
 
 - Routing functions receive a `ParamContext` first argument (`{ params, query, body }`) instead of one merged `param` object. `params` and `query` are always objects; `body` is `undefined` when missing. Route captures remain strings, and the `parseNumber` / `parseDate` options continue to affect query and body only. Existing route callbacks must be migrated. ([#59](https://github.com/han41858/badak/pull/59))
