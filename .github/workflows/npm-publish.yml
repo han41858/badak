@@ -28,7 +28,7 @@ jobs:
           node - <<'NODE'
           const { version } = require('./package.json');
           const tag = process.env.RELEASE_TAG;
-          if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag)) {
+          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag)) {
             console.error('Only stable semver tags (X.Y.Z) may be published.');
             process.exit(1);
           }
