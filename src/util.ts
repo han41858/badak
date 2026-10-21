@@ -10,10 +10,23 @@ import { StaticCache } from './interfaces.js';
 import { CONTENT_TYPE } from './constants.js';
 
 
+// only plain decimal format is converted : '5', '-1.5', '0.25'
+// kept as string : leading zero ('007'), '+5', '.5', '5.', exponent ('1e3'), hex ('0x10'), spaces (' 5'), '', 'Infinity',
+// and integers out of safe range ('12345678901234567890') to keep IDs as they are
+const decimalNumberRegExp: RegExp = /^-?(0|[1-9]\d*)(\.\d+)?$/;
+
 export const convertNumberStr = (param: string): string | number => {
-	return !isNaN(+param)
-		? +param
-		: param;
+	if (!decimalNumberRegExp.test(param)) {
+		return param;
+	}
+
+	const converted: number = Number(param);
+
+	if (Number.isInteger(converted) && !Number.isSafeInteger(converted)) {
+		return param;
+	}
+
+	return converted;
 };
 
 // convert if date string
