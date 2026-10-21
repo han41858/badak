@@ -30,6 +30,8 @@ import {
 	loadFolder,
 	MultipartPart,
 	parseMultipart,
+	SerializedBody,
+	serializeBody,
 	sift,
 	toContentTypeHeader
 } from './util.js';
@@ -1296,71 +1298,75 @@ export class Badak {
 						return def.message == err.message;
 					});
 
-					if (isResponseStarted(res)) {
-						// headersSent : status code and headers can't be changed anymore
-						// writableEnded : response is completed already
-						// just close the response if it is not completed
-						if (!res.writableEnded) {
-							res.end();
-						}
-					}
-					else if (isHttpError(err)) {
-						res.statusCode = err.status;
-
-						if (err.headers !== undefined) {
-							for (const [key, value] of Object.entries(err.headers)) {
-								if (value !== undefined) {
-									res.setHeader(key, value);
-								}
+					// writing the error response must not throw again, it would escape the request handler
+					try {
+						if (isResponseStarted(res)) {
+							// headersSent : status code and headers can't be changed anymore
+							// writableEnded : response is completed already
+							// just close the response if it is not completed
+							if (!res.writableEnded) {
+								res.end();
 							}
 						}
+						else if (isHttpError(err)) {
+							res.statusCode = err.status;
 
-						// status text (e.g. 'Forbidden') if body is not specified
-						const body: unknown = err.body ?? err.message;
-						const contentType: CONTENT_TYPE = getContentType(body);
-
-						if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(contentType));
-						}
-
-						responseBody = contentType === CONTENT_TYPE.APPLICATION_JSON
-							? JSON.stringify(body)
-							: body;
-
-						res.end(responseBody);
-					}
-					else if (foundResult) {
-						res.statusCode = foundResult.code;
-						res.end();
-					}
-					else {
-						res.statusCode = 500; // Internal Server Error
-
-						if (err) {
-							if (err instanceof Error) {
-								// don't expose internal error message to client, it is logged by catchErrorLog
-								responseBody = 'Internal Server Error';
-								res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(CONTENT_TYPE.TEXT_PLAIN));
-							}
-							else {
-								const contentType: CONTENT_TYPE = getContentType(err);
-								res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(contentType));
-
-								switch (contentType) {
-									case CONTENT_TYPE.APPLICATION_JSON:
-										responseBody = JSON.stringify(err);
-										break;
-
-									default:
-										responseBody = err;
+							if (err.headers !== undefined) {
+								for (const [key, value] of Object.entries(err.headers)) {
+									if (value !== undefined) {
+										res.setHeader(key, value);
+									}
 								}
 							}
 
+							// status text (e.g. 'Forbidden') if body is not specified or not serializable
+							const serialized: SerializedBody = (
+								err.body !== undefined && err.body !== null
+									? serializeBody(err.body)
+									: undefined
+							) ?? {
+								body: err.message,
+								contentType: CONTENT_TYPE.TEXT_PLAIN
+							};
+
+							if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
+								res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
+							}
+
+							responseBody = serialized.body;
 							res.end(responseBody);
 						}
-						else {
+						else if (foundResult) {
+							res.statusCode = foundResult.code;
 							res.end();
 						}
+						else {
+							res.statusCode = 500; // Internal Server Error
+
+							// don't expose internal error message to client, it is logged by catchErrorLog
+							// thrown non-Error value (e.g. throw { reason }) is sent as the body if serializable
+							const serialized: SerializedBody = (
+								!(err instanceof Error) && err !== undefined && err !== null
+									? serializeBody(err)
+									: undefined
+							) ?? {
+								body: 'Internal Server Error',
+								contentType: CONTENT_TYPE.TEXT_PLAIN
+							};
+
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
+
+							responseBody = serialized.body;
+							res.end(responseBody);
+						}
+					}
+					catch (responseError: unknown) {
+						if (this._config.catchErrorLog) {
+							console.error('badak failed to write error response :', responseError);
+						}
+
+						// can't respond properly, close the connection
+						res.destroy();
 					}
 
 					if (!this._config.preventError) {

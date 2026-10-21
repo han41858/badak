@@ -58,6 +58,14 @@ describe('HttpError', () => {
 			expect(isHttpError('HttpError')).to.be.false;
 		});
 
+		it('fake brand with invalid properties', () => {
+			const brand: symbol = Symbol.for('badak.HttpError');
+
+			expect(isHttpError({ [brand]: true, status: 'x' })).to.be.false;
+			expect(isHttpError({ [brand]: true, status: 200 })).to.be.false;
+			expect(isHttpError({ [brand]: true, status: 404, headers: 5 })).to.be.false;
+		});
+
 		it('HttpError from another module instance (ESM & CJS)', () => {
 			const fromOtherInstance: object = { [Symbol.for('badak.HttpError')]: true, status: 404 };
 
@@ -171,6 +179,123 @@ describe('HttpError', () => {
 			await request(app.getHttpServer())
 				.get('/test')
 				.expect(404, { id: 'not found' });
+		});
+	});
+
+	describe('body that res.end() can\'t send directly', () => {
+		let unhandledCount: number = 0;
+
+		const onUnhandled = (): void => {
+			++unhandledCount;
+		};
+
+		beforeEach(() => {
+			unhandledCount = 0;
+			process.on('unhandledRejection', onUnhandled);
+		});
+
+		afterEach(async () => {
+			// server should be still alive
+			await request(app.getHttpServer())
+				.get('/alive')
+				.expect(200, 'alive');
+
+			await new Promise((resolve) => setImmediate(resolve));
+			process.off('unhandledRejection', onUnhandled);
+
+			expect(unhandledCount).to.be.eql(0);
+		});
+
+		const listen = async (fnc: () => never): Promise<void> => {
+			await app.get('/test', fnc);
+			await app.get('/alive', (): string => 'alive');
+			await app.listen(TestPort);
+		};
+
+		([
+			[123, '123'],
+			[false, 'false'],
+			[[1, 2], '[1,2]']
+		] as [number | boolean | number[], string][]).forEach(([body, expected]: [number | boolean | number[], string]): void => {
+			it(`${ JSON.stringify(body) } is sent as JSON`, async () => {
+				await listen((): never => {
+					throw new HttpError(400, { body });
+				});
+
+				await request(app.getHttpServer())
+					.get('/test')
+					.expect(400)
+					.expect('content-type', 'application/json')
+					.then((res: SuperTestResponse): void => {
+						expect(res.text).to.be.eql(expected);
+					});
+			});
+		});
+
+		it('null : status text', async () => {
+			await listen((): never => {
+				throw new HttpError(400, { body: null });
+			});
+
+			await request(app.getHttpServer())
+				.get('/test')
+				.expect(400, 'Bad Request');
+		});
+
+		it('circular reference : status text', async () => {
+			await listen((): never => {
+				const body: Record<string, unknown> = {};
+				body.self = body;
+
+				throw new HttpError(400, { body });
+			});
+
+			await request(app.getHttpServer())
+				.get('/test')
+				.expect(400, 'Bad Request');
+		});
+
+		it('Buffer', async () => {
+			await listen((): never => {
+				throw new HttpError(400, { body: Buffer.from('binary') });
+			});
+
+			await request(app.getHttpServer())
+				.get('/test')
+				.expect(400)
+				.then((res: SuperTestResponse): void => {
+					expect(res.text).to.be.eql('binary');
+				});
+		});
+
+		it('thrown number (not HttpError) responds 500 with JSON', async () => {
+			await listen((): never => {
+				throw 123;
+			});
+
+			await request(app.getHttpServer())
+				.get('/test')
+				.expect(500)
+				.expect('content-type', 'application/json')
+				.then((res: SuperTestResponse): void => {
+					expect(res.text).to.be.eql('123');
+				});
+		});
+
+		it('invalid header value closes the connection, server keeps running', async () => {
+			await listen((): never => {
+				throw new HttpError(400, { headers: { 'X-Invalid': 'line\nbreak' } });
+			});
+
+			let failed: boolean = false;
+
+			await request(app.getHttpServer())
+				.get('/test')
+				.catch((): void => {
+					failed = true;
+				});
+
+			expect(failed).to.be.true;
 		});
 	});
 

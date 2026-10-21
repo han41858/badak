@@ -191,7 +191,8 @@ app.get('/limited', () => {
 ```
 
 - `status` : an integer from `400` to `599`.
-- `option.body` : the response body. A string is sent as text, an object is sent as JSON. If omitted, the status text (e.g. `Forbidden`) is sent.
+- `option.body` : the response body. A string is sent as text, a `Buffer` as binary, and other values (object, array, number, boolean) as JSON.
+  If omitted, `null`, or not serializable (e.g. circular reference), the status text (e.g. `Forbidden`) is sent.
 - `option.headers` : response headers. `Content-Type` in it is kept.
 - `option.cause` : the original error, for logging.
 

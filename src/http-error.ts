@@ -5,8 +5,9 @@ import { OutgoingHttpHeaders, STATUS_CODES } from 'node:http';
 const HTTP_ERROR_BRAND: unique symbol = Symbol.for('badak.HttpError');
 
 export interface HttpErrorOption {
-	// response body, string or object (sent as JSON), status text of the code if omitted
-	body?: unknown;
+	// response body : string (text), Buffer (binary), or a value serializable by JSON.stringify() (JSON)
+	// status text of the code if omitted, null, or not serializable (e.g. circular reference)
+	body?: string | Buffer | object | number | boolean | null;
 	// response headers, e.g. { 'Retry-After': 120 }
 	headers?: OutgoingHttpHeaders;
 	// original error, for logging
@@ -42,7 +43,19 @@ export class HttpError extends Error {
 }
 
 export const isHttpError = (value: unknown): value is HttpError => {
-	return typeof value === 'object'
-		&& value !== null
-		&& (value as Partial<Record<typeof HTTP_ERROR_BRAND, boolean>>)[HTTP_ERROR_BRAND] === true;
+	if (
+		typeof value !== 'object'
+		|| value === null
+		|| (value as Partial<Record<typeof HTTP_ERROR_BRAND, boolean>>)[HTTP_ERROR_BRAND] !== true
+	) {
+		return false;
+	}
+
+	// the brand can be faked, check the properties used by badak
+	const { status, headers } = value as { status: unknown, headers: unknown };
+
+	return Number.isInteger(status)
+		&& (status as number) >= 400
+		&& (status as number) <= 599
+		&& (headers === undefined || (typeof headers === 'object' && headers !== null));
 };
