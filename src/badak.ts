@@ -22,9 +22,12 @@ import {
 	convertNumberStr,
 	decodeUriFrag,
 	getContentType,
+	getMultipartBoundary,
 	isExistFile,
 	isFolder,
 	loadFolder,
+	MultipartPart,
+	parseMultipart,
 	sift
 } from './util.js';
 
@@ -518,151 +521,55 @@ export class Badak {
 		const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
 
 		if (contentTypeInHeader) {
-			const [contentType, boundaryStrPair] = contentTypeInHeader
+			const [contentType] = contentTypeInHeader
 				.split(';')
 				.map((s: string): string => s.trim());
 
 			if (bodyBuffer.byteLength > 0) {
 				switch (contentType) {
 					case 'multipart/form-data': {
-						if (boundaryStrPair === undefined) {
+						const boundary: string | undefined = getMultipartBoundary(contentTypeInHeader);
+
+						if (boundary === undefined) {
 							// boundary is mandatory for multipart/form-data
 							throw new Error('Bad Request');
 						}
 
-						const boundaryStrMatching: RegExpMatchArray | null = boundaryStrPair.match(/boundary\s*=\s*(.+)$/);
+						parseMultipart(bodyBuffer, boundary).forEach((part: MultipartPart): void => {
+							let value: string | Buffer;
 
-						if (
-							boundaryStrMatching !== null
-							&& boundaryStrMatching.length > 1
-						) {
-							const midBoundaryBuffer: Buffer = Buffer.from('--' + boundaryStrMatching[1] + '\r\n');
-							const endBoundaryBuffer: Buffer = Buffer.from('\r\n--' + boundaryStrMatching[1] + '--\r\n');
+							if (part.filename === undefined) {
+								// normal field
+								value = part.data.toString();
+							}
+							else {
+								// file, text/plain is default by RFC 7578
+								const fileContentType: string = (part.contentType ?? CONTENT_TYPE.TEXT_PLAIN).toLowerCase();
 
-							const endBoundaryIndex: number = bodyBuffer.indexOf(endBoundaryBuffer);
-
-							// remove end boundary
-							let partialBody: Buffer = Buffer.from(bodyBuffer).subarray(0, endBoundaryIndex);
-
-							const bodyBufferDivided: Buffer[] = [];
-
-							while (partialBody.byteLength > 0) {
-								const index: number = partialBody.indexOf(midBoundaryBuffer);
-
-								if (index >= 0) {
-									const nextIndex: number = partialBody
-										.subarray(index + midBoundaryBuffer.byteLength)
-										.indexOf(midBoundaryBuffer);
-
-									if (nextIndex >= 0) {
-										bodyBufferDivided.push(
-											partialBody.subarray(
-												index + midBoundaryBuffer.byteLength,
-												index + midBoundaryBuffer.byteLength + nextIndex
-											)
-										);
-
-										partialBody = partialBody.subarray(
-											nextIndex + midBoundaryBuffer.byteLength
-										);
-									}
-									else {
-										// last
-										bodyBufferDivided.push(
-											partialBody.subarray(
-												index + midBoundaryBuffer.byteLength
-											)
-										);
-
-										partialBody = partialBody.subarray(
-											index + midBoundaryBuffer.byteLength
-										);
-									}
-								}
-								else {
-									partialBody = Buffer.from('');
-								}
+								value = fileContentType.startsWith(CONTENT_TYPE.TEXT_PLAIN)
+									? part.data.toString()
+									: part.data;
 							}
 
-							bodyBufferDivided.forEach((one: Buffer): void => {
-								const oneStr: string = one.toString();
+							if (!param) {
+								param = {} as TypedObject<unknown>;
+							}
 
-								const filenameMatching: RegExpMatchArray | null = oneStr
-									.match(/filename\s*=\s*["']([^"']+)["']/);
+							if (part.name.endsWith('[]')) {
+								// array
+								const arrayName: string = part.name.replace(/\[]$/g, '');
 
-								if (filenameMatching === null) {
-									const keyMatching: RegExpMatchArray | null = oneStr
-										.match(/name\s*=\s*["']([^"']+)["']/);
-									const valueMatching: RegExpMatchArray | null = oneStr
-										.match(/\r\n\r\n(.*)(\r\n)*$/);
-
-									if (
-										keyMatching !== null
-										&& keyMatching.length > 1
-										&& valueMatching !== null
-										&& valueMatching.length > 1
-									) {
-										const key: string = keyMatching[1];
-										const value: string = valueMatching[1];
-
-
-										if (!param) {
-											param = {} as TypedObject<unknown>;
-										}
-
-										if (key.endsWith('[]')) {
-											// array
-											const arrayName: string = key.replace(/\[]$/g, '');
-
-											if (param[arrayName]) {
-												(param[arrayName] as Array<unknown>).push(value);
-											}
-											else {
-												param[arrayName] = [value];
-											}
-										}
-										else {
-											param[key] = value;
-										}
-									}
+								if (param[arrayName]) {
+									(param[arrayName] as Array<unknown>).push(value);
 								}
 								else {
-									const keyMatching: RegExpMatchArray | null = oneStr
-										.match(/name\s*=\s*["']([^"']+)["']/);
-									const fileContentTypeMatching: RegExpMatchArray | null = oneStr
-										.match(/[cC]ontent-[tT]ype\s*:\s*(.+)(\r\n)*/); // file doesn't end with \r\n, skip $
-
-									if (
-										keyMatching !== null
-										&& keyMatching.length > 1
-										&& fileContentTypeMatching !== null
-										&& fileContentTypeMatching.length > 1
-									) {
-										const fileContentTypeStr: string = fileContentTypeMatching[0];
-
-										const key: string = keyMatching[1];
-										const fileContentType: string = fileContentTypeMatching[1];
-										const cutStartIndex: number = (fileContentTypeMatching.index as number) + fileContentTypeStr.length;
-
-										if (!param) {
-											param = {} as TypedObject<unknown>;
-										}
-
-										switch (fileContentType.toLowerCase()) {
-											case 'text/plain': {
-												param[key] = oneStr.slice(cutStartIndex);
-												break;
-											}
-
-											case 'application/octet-stream': {
-												param[key] = one.subarray(cutStartIndex);
-												break;
-											}
-										}
-									}
+									param[arrayName] = [value];
 								}
-							});
-						}
+							}
+							else {
+								param[part.name] = value;
+							}
+						});
 						break;
 					}
 

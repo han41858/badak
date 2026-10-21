@@ -258,3 +258,110 @@ export function sift<T> (arr: T[]): T[] {
 		return acc;
 	}, []);
 }
+
+
+export interface MultipartPart {
+	name: string;
+	filename?: string;
+	contentType?: string;
+	data: Buffer;
+}
+
+// get boundary parameter from content-type header, quoted or not
+// e.g. 'multipart/form-data; boundary=abc', 'multipart/form-data; charset=utf-8; boundary="abc"'
+export const getMultipartBoundary = (contentTypeHeader: string): string | undefined => {
+	const matching: RegExpMatchArray | null = contentTypeHeader.match(/;\s*boundary\s*=\s*(?:"([^"]+)"|([^;\s]+))/i);
+
+	return matching !== null
+		? matching[1] ?? matching[2]
+		: undefined;
+};
+
+// get parameter from header value, e.g. name from 'form-data; name="a"; filename="b.txt"'
+const getHeaderParam = (headerValue: string, paramName: string): string | undefined => {
+	const matching: RegExpMatchArray | null = headerValue.match(
+		new RegExp(`(?:^|;)\\s*${ paramName }\\s*=\\s*(?:"([^"]*)"|([^;\\s]+))`, 'i')
+	);
+
+	return matching !== null
+		? matching[1] ?? matching[2]
+		: undefined;
+};
+
+// parse multipart/form-data body (RFC 7578), works on Buffer to keep binary data
+// throws 'Bad Request' on malformed body
+export const parseMultipart = (body: Buffer, boundary: string): MultipartPart[] => {
+	const CRLF: string = '\r\n';
+
+	const delimiter: Buffer = Buffer.from('--' + boundary);
+	const nextDelimiter: Buffer = Buffer.from(CRLF + '--' + boundary);
+
+	const parts: MultipartPart[] = [];
+
+	let delimiterIndex: number = body.indexOf(delimiter);
+
+	if (delimiterIndex < 0) {
+		throw new Error('Bad Request');
+	}
+
+	for (;;) {
+		const afterDelimiterIndex: number = delimiterIndex + delimiter.byteLength;
+		const afterDelimiterStr: string = body.subarray(afterDelimiterIndex, afterDelimiterIndex + 2).toString();
+
+		if (afterDelimiterStr === '--') {
+			// close delimiter
+			break;
+		}
+
+		if (afterDelimiterStr !== CRLF) {
+			throw new Error('Bad Request');
+		}
+
+		const partStartIndex: number = afterDelimiterIndex + CRLF.length;
+		const partEndIndex: number = body.indexOf(nextDelimiter, partStartIndex);
+
+		if (partEndIndex < 0) {
+			// no close delimiter
+			throw new Error('Bad Request');
+		}
+
+		const part: Buffer = body.subarray(partStartIndex, partEndIndex);
+		const headerEndIndex: number = part.indexOf(CRLF + CRLF);
+
+		if (headerEndIndex < 0) {
+			throw new Error('Bad Request');
+		}
+
+		const headers: Record<string, string> = {};
+
+		part.subarray(0, headerEndIndex)
+			.toString()
+			.split(CRLF)
+			.forEach((line: string): void => {
+				const colonIndex: number = line.indexOf(':');
+
+				if (colonIndex > 0) {
+					headers[line.slice(0, colonIndex).trim().toLowerCase()] = line.slice(colonIndex + 1).trim();
+				}
+			});
+
+		const disposition: string | undefined = headers['content-disposition'];
+		const name: string | undefined = disposition !== undefined
+			? getHeaderParam(disposition, 'name')
+			: undefined;
+
+		// part without name can't be a parameter, skip it
+		if (name !== undefined) {
+			parts.push({
+				name,
+				filename: getHeaderParam(disposition as string, 'filename'),
+				contentType: headers['content-type'],
+				data: part.subarray(headerEndIndex + (CRLF + CRLF).length)
+			});
+		}
+
+		delimiterIndex = partEndIndex + CRLF.length;
+	}
+
+	return parts;
+};
