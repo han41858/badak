@@ -463,6 +463,20 @@ export class Badak {
 		});
 	}
 
+	async patch (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+		this._routeAbbrValidator(address, fnc);
+
+		// assign to route rule
+		this._assignRule({
+			[address]: {
+				[METHOD.PATCH]: {
+					fnc: fnc,
+					option: option
+				}
+			}
+		});
+	}
+
 	async delete (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
@@ -1118,6 +1132,7 @@ export class Badak {
 
 						case METHOD.PUT:
 						case METHOD.POST:
+						case METHOD.PATCH:
 							if (param) {
 								// TODO: overwrite? uri param & param object
 								param = Object.assign(param, await this._paramParser(req));

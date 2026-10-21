@@ -128,6 +128,11 @@ HTTP 서버를 정지합니다.
 
 `DELETE` 메서드 요청에 반응하는 라우팅 함수를 등록합니다.
 
+### `patch(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
+
+`PATCH` 메서드 요청에 반응하는 라우팅 함수를 등록합니다.
+요청 본문은 `POST`, `PUT`과 같은 방식으로 파싱합니다.
+
 ### `static(uri: string, path: string): Promise<void>`
 
 정적 파일로 제공할 주소와 파일 경로를 연결합니다.

@@ -256,4 +256,35 @@ describe('regression', () => {
 			});
 		});
 	});
+
+	describe('PATCH', () => {
+		it('request body is parsed, with route param', async () => {
+			await app.patch('/users/:id', echoFnc);
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.patch('/users/7')
+				.send({ name: 'han' })
+				.expect(200);
+
+			expect(res.body).to.be.eql({ id: '7', name: 'han' });
+		});
+
+		it('route() with PATCH key', async () => {
+			await app.route({
+				users: {
+					PATCH: echoFnc
+				}
+			});
+
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.patch('/users')
+				.send({ a: 1 })
+				.expect(200);
+
+			expect(res.body).to.be.eql({ a: 1 });
+		});
+	});
 });

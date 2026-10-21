@@ -133,6 +133,11 @@ Registers a routing function that responds to `PUT` method requests.
 
 Registers a routing function that responds to `DELETE` method requests.
 
+### `patch(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
+
+Registers a routing function that responds to `PATCH` method requests.
+The request body is parsed in the same way as `POST` and `PUT`.
+
 ### `static(uri: string, path: string): Promise<void>`
 
 Concatenate the address and file path to be provided as a static file.
