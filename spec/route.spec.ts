@@ -1155,6 +1155,40 @@ describe('route()', () => {
 			});
 		});
 
+		describe('duplication detected regardless of registration order', () => {
+			[
+				['/users/:id/profile', '/users/:name/profile'],
+				['/users/a?b', '/users/ab'],
+				['/a/:x', '/a/:y/b']
+			].forEach(([first, second]: string[]): void => {
+				[
+					[first, second],
+					[second, first]
+				].forEach(([a, b]: string[]): void => {
+					it(`${ a } -> ${ b }, in different time`, async () => {
+						await app.get(a, emptyFnc);
+
+						await promiseFail(
+							app.get(b, emptyFnc)
+						);
+					});
+
+					it(`${ a } & ${ b }, in same time`, () => {
+						return promiseFail(
+							app.route({
+								[a]: {
+									GET: emptyFnc
+								},
+								[b]: {
+									GET: emptyFnc
+								}
+							})
+						);
+					});
+				});
+			});
+		});
+
 		describe('question routing', () => {
 			describe('error', () => {
 				it('start with \'?\'', () => {
