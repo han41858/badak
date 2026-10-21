@@ -339,7 +339,7 @@ describe('middleware', () => {
 					afterFncRunFlag = true;
 
 					expect(responseBody).to.be.a('string');
-					expect(responseBody).to.be.eql('dev error');
+					expect(responseBody).to.be.eql('Internal Server Error');
 				};
 
 				await app.before(beforeFnc);

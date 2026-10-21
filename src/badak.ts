@@ -1261,7 +1261,8 @@ export class Badak {
 
 						if (err) {
 							if (err instanceof Error) {
-								responseBody = err.message;
+								// don't expose internal error message to client, it is logged by catchErrorLog
+								responseBody = 'Internal Server Error';
 								res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.TEXT_PLAIN);
 							}
 							else {

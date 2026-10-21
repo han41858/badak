@@ -171,4 +171,35 @@ describe('regression', () => {
 			});
 		});
 	});
+
+	describe('500 response should not expose error message', () => {
+		beforeEach(async () => {
+			await app.get('/error', (): never => {
+				throw new Error('db password=secret');
+			});
+
+			await app.get('/object', (): never => {
+				throw { reason: 'custom body' };
+			});
+
+			await app.listen(TestPort);
+		});
+
+		it('Error instance', async () => {
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.get('/error')
+				.expect(500);
+
+			expect(res.text).to.be.eql('Internal Server Error');
+			expect(res.text).not.to.include('secret');
+		});
+
+		it('thrown plain object is still sent as response body', async () => {
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.get('/object')
+				.expect(500);
+
+			expect(res.body).to.be.eql({ reason: 'custom body' });
+		});
+	});
 });
