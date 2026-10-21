@@ -15,6 +15,7 @@ import {
 	TypedObject
 } from './interfaces.js';
 import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, MAX_TIMER_DELAY, METHOD } from './constants.js';
+import { isHttpError } from './http-error.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -1191,6 +1192,11 @@ export class Badak {
 							await this._authFnc(req, res);
 						}
 						catch (e: unknown) {
+							// HttpError keeps its own status code, e.g. 403
+							if (isHttpError(e)) {
+								throw e;
+							}
+
 							throw new Error('Unauthorized', { cause: e });
 						}
 
@@ -1297,6 +1303,31 @@ export class Badak {
 						if (!res.writableEnded) {
 							res.end();
 						}
+					}
+					else if (isHttpError(err)) {
+						res.statusCode = err.status;
+
+						if (err.headers !== undefined) {
+							for (const [key, value] of Object.entries(err.headers)) {
+								if (value !== undefined) {
+									res.setHeader(key, value);
+								}
+							}
+						}
+
+						// status text (e.g. 'Forbidden') if body is not specified
+						const body: unknown = err.body ?? err.message;
+						const contentType: CONTENT_TYPE = getContentType(body);
+
+						if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(contentType));
+						}
+
+						responseBody = contentType === CONTENT_TYPE.APPLICATION_JSON
+							? JSON.stringify(body)
+							: body;
+
+						res.end(responseBody);
 					}
 					else if (foundResult) {
 						res.statusCode = foundResult.code;
