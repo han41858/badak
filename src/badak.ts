@@ -4,9 +4,11 @@ import * as querystring from 'node:querystring';
 
 import {
 	BadakOption,
+	ParamTypes,
 	ParamContext,
 	MiddlewareFunction,
 	RouteFunction,
+	RouteHandler,
 	RouteFunctionObj,
 	RouteOption,
 	RouteRule,
@@ -181,7 +183,7 @@ export class Badak {
 		this._setOption(key, value);
 	}
 
-	private _routeAbbrValidator (address: string, fnc: RouteFunction): void {
+	private _routeAbbrValidator (address: string, fnc: RouteHandler): void {
 		if (address === undefined) {
 			throw new Error('no address');
 		}
