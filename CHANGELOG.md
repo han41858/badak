@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 (unreleased)
+## 2.0.0 (2026-10-21)
 
 This release fixes many bugs found in request handling, routing and packaging,
 and adds `HttpError`, `PATCH`, `HEAD`, stream responses and a request body size limit.
