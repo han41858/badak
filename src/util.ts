@@ -5,7 +5,6 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 
 import * as node_path from 'node:path';
 
-import { StaticCache } from './interfaces.js';
 import { CONTENT_TYPE } from './constants.js';
 import { HttpError } from './http-error.js';
 
@@ -81,57 +80,6 @@ export const isFolder = async (path: string): Promise<boolean> => {
 			}
 		});
 	});
-};
-
-
-export const loadFolder = async (uri: string, path: string): Promise<StaticCache[]> => {
-	const foldersAndFiles: string[] = await new Promise<string[]>((resolve, reject) => {
-		fs.readdir(path, (err: Error | null, _foldersAndFiles: string[]) => {
-			if (!err) {
-				resolve(_foldersAndFiles);
-			}
-			else {
-				reject(new Error(`loadFolder() failed : ${ path }`));
-			}
-		});
-	});
-
-	const cache: StaticCache[] = [];
-
-	const allFileData: StaticCache[][] = await Promise.all(foldersAndFiles.map(async (folderOrFileName: string): Promise<StaticCache[]> => {
-		const uriSanitized: string = node_path
-			.join(uri, folderOrFileName)
-			.replace(/\\/g, '/'); // path \\ changed to /
-
-		const fullPath: string = node_path.join(path, folderOrFileName);
-
-		let cacheSet: StaticCache[];
-
-		if (await isFolder(fullPath)) {
-			// call recursively
-			cacheSet = await loadFolder(uriSanitized, fullPath);
-		}
-		else {
-			const { fileData, fileStat } = await loadFile(fullPath);
-			const mimeType: CONTENT_TYPE = getContentType(fileData, folderOrFileName);
-
-			cacheSet = [{
-				uri: uriSanitized,
-				mime: mimeType,
-				fileData: fileData,
-				etag: createEtag(fileData),
-				lastModified: fileStat.mtime.toUTCString()
-			}];
-		}
-
-		return cacheSet;
-	}));
-
-	allFileData.forEach((oneFileData) => {
-		cache.push(...oneFileData);
-	});
-
-	return cache;
 };
 
 // strong ETag from file content : "<size in hex>-<sha1 in base64url>"
@@ -255,28 +203,6 @@ export const isNotModified = (req: IncomingMessage, etag: string, lastModified: 
 	}
 
 	return false;
-};
-
-// read the content and the metadata through the same file handle,
-// so that they are from the same file even if the path is replaced (e.g. by rename) in the meantime
-// it doesn't guarantee atomicity for the file modified while reading
-const loadFile = async (path: string): Promise<{ fileData: Buffer, fileStat: Stats }> => {
-	let fileHandle: fs.promises.FileHandle | undefined;
-
-	try {
-		fileHandle = await fs.promises.open(path, 'r');
-
-		const fileStat: Stats = await fileHandle.stat();
-		const fileData: Buffer = await fileHandle.readFile();
-
-		return { fileData, fileStat };
-	}
-	catch (err: unknown) {
-		throw new Error(`loadFile() failed : ${ path }`, { cause: err });
-	}
-	finally {
-		await fileHandle?.close();
-	}
 };
 
 
