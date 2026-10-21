@@ -5,6 +5,7 @@ import { expect } from 'chai';
 import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 import { HttpError } from '../src/http-error';
 import { TestPort } from './test-util';
 
@@ -27,9 +28,9 @@ describe('auth() runs before receiving the request body', () => {
 			: Promise.resolve();
 	});
 
-	const routeFnc = (param: unknown): unknown => {
+	const routeFnc = (ctx: ParamContext): unknown => {
 		routeFncRunFlag = true;
-		return param;
+		return ctx.body;
 	};
 
 	it('responds before the client sends the rest of the body', async () => {
