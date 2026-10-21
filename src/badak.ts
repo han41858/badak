@@ -184,91 +184,87 @@ export class Badak {
 		return refinedRuleObj;
 	}
 
-	// call recursively
-	private getUriKeyArr (routeRule: RouteRule | RouteRuleSeed): string[][] {
-		const result: string[][] = [];
+	// check uri duplication among sibling uri fragments (same parent), call recursively
+	private _checkUriDuplication (currentRouteRule: RouteRule, newRouteRule: RouteRule): void {
+		const isMethodKey = (key: string): boolean => Object.values(METHOD).includes(key as METHOD);
 
-		for (const [key, value] of Object.entries(routeRule)) {
-			if (typeof value === 'object') {
-				if (!Object.values(METHOD).includes(key as METHOD)) {
-					this.getUriKeyArr(value).forEach((one: string[]): void => {
-						result.push([key, ...one]);
-					});
-				}
-				else {
-					result.push([key]);
-				}
+		this._checkSiblingUriKeys(
+			sift([
+				...Object.keys(currentRouteRule),
+				...Object.keys(newRouteRule)
+			])
+				.filter((key: string): boolean => !isMethodKey(key))
+		);
+
+		// current rule is checked already, so go deeper along new rule only
+		for (const [key, newChild] of Object.entries(newRouteRule)) {
+			if (isMethodKey(key) || typeof newChild !== 'object') {
+				continue;
 			}
-			else {
-				result.push([key]);
+
+			const currentChild: RouteRule | RouteRuleSeed | RouteFunction | undefined = currentRouteRule[key];
+
+			this._checkUriDuplication(
+				typeof currentChild === 'object'
+					? currentChild as RouteRule
+					: {},
+				newChild as RouteRule
+			);
+		}
+	}
+
+	private _checkSiblingUriKeys (targetKeys: string[]): void {
+		// colon routing
+		const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
+		if (colonRouteArr.length > 1) {
+			throw new Error('duplicated colon routing');
+		}
+
+		// question routing
+		const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('?'));
+		if (questionRouteArr.length > 0) {
+			const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
+
+			const matchingResult: string | undefined = questionRouteArr.find((regSrc: string): boolean => {
+				// anchor to match whole uri fragment
+				return targetUris.some((uri: string): boolean => new RegExp(`^(?:${ regSrc })$`).test(uri));
+			});
+
+			if (matchingResult !== undefined) {
+				throw new Error('duplicated question routing');
 			}
 		}
 
-		return result;
-	}
+		// plus routing
+		const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('+'));
+		if (plusRouteArr.length > 0) {
+			plusRouteArr.forEach((plusUri: string): void => {
+				// same as request matching, match whole uri fragment
+				const plusRegExp: RegExp = new RegExp(`^(?:${ plusUri })$`);
 
-	private _checkUriDuplication (currentRouteRule: RouteRule, newRouteRule: RouteRule): void {
-		const allUriKeys: string[][] = [
-			...this.getUriKeyArr(currentRouteRule),
-			...this.getUriKeyArr(newRouteRule)
-		];
+				const isDuplicated: boolean = targetKeys
+					.filter((uri: string): boolean => {
+						// other special routings are checked by themselves
+						return uri !== plusUri
+							&& !uri.startsWith(':')
+							&& !uri.includes('?')
+							&& !uri.includes('*');
+					})
+					// for other plus uri, compare with its shortest matching uri : 'abc+' -> 'abc'
+					.map((uri: string): string => uri.replace(/\+/g, ''))
+					.some((uri: string): boolean => plusRegExp.test(uri));
 
-		const maxDepthLength: number = allUriKeys.reduce((maxLength: number, cur: string[]): number => {
-			return maxLength > cur.length
-				? maxLength
-				: cur.length;
-		}, 0);
-
-		for (let i: number = 0; i <= maxDepthLength; i++) {
-			const targetKeys: string[] = sift(
-				allUriKeys
-					.map((oneTree: string[]): string => oneTree[i])
-					.filter((frag: string): frag is string => !!frag) // for different depth
-			);
-
-			// colon routing
-			const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
-			if (colonRouteArr.length > 1) {
-				throw new Error('duplicated colon routing');
-			}
-
-			// question routing
-			const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('?'));
-			if (questionRouteArr.length > 0) {
-				const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
-
-				const matchingResult: string | undefined = questionRouteArr.find((regSrc: string): boolean => {
-					return targetUris.some((uri: string): boolean => new RegExp(regSrc).test(uri));
-				});
-
-				if (matchingResult !== undefined) {
-					throw new Error('duplicated question routing');
+				if (isDuplicated) {
+					throw new Error('duplicated plus routing');
 				}
-			}
+			});
+		}
 
-			// plus routing
-			const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('+'));
-			if (plusRouteArr.length > 0) {
-				const plusUrisSanitized: string[] = [...targetKeys]; // start with all keys
-				plusRouteArr.forEach((uri: string): void => {
-					const plusIncluded: string = uri.replace('+', '');
-					const plusExcluded: string = uri.replace(/.\+/, '');
+		// asterisk routing
+		const asteriskRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('*'));
 
-					if (plusUrisSanitized.includes(plusIncluded) || plusUrisSanitized.includes(plusExcluded)) {
-						throw new Error('duplicated plus routing');
-					}
-					else {
-						plusUrisSanitized.push(plusIncluded, plusExcluded);
-					}
-				});
-			}
-
-			// asterisk routing
-			const asteriskRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('*'));
-
-			if (asteriskRouteArr.length > 1) {
-				throw new Error('duplicated asterisk routing');
-			}
+		if (asteriskRouteArr.length > 1) {
+			throw new Error('duplicated asterisk routing');
 		}
 	}
 

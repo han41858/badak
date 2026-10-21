@@ -1103,6 +1103,130 @@ describe('route()', () => {
 		});
 
 		// ab?cd - abc, abcd
+		describe('no false duplication error', () => {
+			it('colon routing in different parents, in different time', async () => {
+				await app.get('/users/:id', echoFnc);
+				await app.get('/posts/:postId', echoFnc);
+
+				await app.listen(TestPort);
+
+				const userRes: SuperTestResponse = await request(app.getHttpServer())
+					.get('/users/1')
+					.expect(200);
+
+				expect(userRes.body).to.be.eql({ id: '1' });
+
+				const postRes: SuperTestResponse = await request(app.getHttpServer())
+					.get('/posts/2')
+					.expect(200);
+
+				expect(postRes.body).to.be.eql({ postId: '2' });
+			});
+
+			it('colon routing in different parents, in same time', async () => {
+				await app.route({
+					users: {
+						':id': {
+							GET: echoFnc
+						}
+					},
+					posts: {
+						':postId': {
+							GET: echoFnc
+						}
+					}
+				});
+			});
+
+			it('asterisk routing in different parents', async () => {
+				await app.get('/a/*', emptyFnc);
+				await app.get('/b/*', emptyFnc);
+			});
+
+			it('colon routing in different depth', async () => {
+				await app.get('/:id', emptyFnc);
+				await app.get('/users/:name', emptyFnc);
+			});
+
+			it('question routing should be compared with whole uri fragment', async () => {
+				// 'ab?c' matches 'ac', 'abc', but not 'xabcx'
+				await app.get('/ab?c', emptyFnc);
+				await app.get('/xabcx', emptyFnc);
+			});
+		});
+
+		describe('duplication detected regardless of registration order', () => {
+			[
+				['/users/:id/profile', '/users/:name/profile'],
+				['/users/a?b', '/users/ab'],
+				['/a/:x', '/a/:y/b']
+			].forEach(([first, second]: string[]): void => {
+				[
+					[first, second],
+					[second, first]
+				].forEach(([a, b]: string[]): void => {
+					it(`${ a } -> ${ b }, in different time`, async () => {
+						await app.get(a, emptyFnc);
+
+						await promiseFail(
+							app.get(b, emptyFnc)
+						);
+					});
+
+					it(`${ a } & ${ b }, in same time`, () => {
+						return promiseFail(
+							app.route({
+								[a]: {
+									GET: emptyFnc
+								},
+								[b]: {
+									GET: emptyFnc
+								}
+							})
+						);
+					});
+				});
+			});
+		});
+
+		describe('plus routing duplication', () => {
+			[
+				['ab+c', 'abbc'],
+				['ab+c', 'abbbbc'],
+				['a+b+c', 'aabbc'],
+				['ab+c', 'abb+c']
+			].forEach(([first, second]: string[]): void => {
+				[
+					[first, second],
+					[second, first]
+				].forEach(([a, b]: string[]): void => {
+					it(`${ a } & ${ b } are duplicated`, async () => {
+						await app.get('/' + a, emptyFnc);
+
+						await promiseFail(
+							app.get('/' + b, emptyFnc)
+						);
+					});
+				});
+			});
+
+			[
+				['ab+c', 'ac'],
+				['ab+c', 'abd'],
+				['ab+c', 'xabc']
+			].forEach(([first, second]: string[]): void => {
+				[
+					[first, second],
+					[second, first]
+				].forEach(([a, b]: string[]): void => {
+					it(`${ a } & ${ b } are not duplicated`, async () => {
+						await app.get('/' + a, emptyFnc);
+						await app.get('/' + b, emptyFnc);
+					});
+				});
+			});
+		});
+
 		describe('question routing', () => {
 			describe('error', () => {
 				it('start with \'?\'', () => {
