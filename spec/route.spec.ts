@@ -1103,7 +1103,7 @@ describe('route()', () => {
 		});
 
 		// ab?cd - abc, abcd
-		describe('duplication check between different parents', () => {
+		describe('no false duplication error', () => {
 			it('colon routing in different parents, in different time', async () => {
 				await app.get('/users/:id', echoFnc);
 				await app.get('/posts/:postId', echoFnc);
@@ -1146,6 +1146,12 @@ describe('route()', () => {
 			it('colon routing in different depth', async () => {
 				await app.get('/:id', emptyFnc);
 				await app.get('/users/:name', emptyFnc);
+			});
+
+			it('question routing should be compared with whole uri fragment', async () => {
+				// 'ab?c' matches 'ac', 'abc', but not 'xabcx'
+				await app.get('/ab?c', emptyFnc);
+				await app.get('/xabcx', emptyFnc);
 			});
 		});
 

@@ -226,7 +226,8 @@ export class Badak {
 			const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
 
 			const matchingResult: string | undefined = questionRouteArr.find((regSrc: string): boolean => {
-				return targetUris.some((uri: string): boolean => new RegExp(regSrc).test(uri));
+				// anchor to match whole uri fragment
+				return targetUris.some((uri: string): boolean => new RegExp(`^(?:${ regSrc })$`).test(uri));
 			});
 
 			if (matchingResult !== undefined) {
