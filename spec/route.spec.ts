@@ -1859,14 +1859,19 @@ describe('route()', () => {
 							expect(routeRule).to.be.a('object');
 
 							validUrls.push(
-								`${ prefix }/`,
 								`${ prefix }/a`,
 								`${ prefix }/b`
 							);
 
+							// '*' matches exactly one uri fragment
 							invalidUrls.push(
+								`${ prefix }/`,
 								`${ prefix }/a/c`
 							);
+
+							if (prefix !== '') {
+								invalidUrls.push(prefix);
+							}
 						});
 					});
 				});

@@ -392,6 +392,16 @@ await app.route({
 
 ### `*` 라우팅
 
+`*`는 경로 조각을 정확히 하나 매칭하며, 그 경로 조각은 라우팅 함수 인자의 `*`로 전달됩니다.
+
+```typescript
+await app.get('/img/*', (param) => param);
+
+// GET /img/a.png -> { '*': 'a.png' }
+// GET /img, /img/, /img/a/b -> 404
+```
+
+경로 조각 안의 `*`는 그 경로 조각 안의 임의의 문자를 매칭합니다.
 `/user1*`로 라우팅 경로를 지정하면 `/user`와 `/user1`, `/user11` 등의 경로를 매칭할 수 있습니다.
 
 ### `**` 라우팅
@@ -409,6 +419,34 @@ await app.get('/files/**', (param) => param);
 - `**`는 라우팅 경로의 마지막 조각에만 사용할 수 있습니다. `/files/**/edit` 같은 경로는 등록할 때 에러가 발생합니다.
 - 경로 조각 안의 `%2F`도 `/`로 디코딩되므로, `/files/a%2Fb`와 `/files/a/b`는 같은 값을 전달합니다.
 - 나머지 경로에 잘못된 퍼센트 인코딩이 있으면 `400 Bad Request`로 응답합니다.
+- `**`는 경로 조각 0개 이상을 매칭합니다. `/files/**`는 `/files`, `/files/`, `/files/a`, `/files/a/b`에 매칭되며, `/files`와 `/files/`에서 `**`는 `''`입니다. `/**`는 `/`에도 매칭됩니다.
+- `**`는 폴백입니다. 요청 경로가 다른 라우트에 완전히 매칭되지 않을 때만 사용합니다. [라우팅 우선순위](#라우팅-우선순위)를 참고하세요.
+
+### 라우팅 우선순위
+
+경로 조각마다 아래 순서로 매칭하며, 라우트를 등록한 순서와는 관계없습니다.
+
+1. 일반 라우팅 (예: `/users/me`)
+2. `:` 라우팅 (예: `/users/:id`)
+3. `?` 라우팅
+4. `+` 라우팅
+5. `*` 라우팅 (`*`, `ab*cd`)
+
+`**`는 요청 경로가 다른 라우트에 완전히 매칭되지 않을 때만 사용하며, 매칭된 경로에서 가장 깊은 `**`를 사용합니다.
+예를 들어 `setSPARoot('/')`(`/**`)를 사용해도 `/style.css`와 `/api/users`는 각자의 라우트가 처리하고, 나머지 경로는 `index.html`로 응답합니다.
+
+```typescript
+await app.get('/**', spaFnc);
+await app.get('/api/users', usersFnc);
+await app.get('/api/users/:id', userFnc);
+
+// GET /api/users     -> usersFnc
+// GET /api/users/7   -> userFnc, { id: '7' }
+// GET /api/users/7/x -> spaFnc, { '**': 'api/users/7/x' }
+// GET /api           -> spaFnc, { '**': 'api' }
+```
+
+경로는 라우트에 완전히 매칭되지만 그 메서드의 라우팅 함수가 없으면, `**`를 사용하지 않고 `405 Method Not Allowed`로 응답합니다.
 
 ## 라우팅 인자
 

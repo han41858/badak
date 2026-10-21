@@ -27,7 +27,8 @@ describe('** routing', () => {
 	};
 
 	// before : value of 2.1.0 (uri fragment before '**'), for reference only
-	// matched : same as 2.1.0, matching range and priority are not changed
+	// matched : same as 2.1.0, matching range of '**' is not changed
+	// priority with sibling routes : route-priority.spec.ts
 	interface RegressionCase {
 		uris: string[];
 		url: string;
@@ -50,10 +51,6 @@ describe('** routing', () => {
 		{ uris: ['/users/:id/**'], url: '/users/7', matched: true, before: '7', after: '' },
 		{ uris: ['/users/:id/**'], url: '/users/7/x/y', matched: true, before: '7', after: 'x/y' },
 		{ uris: ['/users/:id/**'], url: '/users', matched: false },
-		// '**' takes precedence over sibling routes, same as 2.1.0
-		{ uris: ['/files/**', '/files/x'], url: '/files/x', matched: true, before: 'files', after: 'x' },
-		{ uris: ['/files/**', '/files/:id'], url: '/files/1/2', matched: true, before: 'files', after: '1/2' },
-		{ uris: ['/files/**', '/files/ab+c'], url: '/files/abbc/d', matched: true, before: 'files', after: 'abbc/d' },
 		{ uris: ['/a/b/**', '/a/c'], url: '/a/b/x', matched: true, before: 'b', after: 'x' },
 		{ uris: ['/a/b/**', '/a/c'], url: '/a/c', matched: true },
 		{ uris: ['/a/b/**', '/a/c'], url: '/a/c/x', matched: false }
@@ -76,10 +73,14 @@ describe('** routing', () => {
 		});
 	});
 
-	describe('regression : * and partial asterisk are not changed', () => {
+	describe('regression : partial asterisk is not changed, * matches exactly one uri fragment', () => {
 		([
 			['/img/*', '/img/a', true, { '*': 'a' }],
+			['/img/*', '/img/a.png', true, { '*': 'a.png' }],
 			['/img/*', '/img/a/b', false, undefined],
+			// matched in 2.1.0 with { '*': 'img' }
+			['/img/*', '/img', false, undefined],
+			['/img/*', '/img/', false, undefined],
 			['/img/user1*', '/img/user', true, { 'user1*': 'user' }],
 			['/img/user1*', '/img/user11', true, { 'user1*': 'user11' }],
 			['/img/user1*', '/img/user11/x', false, undefined]
