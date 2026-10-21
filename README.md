@@ -483,6 +483,20 @@ Routing paths can have non-ASCII characters, e.g. `/사용자/:id`.
 - A malformed percent-encoding in a routing path (e.g. `/100%`) throws an error when it is registered. Use `%25` for `%`.
 - Static file names are literal. Files like `한글.txt`, `a+b.txt` and `100%.txt` are served with their names.
 
+## Generic request types
+
+Specify only the request fields you need using one named type argument. The other fields retain their default types.
+
+```typescript
+interface User { name: string }
+interface IdParams { id: string }
+
+await app.post<{ body: User }>('/users', ({ body }) => body.name);
+await app.get<{ params: IdParams }>('/users/:id', ({ params }) => params.id);
+```
+
+The generic type is a **TypeScript assertion, not runtime validation**. Validate untrusted HTTP input before using it. Supported keys are `params`, `query`, and `body`; wrong keys are rejected when they do not satisfy the type constraint. Typed handlers can also be registered through `app.route()`.
+
 ## Routing parameters
 
 Route callbacks receive `ParamContext` with three separate fields. Data sources never overwrite each other.
