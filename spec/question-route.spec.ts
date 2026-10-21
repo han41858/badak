@@ -373,8 +373,7 @@ describe('? routing', () => {
 		});
 
 		it('param has the matched uri fragment', async () => {
-			await app.get('/colou?r', (ctx: ParamContext) => {
-				const param = ctx.params as unknown): unknown => param);
+			await app.get('/colou?r', (ctx: ParamContext): unknown => ctx.params);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
