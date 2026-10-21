@@ -17,6 +17,9 @@
 	},
 	"types": "build/cjs/index.d.ts",
 	"main": "build/cjs/index.js",
+	"files": [
+		"build"
+	],
 	"scripts": {
 		"prebuild": "rimraf ./build",
 		"build:cjs": "tsx ./scripts/create-package-json.ts cjs",

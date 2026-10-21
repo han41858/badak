@@ -1,0 +1,2 @@
+# published files are whitelisted by "files" in package.json
+# this file exists so that yarn pack does not fall back to .gitignore (which excludes build/)
