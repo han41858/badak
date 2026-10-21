@@ -168,7 +168,7 @@ Files are loaded into memory when `listen()` is called, so restart the server to
 
 Static files are served with `ETag` (from the file content) and `Last-Modified` (from the file modification time),
 and respond `304 Not Modified` without the body if `If-None-Match` or `If-Modified-Since` of the request matches.
-`If-Modified-Since` is ignored if `If-None-Match` exists.
+`If-Modified-Since` is ignored if `If-None-Match` exists, and `If-None-Match` with invalid syntax doesn't match.
 
 `Cache-Control` is `no-cache` by default: browsers cache the file, but check whether it is changed every time.
 Set `cacheControl` to change it.

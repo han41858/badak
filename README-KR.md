@@ -160,7 +160,7 @@ HTTP 서버를 정지합니다.
 
 정적 파일은 `ETag`(파일 내용 기준)와 `Last-Modified`(파일 수정 시각 기준)를 함께 응답하며,
 요청의 `If-None-Match`나 `If-Modified-Since`가 일치하면 본문 없이 `304 Not Modified`로 응답합니다.
-`If-None-Match`가 있으면 `If-Modified-Since`는 무시합니다.
+`If-None-Match`가 있으면 `If-Modified-Since`는 무시하며, 문법이 잘못된 `If-None-Match`는 일치하지 않는 것으로 처리합니다.
 
 `Cache-Control`은 기본값이 `no-cache`입니다. 브라우저는 파일을 캐싱하되, 사용할 때마다 변경 여부를 확인합니다.
 `cacheControl`로 바꿀 수 있습니다.

@@ -8,6 +8,7 @@ import { agent as request, Response as SuperTestResponse } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { StaticOption } from '../src/interfaces';
+import { parseEtagList } from '../src/util';
 import { promiseFail, TestPort } from './test-util';
 
 
@@ -156,6 +157,37 @@ describe('static file cache headers', () => {
 				.expect(200, 'console.log(1);');
 		});
 
+		[
+			'invalid"x", "y"',
+			'"a" "b"',
+			'"a"b',
+			'abc',
+			'"unclosed',
+			'w/"lower-case-weak"',
+			'*, "a"'
+		].forEach((invalidPrefix: string): void => {
+			it(`invalid syntax doesn't match even if it includes the ETag : ${ invalidPrefix }`, async () => {
+				await request(app.getHttpServer())
+					.get('/static/index.html')
+					.set('If-None-Match', `${ invalidPrefix }, ${ etag }`)
+					.expect(200, '<p>index</p>');
+			});
+		});
+
+		it('ETag glued to invalid text doesn\'t match : invalid"<etag>"', async () => {
+			await request(app.getHttpServer())
+				.get('/static/index.html')
+				.set('If-None-Match', `invalid${ etag }`)
+				.expect(200, '<p>index</p>');
+		});
+
+		it('empty list elements are ignored', async () => {
+			await request(app.getHttpServer())
+				.get('/static/index.html')
+				.set('If-None-Match', ` , ,${ etag } ,, `)
+				.expect(304);
+		});
+
 		it('takes precedence over If-Modified-Since (RFC 9110 13.2.2)', async () => {
 			await request(app.getHttpServer())
 				.get('/static/index.html')
@@ -290,6 +322,43 @@ describe('static file cache headers', () => {
 			return promiseFail(
 				app.setSPARoot('/', tempDir, { cacheControl: '' })
 			);
+		});
+	});
+
+	describe('parseEtagList()', () => {
+		([
+			['"a"', ['"a"']],
+			['W/"a"', ['W/"a"']],
+			['"a", W/"b",  "c"', ['"a"', 'W/"b"', '"c"']],
+			['"a,b"', ['"a,b"']],
+			['""', ['""']],
+			['\t"a"\t,\t"b"\t', ['"a"', '"b"']],
+			[', , "a" , ,', ['"a"']],
+			['', []],
+			[' , ', []]
+		] as [string, string[]][]).forEach(([value, expected]: [string, string[]]): void => {
+			it(`valid : ${ JSON.stringify(value) }`, () => {
+				expect(parseEtagList(value)).to.be.eql(expected);
+			});
+		});
+
+		[
+			'invalid"abc"',
+			'"a" "b"',
+			'"a"b',
+			'abc',
+			'"unclosed',
+			'w/"a"',
+			'W/ "a"',
+			'"a"W/"b"',
+			'*',
+			'"a", *',
+			'"a b"',
+			'"a\x7Fb"'
+		].forEach((value: string): void => {
+			it(`invalid : ${ JSON.stringify(value) }`, () => {
+				expect(parseEtagList(value)).to.be.undefined;
+			});
 		});
 	});
 });
