@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 import { afterEach, beforeEach } from 'mocha';
@@ -312,6 +313,50 @@ describe('static()', () => {
 
 				expect(!!res.body || !!res.text).to.be.ok;
 			});
+	});
+
+	describe('about MIME - file name', () => {
+		let tempDir: string;
+
+		const files: [string, string, string][] = [
+			// [file name, contents, expected MIME]
+			['app.min.js', 'console.log(1);', CONTENT_TYPE.APPLICATION_JAVASCRIPT],
+			['main.chunk.abc123.css', 'body {}', CONTENT_TYPE.TEXT_CSS],
+			['module.mjs', 'export {};', CONTENT_TYPE.APPLICATION_JAVASCRIPT],
+			['app.js.map', '{}', CONTENT_TYPE.APPLICATION_JSON],
+			['icon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>', CONTENT_TYPE.IMAGE_SVG],
+			['font.woff2', 'wOF2', CONTENT_TYPE.FONT_WOFF2],
+			['font.woff', 'wOFF', CONTENT_TYPE.FONT_WOFF],
+			['module.wasm', '\0asm', CONTENT_TYPE.APPLICATION_WASM],
+			['site.webmanifest', '{}', CONTENT_TYPE.APPLICATION_MANIFEST_JSON],
+			['UPPER.HTML', '<html></html>', CONTENT_TYPE.TEXT_HTML],
+			// extension wins over short signature : 'BM' is the signature of bitmap
+			['bm.txt', 'BM is not a bitmap', CONTENT_TYPE.TEXT_PLAIN]
+		];
+
+		beforeEach(() => {
+			tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'badak-mime-'));
+
+			files.forEach(([fileName, contents]: [string, string, string]): void => {
+				fs.writeFileSync(path.join(tempDir, fileName), contents);
+			});
+		});
+
+		afterEach(() => {
+			fs.rmSync(tempDir, { recursive: true, force: true });
+		});
+
+		files.forEach(([fileName, , mime]: [string, string, string]): void => {
+			it(`ok : ${ fileName }`, async () => {
+				await app.static('/static', tempDir);
+				await app.listen(TestPort);
+
+				await request(app.getHttpServer())
+					.get(`/static/${ fileName }`)
+					.expect(200)
+					.expect(HEADER_KEY.CONTENT_TYPE, mime);
+			});
+		});
 	});
 
 	describe('about MIME', () => {

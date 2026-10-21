@@ -168,44 +168,106 @@ const loadFile = async (path: string): Promise<Buffer> => {
 };
 
 
+// file extension (lower case, without dot) to MIME type
+const extensionMap: Record<string, CONTENT_TYPE> = {
+	ico: CONTENT_TYPE.IMAGE_ICO,
+	gif: CONTENT_TYPE.IMAGE_GIF,
+	jpg: CONTENT_TYPE.IMAGE_JPEG,
+	jpeg: CONTENT_TYPE.IMAGE_JPEG,
+	bmp: CONTENT_TYPE.IMAGE_BMP,
+	png: CONTENT_TYPE.IMAGE_PNG,
+	tif: CONTENT_TYPE.IMAGE_TIFF,
+	tiff: CONTENT_TYPE.IMAGE_TIFF,
+	webp: CONTENT_TYPE.IMAGE_WEBP,
+	heic: CONTENT_TYPE.IMAGE_HEIC,
+	svg: CONTENT_TYPE.IMAGE_SVG,
+	avif: CONTENT_TYPE.IMAGE_AVIF,
+
+	woff: CONTENT_TYPE.FONT_WOFF,
+	woff2: CONTENT_TYPE.FONT_WOFF2,
+	ttf: CONTENT_TYPE.FONT_TTF,
+	otf: CONTENT_TYPE.FONT_OTF,
+
+	mp3: CONTENT_TYPE.AUDIO_MPEG,
+	mp4: CONTENT_TYPE.VIDEO_MP4,
+	webm: CONTENT_TYPE.VIDEO_WEBM,
+
+	pdf: CONTENT_TYPE.APPLICATION_PDF,
+	css: CONTENT_TYPE.TEXT_CSS,
+	htm: CONTENT_TYPE.TEXT_HTML,
+	html: CONTENT_TYPE.TEXT_HTML,
+	js: CONTENT_TYPE.APPLICATION_JAVASCRIPT,
+	mjs: CONTENT_TYPE.APPLICATION_JAVASCRIPT,
+	cjs: CONTENT_TYPE.APPLICATION_JAVASCRIPT,
+	json: CONTENT_TYPE.APPLICATION_JSON,
+	map: CONTENT_TYPE.APPLICATION_JSON, // source map
+	webmanifest: CONTENT_TYPE.APPLICATION_MANIFEST_JSON,
+	wasm: CONTENT_TYPE.APPLICATION_WASM,
+	xml: CONTENT_TYPE.APPLICATION_XML,
+	txt: CONTENT_TYPE.TEXT_PLAIN,
+	text: CONTENT_TYPE.TEXT_PLAIN,
+	csv: CONTENT_TYPE.TEXT_CSV,
+	md: CONTENT_TYPE.TEXT_MARKDOWN,
+	xls: CONTENT_TYPE.APPLICATION_XLS,
+	xlsx: CONTENT_TYPE.APPLICATION_XLSX
+};
+
 interface Signature {
 	type: CONTENT_TYPE;
 	sign: number[] | RegExp; // hex numbers or regular expression
 }
 
+const signatureMap: Signature[] = [
+	{ type: CONTENT_TYPE.IMAGE_ICO, sign: [0x00, 0x00, 0x01, 0x00] },
+	{ type: CONTENT_TYPE.IMAGE_GIF, sign: [0x47, 0x49, 0x46, 0x38] },
+	{ type: CONTENT_TYPE.IMAGE_JPEG, sign: [0xFF, 0xD8, 0xFF] },
+	{ type: CONTENT_TYPE.IMAGE_BMP, sign: [0x42, 0x4D] },
+	{ type: CONTENT_TYPE.IMAGE_PNG, sign: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] },
+	{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x49, 0x49, 0x2A, 0x00] }, // Intel
+	{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x4D, 0x4D, 0x00, 0x2A] }, // Motorola
+	{ type: CONTENT_TYPE.IMAGE_WEBP, sign: /^RIFF....WEBP/ },
+	{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypheic/ },
+	{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypmif1/ },
+
+	{ type: CONTENT_TYPE.APPLICATION_PDF, sign: [0x25, 0x50, 0x44, 0x46] }
+];
+
+// MIME type by file extension, e.g. 'app.min.js' -> 'js'
+export const getContentTypeByFileName = (fileName: string): CONTENT_TYPE | undefined => {
+	const extension: string = node_path.extname(fileName).slice(1).toLowerCase();
+
+	return Object.hasOwn(extensionMap, extension)
+		? extensionMap[extension]
+		: undefined;
+};
+
+// MIME type by magic number of binary data
+const getContentTypeBySignature = (data: Buffer): CONTENT_TYPE | undefined => {
+	// only head bytes are needed for signature, don't convert whole data to string
+	const headStr: string = data.subarray(0, 16).toString('latin1');
+
+	return signatureMap.find((one: Signature): boolean => {
+		return one.sign instanceof RegExp
+			? one.sign.test(headStr)
+			: Buffer.from(one.sign).equals(data.subarray(0, one.sign.length));
+	})?.type;
+};
+
 export const getContentType = (data: unknown, fileName?: string): CONTENT_TYPE => {
 	let contentType: CONTENT_TYPE | undefined;
 
+	// file extension is more reliable than a short signature (e.g. a text file starting with 'BM' is not a bitmap)
+	if (fileName !== undefined) {
+		contentType = getContentTypeByFileName(fileName);
+	}
+
 	if (
-		data !== null
+		contentType === undefined
+		&& data !== null
 		&& data !== undefined
 	) {
 		if (data instanceof Buffer) {
-			const asBuffer: Buffer = data;
-			const asStr: string = data.toString();
-
-			const SignatureMap: Signature[] = [
-				{ type: CONTENT_TYPE.IMAGE_ICO, sign: [0x00, 0x00, 0x01, 0x00] },
-				{ type: CONTENT_TYPE.IMAGE_GIF, sign: [0x47, 0x49, 0x46, 0x38] },
-				{ type: CONTENT_TYPE.IMAGE_JPEG, sign: [0xFF, 0xD8, 0xFF] },
-				{ type: CONTENT_TYPE.IMAGE_BMP, sign: [0x42, 0x4D] },
-				{ type: CONTENT_TYPE.IMAGE_PNG, sign: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] },
-				{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x49, 0x49, 0x2A, 0x00] }, // Intel
-				{ type: CONTENT_TYPE.IMAGE_TIFF, sign: [0x4D, 0x4D, 0x00, 0x2A] }, // Motorola
-				{ type: CONTENT_TYPE.IMAGE_WEBP, sign: /^RIFF....WEBP/ },
-				{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypheic/ },
-				{ type: CONTENT_TYPE.IMAGE_HEIC, sign: /^.{4}ftypmif1/ },
-
-				{ type: CONTENT_TYPE.APPLICATION_PDF, sign: [0x25, 0x50, 0x44, 0x46] }
-			];
-
-			const foundResult: Signature | undefined = SignatureMap.find((one: Signature): boolean => {
-				return one.sign instanceof RegExp
-					? one.sign.test(asStr)
-					: Buffer.from(one.sign).equals(asBuffer.subarray(0, one.sign.length));
-			});
-
-			contentType = foundResult?.type;
+			contentType = getContentTypeBySignature(data);
 		}
 		else if (typeof data === 'object') {
 			try {
@@ -216,38 +278,8 @@ export const getContentType = (data: unknown, fileName?: string): CONTENT_TYPE =
 				// do nothing
 			}
 		}
-
-		if (contentType === undefined) {
-			if (fileName !== undefined) {
-				const [, extension] = fileName.split('.');
-
-				const extensionMap: Record<string, CONTENT_TYPE> = {
-					ico: CONTENT_TYPE.IMAGE_ICO,
-					gif: CONTENT_TYPE.IMAGE_GIF,
-					jpg: CONTENT_TYPE.IMAGE_JPEG,
-					jpeg: CONTENT_TYPE.IMAGE_JPEG,
-					png: CONTENT_TYPE.IMAGE_PNG,
-					tiff: CONTENT_TYPE.IMAGE_TIFF,
-					webp: CONTENT_TYPE.IMAGE_WEBP,
-					heic: CONTENT_TYPE.IMAGE_HEIC,
-
-					pdf: CONTENT_TYPE.APPLICATION_PDF,
-					css: CONTENT_TYPE.TEXT_CSS,
-					htm: CONTENT_TYPE.TEXT_HTML,
-					html: CONTENT_TYPE.TEXT_HTML,
-					js: CONTENT_TYPE.APPLICATION_JAVASCRIPT,
-					json: CONTENT_TYPE.APPLICATION_JSON,
-					txt: CONTENT_TYPE.TEXT_PLAIN,
-					text: CONTENT_TYPE.TEXT_PLAIN,
-					xls: CONTENT_TYPE.APPLICATION_XLS,
-					xlsx: CONTENT_TYPE.APPLICATION_XLSX
-				};
-
-				contentType = extensionMap[extension];
-			}
-			else if (typeof data === 'string') {
-				contentType = CONTENT_TYPE.TEXT_PLAIN;
-			}
+		else if (typeof data === 'string') {
+			contentType = CONTENT_TYPE.TEXT_PLAIN;
 		}
 	}
 
