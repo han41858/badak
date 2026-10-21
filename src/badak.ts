@@ -238,16 +238,24 @@ export class Badak {
 		// plus routing
 		const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('+'));
 		if (plusRouteArr.length > 0) {
-			const plusUrisSanitized: string[] = [...targetKeys]; // start with all keys
-			plusRouteArr.forEach((uri: string): void => {
-				const plusIncluded: string = uri.replace('+', '');
-				const plusExcluded: string = uri.replace(/.\+/, '');
+			plusRouteArr.forEach((plusUri: string): void => {
+				// same as request matching, match whole uri fragment
+				const plusRegExp: RegExp = new RegExp(`^(?:${ plusUri })$`);
 
-				if (plusUrisSanitized.includes(plusIncluded) || plusUrisSanitized.includes(plusExcluded)) {
+				const isDuplicated: boolean = targetKeys
+					.filter((uri: string): boolean => {
+						// other special routings are checked by themselves
+						return uri !== plusUri
+							&& !uri.startsWith(':')
+							&& !uri.includes('?')
+							&& !uri.includes('*');
+					})
+					// for other plus uri, compare with its shortest matching uri : 'abc+' -> 'abc'
+					.map((uri: string): string => uri.replace(/\+/g, ''))
+					.some((uri: string): boolean => plusRegExp.test(uri));
+
+				if (isDuplicated) {
 					throw new Error('duplicated plus routing');
-				}
-				else {
-					plusUrisSanitized.push(plusIncluded, plusExcluded);
 				}
 			});
 		}

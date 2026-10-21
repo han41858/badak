@@ -1189,6 +1189,44 @@ describe('route()', () => {
 			});
 		});
 
+		describe('plus routing duplication', () => {
+			[
+				['ab+c', 'abbc'],
+				['ab+c', 'abbbbc'],
+				['a+b+c', 'aabbc'],
+				['ab+c', 'abb+c']
+			].forEach(([first, second]: string[]): void => {
+				[
+					[first, second],
+					[second, first]
+				].forEach(([a, b]: string[]): void => {
+					it(`${ a } & ${ b } are duplicated`, async () => {
+						await app.get('/' + a, emptyFnc);
+
+						await promiseFail(
+							app.get('/' + b, emptyFnc)
+						);
+					});
+				});
+			});
+
+			[
+				['ab+c', 'ac'],
+				['ab+c', 'abd'],
+				['ab+c', 'xabc']
+			].forEach(([first, second]: string[]): void => {
+				[
+					[first, second],
+					[second, first]
+				].forEach(([a, b]: string[]): void => {
+					it(`${ a } & ${ b } are not duplicated`, async () => {
+						await app.get('/' + a, emptyFnc);
+						await app.get('/' + b, emptyFnc);
+					});
+				});
+			});
+		});
+
 		describe('question routing', () => {
 			describe('error', () => {
 				it('start with \'?\'', () => {
