@@ -1512,10 +1512,11 @@ describe('route()', () => {
 					expect(testFncRunCount).to.be.eql(2);
 				});
 
-				it('group question uri', async () => {
+				// '(', ')' are literal, '?' makes only ')' optional : 'ab(cd)e', 'ab(cde'
+				// it was a group of regular expression ('abe', 'abcde') until 3.0.0
+				it('parentheses are literal, not a group', async () => {
 					const testUri: string = 'ab(cd)?e';
 
-					let outerCounter: number = 0;
 					let testFncRunCount: number = 0;
 
 					const testFnc = (): void => {
@@ -1530,19 +1531,25 @@ describe('route()', () => {
 
 					await app.listen(TestPort);
 
-					expect(testFncRunCount).to.be.eql(outerCounter++);
+					await request(app.getHttpServer())
+						.get('/ab(cd)e')
+						.expect(200);
+
+					await request(app.getHttpServer())
+						.get('/ab(cde')
+						.expect(200);
+
+					expect(testFncRunCount).to.be.eql(2);
 
 					await request(app.getHttpServer())
 						.get('/abe')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(outerCounter++);
+						.expect(404);
 
 					await request(app.getHttpServer())
 						.get('/abcde')
-						.expect(200);
+						.expect(404);
 
-					expect(testFncRunCount).to.be.eql(outerCounter);
+					expect(testFncRunCount).to.be.eql(2);
 				});
 			});
 		});
