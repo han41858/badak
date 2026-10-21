@@ -354,8 +354,15 @@ export const getContentType = (data: unknown, fileName?: string): CONTENT_TYPE =
 		}
 	}
 
+	if (contentType !== undefined) {
+		return contentType;
+	}
+
 	// fallback
-	return contentType ?? CONTENT_TYPE.TEXT_PLAIN;
+	// file of unknown extension (or without extension) can be binary, don't let browsers render it as text
+	return fileName !== undefined
+		? CONTENT_TYPE.APPLICATION_OCTET_STREAM
+		: CONTENT_TYPE.TEXT_PLAIN;
 };
 
 

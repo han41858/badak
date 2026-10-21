@@ -153,6 +153,7 @@ HTTP 서버를 정지합니다.
 정적 파일로 제공할 주소와 파일 경로를 연결합니다.
 
 `Content-Type`은 파일 확장자로 결정합니다.
+알 수 없는 확장자이거나 확장자가 없는 파일은 파일 시그니처(예: PNG)로 판별하고, 그래도 알 수 없으면 `application/octet-stream`으로 응답합니다.
 텍스트 파일(`text/*`)과 JavaScript 파일은 `charset=utf-8`로 응답하므로 UTF-8로 저장해야 합니다.
 
 ### `setSPARoot(uri: string, path: string): Promise<void>`
