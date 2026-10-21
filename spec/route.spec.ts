@@ -5,6 +5,7 @@ import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 import { RouteFunction, RouteRule, RouteRuleSeed, TypedObject } from '../src/interfaces';
 import { echoFnc, emptyAsyncFnc, emptyFnc, promiseFail, TestPort } from './test-util';
 
@@ -369,7 +370,8 @@ describe('route()', () => {
 			const firstName: string = 'Janghyun';
 			const lastName: string = 'Han';
 
-			const rootPostFnc = async <T> (param: T): Promise<T> => {
+			const rootPostFnc = async <T> (ctx: ParamContext): Promise<T> => {
+				const param = ctx.body as T;
 				fncRunFlag = true;
 
 				// return param data;
@@ -919,7 +921,8 @@ describe('route()', () => {
 				const testId: string = 'this_is_id';
 				let fncRunFlag: boolean = false;
 
-				const testFnc = async (param: ReqParam): Promise<void> => {
+				const testFnc = async (ctx: ParamContext): Promise<void> => {
+					const param = ctx.params as ReqParam;
 					expect(param).to.be.a('object');
 
 					expect(param['id']).to.be.a('string');
@@ -955,7 +958,8 @@ describe('route()', () => {
 				const testId: string = 'this_is_id';
 				let fncRunFlag: boolean = false;
 
-				const testFnc = async (param: ReqParam): Promise<ReturnObj> => {
+				const testFnc = async (ctx: ParamContext): Promise<ReturnObj> => {
+					const param = ctx.params as ReqParam;
 					expect(param).to.be.a('object');
 					expect(param['id']).to.be.eql(testId);
 
@@ -997,7 +1001,8 @@ describe('route()', () => {
 
 				let fncRunFlag: boolean = false;
 
-				const testFnc = async (param: ReqParam): Promise<void> => {
+				const testFnc = async (ctx: ParamContext): Promise<void> => {
+					const param = ctx.params as ReqParam;
 					expect(param).to.be.a('object');
 
 					expect(param).to.have.property('firstName', firstName);
@@ -1037,7 +1042,8 @@ describe('route()', () => {
 
 				let fncRunFlag: boolean = false;
 
-				const testFnc = async (param: ReqParam): Promise<ReturnObj> => {
+				const testFnc = async (ctx: ParamContext): Promise<ReturnObj> => {
+					const param = ctx.params as ReqParam;
 					fncRunFlag = true;
 
 					return {
@@ -1080,7 +1086,8 @@ describe('route()', () => {
 
 				let fncRunFlag: boolean = false;
 
-				const testFnc = async (param: ReqParam): Promise<void> => {
+				const testFnc = async (ctx: ParamContext): Promise<void> => {
+					const param = ctx.body as ReqParam;
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('firstName', firstName);
 					expect(param).to.have.property('lastName', lastName);
@@ -1120,13 +1127,13 @@ describe('route()', () => {
 					.get('/users/1')
 					.expect(200);
 
-				expect(userRes.body).to.be.eql({ id: '1' });
+				expect(userRes.body).to.be.eql({ params: { id: '1' }, query: {} });
 
 				const postRes: SuperTestResponse = await request(app.getHttpServer())
 					.get('/posts/2')
 					.expect(200);
 
-				expect(postRes.body).to.be.eql({ postId: '2' });
+				expect(postRes.body).to.be.eql({ params: { postId: '2' }, query: {} });
 			});
 
 			it('colon routing in different parents, in same time', async () => {
@@ -1332,7 +1339,8 @@ describe('route()', () => {
 
 					let testFncRunFlag: boolean = false;
 
-					const testFnc = async (param: TypedObject<string>): Promise<void> => {
+					const testFnc = async (ctx: ParamContext): Promise<void> => {
+						const param = ctx.params as TypedObject<string>;
 						testFncRunFlag = true;
 
 						expect(param).to.be.a('object');
@@ -1512,10 +1520,11 @@ describe('route()', () => {
 					expect(testFncRunCount).to.be.eql(2);
 				});
 
-				it('group question uri', async () => {
+				// '(', ')' are literal, '?' makes only ')' optional : 'ab(cd)e', 'ab(cde'
+				// it was a group of regular expression ('abe', 'abcde') until 3.0.0
+				it('parentheses are literal, not a group', async () => {
 					const testUri: string = 'ab(cd)?e';
 
-					let outerCounter: number = 0;
 					let testFncRunCount: number = 0;
 
 					const testFnc = (): void => {
@@ -1530,19 +1539,25 @@ describe('route()', () => {
 
 					await app.listen(TestPort);
 
-					expect(testFncRunCount).to.be.eql(outerCounter++);
+					await request(app.getHttpServer())
+						.get('/ab(cd)e')
+						.expect(200);
+
+					await request(app.getHttpServer())
+						.get('/ab(cde')
+						.expect(200);
+
+					expect(testFncRunCount).to.be.eql(2);
 
 					await request(app.getHttpServer())
 						.get('/abe')
-						.expect(200);
-
-					expect(testFncRunCount).to.be.eql(outerCounter++);
+						.expect(404);
 
 					await request(app.getHttpServer())
 						.get('/abcde')
-						.expect(200);
+						.expect(404);
 
-					expect(testFncRunCount).to.be.eql(outerCounter);
+					expect(testFncRunCount).to.be.eql(2);
 				});
 			});
 		});
@@ -1627,7 +1642,8 @@ describe('route()', () => {
 					const testUri: string = 'ab+cd';
 
 					let testFncRunCount: number = 0;
-					const testFnc = (param: TypedObject<string>): void => {
+					const testFnc = (ctx: ParamContext): void  => {
+						const param = ctx.params as TypedObject<string>;
 						expect(param).to.be.a('object');
 						expect(param[testUri]).to.be.a('string');
 						expect(new RegExp(testUri).test(param[testUri])).to.be.true;
@@ -1801,7 +1817,9 @@ describe('route()', () => {
 			});
 
 			describe('**', () => {
-				const testFnc = (param: unknown, req: IncomingMessage): void => {
+				const testFnc = (ctx: ParamContext, req: IncomingMessage): void => {
+					const param = ctx.params as unknown;
+
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('**');
 
@@ -1834,7 +1852,9 @@ describe('route()', () => {
 			});
 
 			describe('*', () => {
-				const testFnc = (param: unknown, req: IncomingMessage): void => {
+				const testFnc = (ctx: ParamContext, req: IncomingMessage): void => {
+					const param = ctx.params as unknown;
+
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('*');
 
@@ -1910,7 +1930,9 @@ describe('route()', () => {
 			describe('partial *', () => {
 				const testFrag: string = 'ab*cd';
 
-				const testFnc = (param: TypedObject<string>, req: IncomingMessage): void => {
+				const testFnc = (ctx: ParamContext, req: IncomingMessage): void => {
+					const param = ctx.params as TypedObject<string>;
+
 					expect(param).to.be.a('object');
 
 					const regExpKey: string = param[testFrag].replace('*', '(\\w)*');
@@ -1956,7 +1978,9 @@ describe('route()', () => {
 			describe('trailing *', () => {
 				const testFrag: string = 'user1*';
 
-				const testFnc = (param: TypedObject<string>, req: IncomingMessage): void => {
+				const testFnc = (ctx: ParamContext, req: IncomingMessage): void => {
+					const param = ctx.params as TypedObject<string>;
+
 					expect(param).to.be.a('object');
 					expect(param[testFrag]).to.be.a('string');
 
@@ -2044,7 +2068,7 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(Object.keys(res.body)).to.be.lengthOf(0);
+									expect(Object.keys(res.body.query)).to.be.lengthOf(0);
 								});
 						});
 
@@ -2054,8 +2078,8 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.eql('');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.eql('');
 								});
 						});
 
@@ -2066,9 +2090,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('');
 								});
 						});
 
@@ -2078,9 +2102,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('null');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('null');
 								});
 						});
 
@@ -2090,9 +2114,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('value');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('value');
 								});
 						});
 
@@ -2102,9 +2126,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('this is sentence.');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('this is sentence.');
 								});
 						});
 
@@ -2114,9 +2138,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.instanceOf(Array);
-									expect(res.body['key1']).to.be.lengthOf(2);
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.instanceOf(Array);
+									expect(res.body.query['key1']).to.be.lengthOf(2);
 								});
 						});
 
@@ -2127,13 +2151,13 @@ describe('route()', () => {
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
 
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('value1');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('value1');
 
-									expect(res.body).to.have.property('key2');
-									expect(res.body['key2']).to.be.a('string');
-									expect(res.body['key2']).to.be.eql('value2');
+									expect(res.body.query).to.have.property('key2');
+									expect(res.body.query['key2']).to.be.a('string');
+									expect(res.body.query['key2']).to.be.eql('value2');
 								});
 						});
 					});
@@ -2160,7 +2184,7 @@ describe('route()', () => {
 							.expect(200)
 							.expect((res: SuperTestResponse): void => {
 								expect(res.body).to.be.a('object');
-								expect(Object.keys(res.body)).to.be.lengthOf(0);
+								expect(Object.keys(res.body.query)).to.be.lengthOf(0);
 							});
 					});
 
@@ -2180,7 +2204,7 @@ describe('route()', () => {
 								expect(res.body).to.be.a('object');
 
 								keyValues.forEach(([key, value]: [string, string]): void => {
-									expect(res.body).to.have.property(key, value);
+									expect(res.body.query).to.have.property(key, value);
 								});
 							});
 					});

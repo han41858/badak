@@ -1,6 +1,6 @@
 {
 	"name": "badak",
-	"version": "3.0.0",
+	"version": "4.0.0",
 	"description": "node.js Server framework based on Promise and TypeScript",
 	"type": "commonjs",
 	"exports": {
@@ -28,6 +28,8 @@
 		"build:esm": "tsx ./scripts/create-package-json.ts esm",
 		"build": "yarn build:cjs&&yarn build:esm",
 		"test": "mocha",
+		"test:types": "tsc --project tsconfig.types.json",
+		"test:types:dist": "tsx ./scripts/check-dist-types.ts",
 		"lint": "eslint src spec"
 	},
 	"repository": {

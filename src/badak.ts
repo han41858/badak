@@ -4,8 +4,14 @@ import * as querystring from 'node:querystring';
 
 import {
 	BadakOption,
+	CheckedParamTypes,
+	NoBodyParamTypes,
+	NoBodyRouteFunction,
+	ParamTypes,
+	ParamContext,
 	MiddlewareFunction,
 	RouteFunction,
+	RouteHandler,
 	RouteFunctionObj,
 	RouteOption,
 	RouteRule,
@@ -23,6 +29,7 @@ import { HttpError, isHttpError } from './http-error.js';
 import { convertParam, parseRequestBody } from './body-parser.js';
 import { sendErrorResponse, sendRouteResult } from './response.js';
 import { checkStaticOption, loadStaticRule, sendStaticFile } from './static.js';
+import { encodeLiteralPath } from './route-segment.js';
 import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl } from './router.js';
 import {
 	checkAbsolutePath,
@@ -179,7 +186,7 @@ export class Badak {
 		this._setOption(key, value);
 	}
 
-	private _routeAbbrValidator (address: string, fnc: RouteFunction): void {
+	private _routeAbbrValidator (address: string, fnc: RouteHandler): void {
 		if (address === undefined) {
 			throw new Error('no address');
 		}
@@ -194,21 +201,22 @@ export class Badak {
 	}
 
 	// route abbreviation
-	async get (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
-		this._routeAbbrValidator(address, fnc);
+	async get<T extends CheckedParamTypes<T, false> = NoBodyParamTypes> (address: string, fnc: NoBodyRouteFunction<T>, option?: RouteOption): Promise<void> {
+		// request body is not parsed for GET, declaring body is rejected by NoBodyRouteFunction
+		this._routeAbbrValidator(address, fnc as RouteHandler);
 
 		// assign to route rule
 		this._assignRule({
 			[address]: {
 				[METHOD.GET]: {
-					fnc: fnc,
+					fnc: fnc as RouteHandler,
 					option: option
 				}
 			}
 		});
 	}
 
-	async post (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async post<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -222,7 +230,7 @@ export class Badak {
 		});
 	}
 
-	async put (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async put<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -236,7 +244,7 @@ export class Badak {
 		});
 	}
 
-	async patch (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async patch<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -250,14 +258,15 @@ export class Badak {
 		});
 	}
 
-	async delete (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
-		this._routeAbbrValidator(address, fnc);
+	async delete<T extends CheckedParamTypes<T, false> = NoBodyParamTypes> (address: string, fnc: NoBodyRouteFunction<T>, option?: RouteOption): Promise<void> {
+		// request body is not parsed for DELETE, declaring body is rejected by NoBodyRouteFunction
+		this._routeAbbrValidator(address, fnc as RouteHandler);
 
 		// assign to route rule
 		this._assignRule({
 			[address]: {
 				[METHOD.DELETE]: {
-					fnc: fnc,
+					fnc: fnc as RouteHandler,
 					option: option
 				}
 			}
@@ -334,12 +343,20 @@ export class Badak {
 				})
 			);
 
-			allCache.forEach((oneCacheSet: StaticCache[]): void => {
+			allCache.forEach((oneCacheSet: StaticCache[], ruleIndex: number): void => {
+				// uri of the static rule is a routing path given by the user, kept as it is
+				const ruleUri: string = this._staticRules[ruleIndex].uri;
+
 				oneCacheSet.forEach((oneCache: StaticCache): void => {
 					this._staticCache.push(oneCache);
 
+					// file names are literal, not routing syntax, e.g. 'a+b.txt', '한글.txt', '100%.txt'
+					const routeUri: string = oneCache.uri.startsWith(ruleUri)
+						? ruleUri + encodeLiteralPath(oneCache.uri.slice(ruleUri.length))
+						: encodeLiteralPath(oneCache.uri);
+
 					this.get(
-						oneCache.uri,
+						routeUri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
 							sendStaticFile(req, res, oneCache);
 						},
@@ -419,8 +436,7 @@ export class Badak {
 					const { path: uriSanitized, queryStr } = splitUrl(req.url as string);
 
 					const { rule: matchedRule, param: routeParam } = findRoute(this._routeRule, uriSanitized);
-					let param: TypedObject<unknown> | undefined = routeParam;
-
+					const params: Record<string, string> = (routeParam ?? {}) as Record<string, string>;
 					const { targetFncObj, allowedMethods } = findRouteFunction(matchedRule, method);
 
 					if (targetFncObj === undefined) {
@@ -461,53 +477,31 @@ export class Badak {
 						}
 					}
 
-					// params are merged in this order, the latter wins for the same key :
-					// route param (e.g. colon routing) -> query string -> request body
+					// Keep route params, query string and request body separate.
+					// Route params are always strings; parseNumber/parseDate apply to query and body.
+					const query: Record<string, unknown> = queryStr !== undefined && queryStr !== ''
+						? convertParam({ ...querystring.parse(queryStr) }, this._config)
+						: {};
 
-					// query string, for every method
-					if (
-						queryStr !== undefined
-						&& queryStr !== ''
-					) {
-						// convert by parseNumber & parseDate options, same as request body
-						param = Object.assign(
-							param ?? {},
-							convertParam({ ...querystring.parse(queryStr) }, this._config)
-						);
-					}
+					let body: unknown;
 
-					// request body
 					switch (method) {
 						case METHOD.PUT:
 						case METHOD.POST:
 						case METHOD.PATCH: {
-							// bodyLimit of the route option overrides the app option
 							const bodyLimit: number = (targetFncObj as RouteFunctionObj)?.option?.bodyLimit
 								?? this._config.bodyLimit;
 
-							const bodyParam: TypedObject<unknown> | undefined = await parseRequestBody(req, bodyLimit, this._config);
-
-							if (bodyParam !== undefined) {
-								if (
-									param !== undefined
-									&& typeof bodyParam === 'object'
-									&& bodyParam !== null
-									&& !Array.isArray(bodyParam)
-								) {
-									param = Object.assign(param, bodyParam);
-								}
-								else {
-									// array or primitive JSON body can't be merged, passed as it is
-									param = bodyParam;
-								}
-							}
+							body = await parseRequestBody(req, bodyLimit, this._config);
 							break;
 						}
 					}
 
+					const ctx: ParamContext = { params, query, body };
+
 					const responseData: unknown = typeof targetFncObj === 'function'
-						? await targetFncObj(param, req, res)
-						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
+						? await targetFncObj(ctx, req, res)
+						: await (targetFncObj as RouteFunctionObj).fnc(ctx, req, res);
 
 
 					await sendRouteResult(req, res, responseData, this._config.catchErrorLog, setResponseBody);

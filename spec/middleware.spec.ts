@@ -5,6 +5,7 @@ import { expect } from 'chai';
 import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 import { MiddlewareFunction, RouteFunction, TypedObject } from '../src/interfaces';
 import { emptyAsyncFnc, emptyFnc, promiseFail } from './test-util';
 
@@ -266,7 +267,8 @@ describe('middleware', () => {
 					expect(res).to.be.a('object');
 				};
 
-				const routeFnc: RouteFunction = async (param: TypedObject<unknown>): Promise<unknown> => {
+				const routeFnc: RouteFunction = async (ctx: ParamContext): Promise<unknown> => {
+					const param = ctx.body as TypedObject<unknown>;
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified
@@ -549,7 +551,8 @@ describe('middleware', () => {
 		});
 
 		it('route function ends response and returns value', async () => {
-			await app.get('/manual', (param: unknown, req: IncomingMessage, res: ServerResponse): string => {
+			await app.get('/manual', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): string => {
+
 				res.end('manual');
 				return 'ignored';
 			});
@@ -562,7 +565,8 @@ describe('middleware', () => {
 		});
 
 		it('route function ends response and throws', async () => {
-			await app.get('/manual', (param: unknown, req: IncomingMessage, res: ServerResponse): never => {
+			await app.get('/manual', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): never => {
+
 				res.statusCode = 202;
 				res.end('done');
 				throw new Error('after response');
@@ -576,7 +580,8 @@ describe('middleware', () => {
 		});
 
 		it('route function starts response and returns value, ending is left to route function', async () => {
-			await app.get('/stream', (param: unknown, req: IncomingMessage, res: ServerResponse): string => {
+			await app.get('/stream', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): string => {
+
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
 				res.write('partial');
 
@@ -596,7 +601,8 @@ describe('middleware', () => {
 		});
 
 		it('route function sends headers and throws', async () => {
-			await app.get('/partial', (param: unknown, req: IncomingMessage, res: ServerResponse): never => {
+			await app.get('/partial', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): never => {
+
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
 				res.write('partial');
 				throw new Error('in the middle of response');
