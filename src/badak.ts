@@ -806,6 +806,18 @@ export class Badak {
 			stream.on('error', (err: Error): void => {
 				stream.unpipe(res);
 
+				// release resources, a stream with autoDestroy: false is not destroyed by itself
+				stream.destroy();
+
+				if (settled) {
+					// the response is finished or closed already, don't touch it
+					if (this._config.catchErrorLog) {
+						console.error('badak stream failed after response :', err);
+					}
+
+					return;
+				}
+
 				if (res.headersSent) {
 					// some data is sent already, close the connection so that the client can know the response is incomplete
 					if (this._config.catchErrorLog) {

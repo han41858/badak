@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { IncomingMessage, request as httpRequest, ServerResponse } from 'node:http';
+import { Agent, IncomingMessage, request as httpRequest, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 
 import { afterEach, beforeEach } from 'mocha';
@@ -175,6 +175,127 @@ describe('Readable stream returned by route function', () => {
 		await request(app.getHttpServer())
 			.get('/alive')
 			.expect(200, 'alive');
+	});
+
+	describe('stream is destroyed on error, even with autoDestroy: false', () => {
+		it('error before sending data', async () => {
+			let stream: Readable | undefined;
+
+			await app.get('/error', (): Readable => {
+				stream = new Readable({
+					autoDestroy: false,
+					read (): void {
+						this.emit('error', new Error('read failed'));
+					}
+				});
+
+				return stream;
+			});
+
+			await app.listen(TestPort);
+
+			await request(app.getHttpServer())
+				.get('/error')
+				.expect(500);
+
+			expect(stream?.destroyed).to.be.true;
+		});
+
+		it('error while sending data', async () => {
+			let stream: Readable | undefined;
+
+			await app.get('/broken', (): Readable => {
+				let sent: boolean = false;
+
+				stream = new Readable({
+					autoDestroy: false,
+					read (): void {
+						if (!sent) {
+							sent = true;
+							this.push('partial');
+						}
+						else {
+							setTimeout((): void => {
+								this.emit('error', new Error('read failed'));
+							}, 10);
+						}
+					}
+				});
+
+				return stream;
+			});
+
+			await app.listen(TestPort);
+
+			const res = await rawGet('/broken');
+
+			expect(res.aborted).to.be.true;
+			expect(stream?.destroyed).to.be.true;
+		});
+
+		it('error after the response is finished doesn\'t affect the next request on the same connection', async () => {
+			let stream: Readable | undefined;
+
+			await app.get('/late', (param: unknown, req: IncomingMessage, res: ServerResponse): Readable => {
+				res.setHeader('Content-Type', 'text/plain');
+
+				stream = new Readable({
+					autoDestroy: false,
+					read (): void {
+						this.push('done');
+						this.push(null);
+					}
+				});
+
+				setTimeout((): void => {
+					stream?.emit('error', new Error('late error'));
+				}, 30);
+
+				return stream;
+			});
+
+			await app.get('/slow', async (): Promise<string> => {
+				await new Promise((resolve) => setTimeout(resolve, 60));
+				return 'slow';
+			});
+
+			await app.listen(TestPort);
+
+			const agent: Agent = new Agent({ keepAlive: true, maxSockets: 1 });
+			const sockets: Set<unknown> = new Set();
+
+			const get = (uri: string): Promise<string> => {
+				return new Promise((resolve, reject): void => {
+					const req = httpRequest({ port: TestPort, path: uri, agent }, (res: IncomingMessage): void => {
+						sockets.add(res.socket);
+
+						let body: string = '';
+
+						res.on('data', (chunk: Buffer): void => {
+							body += chunk.toString();
+						});
+
+						res.on('end', (): void => resolve(body));
+					});
+
+					req.on('error', reject);
+					req.end();
+				});
+			};
+
+			try {
+				expect(await get('/late')).to.be.eql('done');
+
+				// late error is emitted while this request is being handled
+				expect(await get('/slow')).to.be.eql('slow');
+
+				expect(sockets.size).to.be.eql(1);
+				expect(stream?.destroyed).to.be.true;
+			}
+			finally {
+				agent.destroy();
+			}
+		});
 	});
 
 	it('client abort destroys the stream', async () => {
