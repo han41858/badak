@@ -1,12 +1,12 @@
 ![npm](https://img.shields.io/npm/v/badak?logo=npm)
-![NPM Last Update](https://img.shields.io/npm/last-update/ejv)
+![NPM Last Update](https://img.shields.io/npm/last-update/badak)
 
 ![logo](https://github.com/han41858/badak/raw/main/docs/logo/badak_200.png)
 
 # badak
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-black?color=3178C6&logo=typescript&logoColor=white)
-![TypeScript](https://img.shields.io/badge/node.js-black?color=5FA04E&logo=nodedotjs&logoColor=white)
+![Node.js](https://img.shields.io/badge/node.js-black?color=5FA04E&logo=nodedotjs&logoColor=white)
 
 badak은 Promise, TypeScript 기반으로 개발된 백엔드 프레임워크입니다.
 
@@ -26,7 +26,11 @@ yarn add badak
 ## 사용방법
 
 ```typescript
-import { Badak } from 'badak';
+import { Badak, RouteRule } from 'badak';
+
+interface User {
+	name: string;
+}
 
 const rule: RouteRule = {
 	users: {
@@ -34,20 +38,20 @@ const rule: RouteRule = {
 			// 사용자 목록을 반환합니다.
 			return {
 				list: ['han', 'kim', 'lee']
-			}
+			};
 		},
 		POST: (user: User) => {
 			// 사용자를 추가합니다.
 			return {
 				result: 'ok'
-			}
+			};
 		}
 	}
 };
 
 
 const app: Badak = new Badak();
-await app.route(routeRule);
+await app.route(rule);
 await app.listen(3000);
 ```
 
@@ -282,8 +286,8 @@ app.route({
 아래 예제는 모두 `/path` 경로와 매칭되며 전달되는 인자는 각각 이렇습니다.
 
 ```bash
-/path?          # {}
-/path?key       # { key: null }
+/path?          # undefined
+/path?key       # { key: '' }
 /path?key=      # { key: '' }
 /path?key=value # { key: 'value' }
 ```
