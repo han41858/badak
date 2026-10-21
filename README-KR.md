@@ -488,7 +488,14 @@ await app.get<{ params: IdParams }>('/users/:id', ({ params }) => params.id);
 
 - 허용 키는 `params`, `query`, `body`입니다. 그 밖의 키(예: 오타 `bdy`)는 올바른 키와 함께 써도 컴파일 오류가 발생합니다.
 - 경로 파라미터는 항상 디코딩된 문자열이므로(`parseNumber`, `parseDate`도 적용되지 않음) `params`의 값은 문자열이어야 합니다. `{ params: { id: number } }`는 컴파일 오류입니다. `interface IdParams { id: string }` 같은 인터페이스와 `{ id?: string }` 같은 선택적 키는 사용할 수 있습니다.
+- `params`는 이름 있는 경로 파라미터의 객체여야 하며, 배열은 지정할 수 없습니다.
 - `query`는 객체여야 하며, `body`는 어떤 타입이든 지정할 수 있습니다.
+- `GET`과 `DELETE`는 요청 본문을 파싱하지 않으므로(`ctx.body`는 항상 `undefined`) `app.get()`과 `app.delete()`에는 `body`를 지정할 수 없습니다. `body`를 선언한 핸들러를 따로 만들어 전달해도 컴파일 오류가 발생합니다. 단, `app.route()`에 등록하는 핸들러는 이 검사를 하지 않습니다.
+
+선언한 타입은 런타임 값과 비교하지 않습니다. 실제 값은 다음과 같습니다.
+
+- `query`의 값은 문자열이며, 같은 키가 반복되면 문자열 배열입니다(예: `?page=2&page=3` -> `['2', '3']`). `parseNumber`나 `parseDate`를 켠 경우에만 숫자나 `Date`가 됩니다. `{ query: { page: number } }`로 선언해도 값이 변환되지는 않습니다.
+- `POST`, `PUT`, `PATCH` 요청에 본문이 없으면, `body`를 선언했더라도(예: `{ body: User }`) `body`는 `undefined`입니다.
 
 ## 라우팅 인자
 

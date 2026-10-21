@@ -106,3 +106,23 @@ export type _NumberContext = ParamContext<{ params: { id: number } }>;
 void app.post<{ body: User, bdy: User }>('/typo-mixed', ({ body }) => body.name);
 // @ts-expect-error: query should be an object
 void app.get<{ query: string }>('/query-string', ({ query }) => query);
+
+// GET and DELETE : the request body is never parsed (always undefined), declaring body is rejected
+const withBody: RouteFunction<{ body: User }> = ({ body }) => body.name;
+const withIdParams: RouteFunction<{ params: IdParams }> = ({ params }) => params.id;
+
+void app.get('/default-annotated', (ctx: ParamContext) => ctx.params.id);
+void app.delete('/default-annotated', (ctx: ParamContext, req, res) => res.statusCode);
+void app.get('/inferred-params/:id', withIdParams);
+void app.get('/plain', (({ params }) => params.id) as RouteFunction);
+// @ts-expect-error: GET has no request body
+void app.get<{ body: User }>('/get-body', ({ body }) => body.name);
+// @ts-expect-error: DELETE has no request body
+void app.delete<{ params: IdParams, body: User }>('/delete-body/:id', ({ body }) => body.name);
+// @ts-expect-error: a separately typed handler declaring body is rejected for GET too
+void app.get('/get-body-inferred', withBody);
+// not checked in route() : GET with a handler declaring body is accepted (documented limitation)
+void app.route({ '/route-get-body': { GET: withBody } });
+
+// @ts-expect-error: params is an object of named captures, not an array
+void app.get<{ params: string[] }>('/array-params', ({ params }) => params.length);

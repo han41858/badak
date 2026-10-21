@@ -14,23 +14,32 @@ export interface ParamTypes {
 	body?: unknown;
 }
 
+/** Named type declarations without body, for GET and DELETE whose request body is not parsed. */
+export interface NoBodyParamTypes {
+	params?: object;
+	query?: object;
+}
+
 // declared route params with string values, keys come from the declared type
 // interfaces without an index signature are allowed, e.g. interface IdParams { id: string }
-export type StringValues<P> = { [K in keyof P]: string };
+// arrays are rejected, route params are an object of named captures
+export type StringValues<P> = P extends readonly unknown[]
+	? never
+	: { [K in keyof P]: string };
 
 /**
  * Constraint of the named type argument, checked against the declared type itself
  * - params : values should be strings, route captures are always decoded strings (parseNumber / parseDate don't apply)
- * - query : object, body : any type
+ * - query : object, body : any type (AllowBody = false : body is rejected, for GET and DELETE)
  * - other keys (e.g. a typo 'bdy') are rejected, even with correct keys
  */
-export type CheckedParamTypes<T> = ParamTypes & {
+export type CheckedParamTypes<T, AllowBody extends boolean = true> = ParamTypes & {
 	[K in keyof T]: K extends 'params'
 		? StringValues<T[K]>
 		: K extends 'query'
 			? object
 			: K extends 'body'
-				? unknown
+				? (AllowBody extends true ? unknown : never)
 				: never;
 };
 
@@ -46,6 +55,12 @@ export type RouteFunction<T extends CheckedParamTypes<T> = ParamTypes> = (
 	req: IncomingMessage,
 	res: ServerResponse
 ) => unknown | Promise<unknown>;
+
+// route function for GET and DELETE, the request body is never parsed for them (always undefined)
+// a handler declaring body is rejected, also when T is inferred from a separately typed handler
+export type NoBodyRouteFunction<T extends CheckedParamTypes<T, false>> = T extends { body: unknown }
+	? never
+	: RouteFunction<T>;
 
 // Method-signature bivariance allows separately typed handlers in a heterogeneous route() tree.
 // Runtime dispatch only invokes the selected handler; declaring request types does not validate them.

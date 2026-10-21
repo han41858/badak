@@ -499,7 +499,14 @@ The generic type is a **TypeScript assertion, not runtime validation**. Validate
 
 - Supported keys are `params`, `query`, and `body`. Other keys (e.g. a typo `bdy`) are compile errors, even together with correct keys.
 - `params` values should be strings, because route captures are always decoded strings (`parseNumber` and `parseDate` don't apply to them). `{ params: { id: number } }` is a compile error. Interfaces and optional keys are supported, e.g. `interface IdParams { id: string }`, `{ id?: string }`.
+- `params` should be an object of named captures, not an array.
 - `query` should be an object, `body` can be any type.
+- `app.get()` and `app.delete()` can't declare `body`, because the request body is not parsed for `GET` and `DELETE` (`ctx.body` is always `undefined`). A separately typed handler declaring `body` is rejected too. This is not checked for handlers in `app.route()`.
+
+The declared types are not checked against the runtime values. Note the actual values :
+
+- `query` values are strings, or arrays of strings for repeated keys (e.g. `?page=2&page=3` -> `['2', '3']`). They are numbers or `Date` only when `parseNumber` or `parseDate` is enabled. Declaring `{ query: { page: number } }` doesn't convert the value.
+- `body` is `undefined` when a `POST`, `PUT` or `PATCH` request has no body, even if `body` is declared (e.g. `{ body: User }`).
 
 ## Routing parameters
 
