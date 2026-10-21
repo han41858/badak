@@ -5,6 +5,7 @@ import { expect } from 'chai';
 import { agent as request, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { ParamContext } from '../src/interfaces';
 import { DEFAULT_BODY_LIMIT, METHOD } from '../src/constants';
 import { BadakOption, RouteRule, TypedObject } from '../src/interfaces';
 import { promiseFail, TestPort } from './test-util';
@@ -78,7 +79,8 @@ describe('config()', () => {
 		const num: number = 123;
 		const float: number = 123.45;
 
-		const testFncStr = (param: TestObj): void => {
+		const testFncStr = (ctx: ParamContext): void  => {
+			const param = ctx.body as TestObj;
 			expect(param).to.be.a('object');
 
 			expect(param.num).to.be.a('string');
@@ -88,7 +90,8 @@ describe('config()', () => {
 			expect(param.float).to.be.eql('' + float);
 		};
 
-		const testFncNum = (param: TestObj): void => {
+		const testFncNum = (ctx: ParamContext): void  => {
+			const param = ctx.body as TestObj;
 			expect(param).to.be.a('object');
 
 			expect(param.num).to.be.a('number');
@@ -157,7 +160,8 @@ describe('config()', () => {
 		describe('in array', () => {
 			describe('single value', () => {
 				it('application/json', async () => {
-					const testFnc = (param: number[]): void => {
+					const testFnc = (ctx: ParamContext): void  => {
+			const param = ctx.body as number[];
 						expect(param).to.be.instanceOf(Array);
 
 						param.forEach((value: number): void => {
@@ -182,10 +186,11 @@ describe('config()', () => {
 				});
 
 				it('multipart/form-data', async () => {
-					const testFnc = (param: {
+					const testFnc = (ctx: ParamContext): void  => {
+			const param = ctx.body as {
 						num: number[];
 						float: number[];
-					}): void => {
+					};
 						expect(param).to.be.a('object');
 						expect(param.num).to.be.instanceOf(Array);
 
@@ -218,10 +223,11 @@ describe('config()', () => {
 				});
 
 				it('application/x-www-form-urlencoded', async () => {
-					const testFnc = (param: {
+					const testFnc = (ctx: ParamContext): void  => {
+			const param = ctx.body as {
 						num: number[];
 						float: number[];
-					}): void => {
+					};
 						expect(param).to.be.a('object');
 						expect(param.num).to.be.instanceOf(Array);
 
@@ -253,7 +259,8 @@ describe('config()', () => {
 
 			describe('object', () => {
 				it('application/json', async () => {
-					const testFnc = (param: TestObj[]): void => {
+					const testFnc = (ctx: ParamContext): void  => {
+			const param = ctx.body as TestObj[];
 						expect(param).to.be.instanceOf(Array);
 
 						expect(param[0].num).to.be.a('number');
@@ -301,7 +308,8 @@ describe('config()', () => {
 				noDate: string;
 			}
 
-			const testFncJson = (param: TestObj): void => {
+			const testFncJson = (ctx: ParamContext): void  => {
+			const param = ctx.body as TestObj;
 				expect(param).to.be.a('object');
 
 				expect(param.num).to.be.a('number'); // not string
@@ -316,7 +324,8 @@ describe('config()', () => {
 				expect(param.noDate).to.be.eql(noDateStr);
 			};
 
-			const testFncStr = (param: TestObj): void => {
+			const testFncStr = (ctx: ParamContext): void  => {
+			const param = ctx.body as TestObj;
 				expect(param).to.be.a('object');
 
 				expect(param.num).to.be.a('string');
@@ -393,7 +402,8 @@ describe('config()', () => {
 				noDate: string;
 			}
 
-			const testFncJson = (param: TestObj): void => {
+			const testFncJson = (ctx: ParamContext): void  => {
+			const param = ctx.body as TestObj;
 				expect(param).to.be.a('object');
 
 				expect(param.num).to.be.a('number'); // not string
@@ -408,7 +418,8 @@ describe('config()', () => {
 				expect(param.noDate).to.be.eql(noDateStr);
 			};
 
-			const testFncStr = (param: TestObj): void => {
+			const testFncStr = (ctx: ParamContext): void  => {
+			const param = ctx.body as TestObj;
 				expect(param).to.be.a('object');
 
 				expect(param.num).to.be.a('string');
@@ -485,9 +496,10 @@ describe('config()', () => {
 
 		describe('in array', () => {
 			describe('single value', () => {
-				const testFnc = (param: {
+				const testFnc = (ctx: ParamContext): void  => {
+			const param = ctx.body as {
 					arr: Date[];
-				}): void => {
+				};
 					expect(param).to.be.a('object');
 
 					expect(param.arr).to.be.instanceOf(Array);
@@ -538,7 +550,8 @@ describe('config()', () => {
 					value: string;
 				}
 
-				const testFnc = (param: TestObj[]): void => {
+				const testFnc = (ctx: ParamContext): void  => {
+			const param = ctx.body as TestObj[];
 					expect(param).to.be.instanceOf(Array);
 
 					expect(param[0].value).to.be.instanceOf(Date);
@@ -575,7 +588,8 @@ describe('config()', () => {
 
 		const methods: METHOD[] = [METHOD.GET, METHOD.POST, METHOD.PUT, METHOD.PATCH, METHOD.DELETE];
 
-		const echoFnc = <T> (param: T): T => {
+		const echoFnc = <T> (ctx: ParamContext): T  => {
+			const param = ctx.body as T;
 			return param;
 		};
 
