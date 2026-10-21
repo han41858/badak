@@ -202,4 +202,58 @@ describe('regression', () => {
 			expect(res.body).to.be.eql({ reason: 'custom body' });
 		});
 	});
+
+	describe('GET query string with parseNumber & parseDate', () => {
+		const typeOf = (value: unknown): string => {
+			if (Array.isArray(value)) {
+				return 'array<' + value.map(typeOf).join(',') + '>';
+			}
+
+			return value instanceof Date ? 'date' : typeof value;
+		};
+
+		const typeFnc = (param: TypedObject<unknown>): TypedObject<string> => {
+			return Object.fromEntries(
+				Object.entries(param).map(([key, value]) => [key, typeOf(value)])
+			);
+		};
+
+		it('converted when options are on', async () => {
+			app = new Badak({
+				catchErrorLog: false,
+				parseNumber: true,
+				parseDate: true
+			});
+
+			await app.get('/users/:id', typeFnc);
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.get('/users/7?num=5&str=abc&date=2018-06-20&list=1&list=2&empty=')
+				.expect(200);
+
+			expect(res.body).to.be.eql({
+				id: 'string', // route param is not converted
+				num: 'number',
+				str: 'string',
+				date: 'date',
+				list: 'array<number,number>',
+				empty: 'string'
+			});
+		});
+
+		it('not converted by default', async () => {
+			await app.get('/test', typeFnc);
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.get('/test?num=5&date=2018-06-20')
+				.expect(200);
+
+			expect(res.body).to.be.eql({
+				num: 'string',
+				date: 'string'
+			});
+		});
+	});
 });
