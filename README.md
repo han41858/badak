@@ -210,6 +210,9 @@ app.route({
 #### `parseNumber: boolean`
 
 Converts the string-type number passed as an argument to the `number` type.
+Only plain decimal numbers such as `5`, `-1.5` are converted.
+Values like `007` (leading zero), `1e3`, `0x10`, ` 5` (with spaces), and integers out of the safe integer range are kept as strings,
+so zip codes and IDs are not changed.
 It applies to the query string of `GET` requests and the body of `POST`/`PUT` requests, not to route params such as `:id`.
 
 The default is `false`.
