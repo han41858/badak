@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Static files have `ETag` and `Last-Modified`, and respond `304 Not Modified` for `If-None-Match` and `If-Modified-Since`. `Cache-Control` is `no-cache` by default, and can be changed with the `cacheControl` option of `static()` and `setSPARoot()`.
+
 ## 2.0.0 (2026-10-21)
 
 This release fixes many bugs found in request handling, routing and packaging,

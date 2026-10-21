@@ -155,7 +155,7 @@ Registers a routing function that responds to `DELETE` method requests.
 Registers a routing function that responds to `PATCH` method requests.
 The request body is parsed in the same way as `POST` and `PUT`.
 
-### `static(uri: string, path: string): Promise<void>`
+### `static(uri: string, path: string, option?: StaticOption): Promise<void>`
 
 Concatenate the address and file path to be provided as a static file.
 
@@ -164,10 +164,32 @@ For an unknown extension or a file without extension, it is determined by the fi
 and `application/octet-stream` is used if it is not known either.
 Text files (`text/*`) and JavaScript files are served with `charset=utf-8`, so save them in UTF-8.
 
-### `setSPARoot(uri: string, path: string): Promise<void>`
+Files are loaded into memory when `listen()` is called, so restart the server to serve changed files.
+
+Static files are served with `ETag` (from the file content) and `Last-Modified` (from the file modification time),
+and respond `304 Not Modified` without the body if `If-None-Match` or `If-Modified-Since` of the request matches.
+`If-Modified-Since` is ignored if `If-None-Match` exists.
+
+`Cache-Control` is `no-cache` by default: browsers cache the file, but check whether it is changed every time.
+Set `cacheControl` to change it.
+
+```typescript
+// files with hashed names, e.g. main.3f2a1b.js
+await app.static('/assets', '/var/www/assets', { cacheControl: 'public, max-age=31536000, immutable' });
+
+// no Cache-Control header, ETag and Last-Modified are still sent
+await app.static('/public', '/var/www/public', { cacheControl: false });
+```
+
+| option | type | default | description |
+|---|---|---|---|
+| `cacheControl` | `string \| false` | `'no-cache'` | `Cache-Control` header value, `false` to omit the header |
+
+### `setSPARoot(uri: string, path: string, option?: StaticOption): Promise<void>`
 
 Connect the address and file path to be used with the SPA app.
-Files within the specified folder are served statically and cached.
+Files within the specified folder are served statically and cached, in the same way as `static()`.
+`option` is the same as `static()`.
 
 ## Error Response
 

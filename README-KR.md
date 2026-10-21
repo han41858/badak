@@ -148,7 +148,7 @@ HTTP 서버를 정지합니다.
 `PATCH` 메서드 요청에 반응하는 라우팅 함수를 등록합니다.
 요청 본문은 `POST`, `PUT`과 같은 방식으로 파싱합니다.
 
-### `static(uri: string, path: string): Promise<void>`
+### `static(uri: string, path: string, option?: StaticOption): Promise<void>`
 
 정적 파일로 제공할 주소와 파일 경로를 연결합니다.
 
@@ -156,10 +156,32 @@ HTTP 서버를 정지합니다.
 알 수 없는 확장자이거나 확장자가 없는 파일은 파일 시그니처(예: PNG)로 판별하고, 그래도 알 수 없으면 `application/octet-stream`으로 응답합니다.
 텍스트 파일(`text/*`)과 JavaScript 파일은 `charset=utf-8`로 응답하므로 UTF-8로 저장해야 합니다.
 
-### `setSPARoot(uri: string, path: string): Promise<void>`
+파일은 `listen()`을 실행할 때 메모리에 올라가므로, 파일을 바꾸면 서버를 다시 시작해야 반영됩니다.
+
+정적 파일은 `ETag`(파일 내용 기준)와 `Last-Modified`(파일 수정 시각 기준)를 함께 응답하며,
+요청의 `If-None-Match`나 `If-Modified-Since`가 일치하면 본문 없이 `304 Not Modified`로 응답합니다.
+`If-None-Match`가 있으면 `If-Modified-Since`는 무시합니다.
+
+`Cache-Control`은 기본값이 `no-cache`입니다. 브라우저는 파일을 캐싱하되, 사용할 때마다 변경 여부를 확인합니다.
+`cacheControl`로 바꿀 수 있습니다.
+
+```typescript
+// 이름에 해시가 들어간 파일, 예: main.3f2a1b.js
+await app.static('/assets', '/var/www/assets', { cacheControl: 'public, max-age=31536000, immutable' });
+
+// Cache-Control 헤더 없음, ETag와 Last-Modified는 그대로 응답
+await app.static('/public', '/var/www/public', { cacheControl: false });
+```
+
+| 옵션 | 타입 | 기본값 | 설명 |
+|---|---|---|---|
+| `cacheControl` | `string \| false` | `'no-cache'` | `Cache-Control` 헤더 값, `false`면 헤더를 보내지 않음 |
+
+### `setSPARoot(uri: string, path: string, option?: StaticOption): Promise<void>`
 
 SPA 앱으로 사용할 주소와 파일 경로를 연결합니다.
-지정된 폴더 안에 있는 파일은 정적으로 제공되며, 캐싱됩니다.
+지정된 폴더 안에 있는 파일은 `static()`과 같은 방식으로 정적으로 제공되며, 캐싱됩니다.
+`option`은 `static()`과 같습니다.
 
 ## 에러 응답
 

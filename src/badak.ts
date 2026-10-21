@@ -12,10 +12,18 @@ import {
 	RouteRule,
 	RouteRuleSeed,
 	StaticCache,
+	StaticOption,
 	StaticRule,
 	TypedObject
 } from './interfaces.js';
-import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, MAX_TIMER_DELAY, METHOD } from './constants.js';
+import {
+	CONTENT_TYPE,
+	DEFAULT_BODY_LIMIT,
+	DEFAULT_STATIC_CACHE_CONTROL,
+	HEADER_KEY,
+	MAX_TIMER_DELAY,
+	METHOD
+} from './constants.js';
 import { HttpError, isHttpError } from './http-error.js';
 import {
 	checkAbsolutePath,
@@ -26,6 +34,7 @@ import {
 	getMultipartBoundary,
 	isExistFile,
 	isFolder,
+	isNotModified,
 	isResponseStarted,
 	loadFolder,
 	MultipartPart,
@@ -35,6 +44,32 @@ import {
 	sift,
 	toContentTypeHeader
 } from './util.js';
+
+const checkStaticOption = (option: unknown): void => {
+	if (option === undefined) {
+		return;
+	}
+
+	if (typeof option !== 'object' || option === null || Array.isArray(option)) {
+		throw new Error('static option should be an object');
+	}
+
+	const unknownKeys: string[] = Object.keys(option).filter((key: string): boolean => key !== 'cacheControl');
+
+	if (unknownKeys.length > 0) {
+		throw new Error(`unknown static option : ${ unknownKeys.join(', ') }`);
+	}
+
+	const { cacheControl } = option as StaticOption;
+
+	if (
+		cacheControl !== undefined
+		&& cacheControl !== false
+		&& (typeof cacheControl !== 'string' || cacheControl.trim() === '' || /[\r\n]/.test(cacheControl))
+	) {
+		throw new Error(`invalid cacheControl : ${ String(cacheControl) }`);
+	}
+};
 
 /**
  * rule format, reserved keyword is 4-methods in upper cases
@@ -724,17 +759,19 @@ export class Badak {
 		});
 	}
 
-	private async _static (uri: string, path: string): Promise<void> {
+	private async _static (uri: string, path: string, option?: StaticOption): Promise<void> {
+		checkStaticOption(option);
+
 		// not assign to route rule
 		if (!this._staticRules) {
-			this._staticRules = [{ uri, path }];
+			this._staticRules = [{ uri, path, option }];
 		}
 		else {
-			this._staticRules.push({ uri, path });
+			this._staticRules.push({ uri, path, option });
 		}
 	}
 
-	async static (uri: string, path: string): Promise<void> {
+	async static (uri: string, path: string, option?: StaticOption): Promise<void> {
 		await checkAbsoluteUri(uri);
 
 		await checkAbsolutePath(path);
@@ -743,7 +780,7 @@ export class Badak {
 			throw new Error(`target should be a folder : ${ path }`);
 		}
 
-		await this._static(uri, path);
+		await this._static(uri, path, option);
 	}
 
 	async route (rule: RouteRule): Promise<void> {
@@ -751,7 +788,7 @@ export class Badak {
 	}
 
 	// add folder to static & add route rule for Single Page Application
-	async setSPARoot (uri: string, path: string): Promise<void> {
+	async setSPARoot (uri: string, path: string, option?: StaticOption): Promise<void> {
 		await checkAbsoluteUri(uri);
 
 		await checkAbsolutePath(path);
@@ -767,9 +804,31 @@ export class Badak {
 			throw new Error(`index.html not exists in : ${ path }`);
 		}
 
-		await this._static(uri, path);
+		await this._static(uri, path, option);
 
 		this._spaRoot = uri;
+	}
+
+	// send cached static file, 304 Not Modified if the client has the same file
+	private _sendStaticFile (req: IncomingMessage, res: ServerResponse, cache: StaticCache): void {
+		// validators and Cache-Control are sent with 304 too (RFC 9110 15.4.5)
+		res.setHeader(HEADER_KEY.ETAG, cache.etag);
+		res.setHeader(HEADER_KEY.LAST_MODIFIED, cache.lastModified);
+
+		if (cache.cacheControl !== undefined) {
+			res.setHeader(HEADER_KEY.CACHE_CONTROL, cache.cacheControl);
+		}
+
+		if (isNotModified(req, cache.etag, cache.lastModified)) {
+			res.statusCode = 304;
+			res.end();
+			return;
+		}
+
+		res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(cache.mime));
+		// explicit content-length for HEAD, same as GET
+		res.setHeader(HEADER_KEY.CONTENT_LENGTH, cache.fileData.byteLength);
+		res.end(cache.fileData);
 	}
 
 	// send Readable stream returned by route function
@@ -866,7 +925,18 @@ export class Badak {
 		) {
 			const allCache: StaticCache[][] = await Promise.all<StaticCache[]>(
 				this._staticRules.map(async (staticRule: StaticRule): Promise<StaticCache[]> => {
-					return loadFolder(staticRule.uri, staticRule.path);
+					const cacheSet: StaticCache[] = await loadFolder(staticRule.uri, staticRule.path);
+
+					const cacheControlOption: string | false | undefined = staticRule.option?.cacheControl;
+					const cacheControl: string | undefined = cacheControlOption === undefined
+						? DEFAULT_STATIC_CACHE_CONTROL
+						: (cacheControlOption || undefined);
+
+					cacheSet.forEach((oneCache: StaticCache): void => {
+						oneCache.cacheControl = cacheControl;
+					});
+
+					return cacheSet;
 				})
 			);
 
@@ -877,10 +947,7 @@ export class Badak {
 					this.get(
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(oneCache.mime));
-							// explicit content-length for HEAD, same as GET
-							res.setHeader(HEADER_KEY.CONTENT_LENGTH, oneCache.fileData.byteLength);
-							res.end(oneCache.fileData);
+							this._sendStaticFile(req, res, oneCache);
 						},
 						{
 							auth: false
@@ -907,18 +974,7 @@ export class Badak {
 						});
 
 						if (targetCache) {
-							const resFileObj: {
-								mime: string;
-								fileData: Uint8Array;
-							} = {
-								mime: targetCache.mime,
-								fileData: targetCache.fileData
-							};
-
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(resFileObj.mime));
-							// explicit content-length for HEAD, same as GET
-							res.setHeader(HEADER_KEY.CONTENT_LENGTH, resFileObj.fileData.byteLength);
-							res.end(resFileObj.fileData);
+							this._sendStaticFile(req, res, targetCache);
 						}
 						else {
 							res.end();

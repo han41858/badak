@@ -59,13 +59,23 @@ export interface BadakOption extends TypedObject<boolean | number | METHOD | und
 	bodyLimit: number; // default 100KB (102400), max request body size in bytes, 413 Payload Too Large if exceeded
 }
 
+export interface StaticOption {
+	// Cache-Control header of static files, default 'no-cache' (cached, but revalidated every time)
+	// e.g. 'public, max-age=31536000, immutable' for files with hashed names, false : no Cache-Control header
+	cacheControl?: string | false;
+}
+
 export interface StaticRule {
 	uri: string;
 	path: string;
+	option?: StaticOption;
 }
 
 export interface StaticCache {
 	uri: string;
 	mime: string;
 	fileData: Buffer;
+	etag: string; // strong ETag from file content
+	lastModified: string; // HTTP date from file mtime
+	cacheControl?: string; // undefined : no Cache-Control header
 }

@@ -1,8 +1,9 @@
 // convert if number string
 // if not number string, return itself
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { Stats } from 'node:fs';
-import { ServerResponse } from 'node:http';
+import { IncomingMessage, ServerResponse } from 'node:http';
 
 import * as node_path from 'node:path';
 
@@ -150,11 +151,14 @@ export const loadFolder = async (uri: string, path: string): Promise<StaticCache
 		else {
 			const fileData: Buffer<ArrayBufferLike> = await loadFile(fullPath);
 			const mimeType: CONTENT_TYPE = getContentType(fileData, folderOrFileName);
+			const fileStat: Stats = await fs.promises.stat(fullPath);
 
 			cacheSet = [{
 				uri: uriSanitized,
 				mime: mimeType,
-				fileData: fileData
+				fileData: fileData,
+				etag: createEtag(fileData),
+				lastModified: fileStat.mtime.toUTCString()
 			}];
 		}
 
@@ -166,6 +170,57 @@ export const loadFolder = async (uri: string, path: string): Promise<StaticCache
 	});
 
 	return cache;
+};
+
+// strong ETag from file content : "<size in hex>-<sha1 in base64url>"
+export const createEtag = (data: Buffer): string => {
+	const hash: string = createHash('sha1')
+		.update(data)
+		.digest('base64url');
+
+	return `"${ data.byteLength.toString(16) }-${ hash }"`;
+};
+
+// remove weak indicator for weak comparison
+const toOpaqueTag = (etag: string): string => {
+	return etag.startsWith('W/')
+		? etag.slice(2)
+		: etag;
+};
+
+// RFC 9110 13.1.2 If-None-Match : weak comparison, '*' matches any
+const matchEtag = (ifNoneMatch: string, etag: string): boolean => {
+	if (ifNoneMatch.trim() === '*') {
+		return true;
+	}
+
+	const target: string = toOpaqueTag(etag);
+	const etagsInHeader: string[] = ifNoneMatch.match(/(?:W\/)?"[^"]*"/g) ?? [];
+
+	return etagsInHeader.some((etagInHeader: string): boolean => {
+		return toOpaqueTag(etagInHeader) === target;
+	});
+};
+
+// RFC 9110 13.2.2 : If-None-Match takes precedence, If-Modified-Since is ignored if If-None-Match exists
+export const isNotModified = (req: IncomingMessage, etag: string, lastModified: string): boolean => {
+	const ifNoneMatch: string | undefined = req.headers['if-none-match'];
+
+	if (ifNoneMatch !== undefined) {
+		return matchEtag(ifNoneMatch, etag);
+	}
+
+	const ifModifiedSince: string | undefined = req.headers['if-modified-since'];
+
+	if (ifModifiedSince !== undefined) {
+		const since: number = Date.parse(ifModifiedSince);
+
+		// invalid date is ignored
+		return !Number.isNaN(since)
+			&& Date.parse(lastModified) <= since;
+	}
+
+	return false;
 };
 
 const loadFile = async (path: string): Promise<Buffer> => {
