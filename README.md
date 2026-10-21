@@ -264,7 +264,7 @@ If the routing function returns a `Readable` stream, badak pipes it to the respo
 ```typescript
 import { createReadStream } from 'node:fs';
 
-app.get('/download', (param, req, res) => {
+app.get('/download', (_ctx, req, res) => {
 	res.setHeader('Content-Type', 'application/pdf');
 	return createReadStream('/path/to/file.pdf');
 });
@@ -328,7 +328,7 @@ Converts the string-type number passed as an argument to the `number` type.
 Only plain decimal numbers such as `5`, `-1.5` are converted.
 Values like `007` (leading zero), `1e3`, `0x10`, ` 5` (with spaces), and integers out of the safe integer range are kept as strings,
 so zip codes and IDs are not changed.
-It applies to the query string of `GET` requests and the body of `POST`/`PUT` requests, not to route params such as `:id`.
+It applies to the query string of all HTTP methods and the body of `POST`/`PUT`/`PATCH` requests, not to route params such as `:id`.
 
 The default is `false`.
 
@@ -397,7 +397,7 @@ the request is matched and `{ userId: 'user1' }` is passed as an argument to the
 
 `?` makes the character just before it optional.
 If you specify the routing path as `/users?`, you can match the `/user` and `/users` paths.
-The matched uri fragment is passed as the param with the routing path as the key, e.g. `{ 'users?': 'user' }`.
+The matched fragment is available in `ctx.params`, keyed by the routing pattern, e.g. `{ 'users?': 'user' }`.
 
 - Other characters are literal, including characters with special meaning in regular expressions (e.g. `.`, `(`, `)`, `[`, `]`). `/a.c?` matches `/a.c` and `/a.`, not `/abc`.
 - `??`, and `?` with `+` or `*` in the same uri fragment (e.g. `/ab?c+`), throw an error when they are registered.
@@ -411,10 +411,10 @@ If you specify the routing path as `/user1+`, you can match paths such as `/user
 
 ### `*` routing
 
-`*` matches exactly one uri fragment, and the uri fragment is passed as `*` of the param.
+`*` matches exactly one uri fragment; its value is available as `ctx.params['*']`.
 
 ```typescript
-await app.get('/img/*', (param) => param);
+await app.get('/img/*', ({ params }) => params);
 
 // GET /img/a.png -> { '*': 'a.png' }
 // GET /img, /img/, /img/a/b -> 404
@@ -427,13 +427,13 @@ Only one `*` can be used in a uri fragment, and it should follow a character (`/
 ### `**` routing
 
 `**` matches the rest of the path, including `/`.
-The rest of the path is passed as `**` of the param: each uri fragment is decoded and joined with `/`.
+The remaining path is available as `ctx.params['**']`: each fragment is decoded and joined with `/`.
 
 ```typescript
-await app.get('/files/**', (param) => param);
+await app.get('/files/**', ({ params, query }) => ({ params, query }));
 
-// GET /files/a/b%20c/d.txt -> { '**': 'a/b c/d.txt' }
-// GET /files/a/b?c=1       -> { '**': 'a/b', c: '1' }
+// GET /files/a/b%20c/d.txt -> { params: { '**': 'a/b c/d.txt' }, query: {} }
+// GET /files/a/b?c=1       -> { params: { '**': 'a/b' }, query: { c: '1' } }
 ```
 
 - `**` should be the last uri fragment of the routing path. A path like `/files/**/edit` throws an error when it is registered.
@@ -498,33 +498,34 @@ await app.patch('/users/:id', ({ params, query, body }) => {
 
 Existing route callbacks must be migrated. The raw Node.js `req` and `res` remain the second and third arguments.
 
-## Routing Param
+## Routing parameters
 
-### query string
+Route callbacks receive `ParamContext` with three separate fields. Data sources never overwrite each other.
 
-The query string is parsed and passed to the routing function, for every method.
+### Query string
 
-The examples below all match the `/path` path, and the arguments passed are as follows.
+Every HTTP method parses query parameters into `ctx.query`. Without query parameters, `ctx.query` is `{}`.
 
-```bash
-/path?          # undefined
-/path?key       # { key: '' }
-/path?key=      # { key: '' }
-/path?key=value # { key: 'value' }
+```text
+GET /path?             → query: {}
+GET /path?key          → query: { key: '' }
+GET /path?key=         → query: { key: '' }
+GET /path?key=value    → query: { key: 'value' }
 ```
 
-### merging params
+### Route captures and body
 
-Route params (e.g. `:id`), the query string and the request body (`POST`, `PUT`, `PATCH`) are merged into one object in this order.
-If the same key exists, the latter wins.
+`ctx.params` contains only decoded path captures (always strings). `ctx.body` is parsed for POST, PUT, and PATCH, and may be an object, array, JSON primitive, or `undefined`.
 
-```bash
-PATCH /users/7?name=a  with body { "name": "b" }  # { id: '7', name: 'b' }
+```typescript
+await app.patch('/users/:id', (ctx) => ctx);
+
+// PATCH /users/7?id=8 with JSON body { "id": 9 }
+// {
+//   params: { id: '7' },
+//   query: { id: '8' },
+//   body: { id: 9 }
+// }
 ```
 
-> **Warning** : the query string and the request body can override route params.
-> For example, `PATCH /users/7?id=8` with body `{ "id": 9 }` passes `{ id: 9 }` to the route function `/users/:id`.
-> Don't trust a key that can come from the client as the route param.
-> Name route params so that they don't collide with query and body keys (e.g. `/users/:userId`).
-
-If the request body is not an object (e.g. a JSON array), it is passed as it is, without route params and the query string.
+`parseNumber` and `parseDate` apply to query and body strings, but never to path captures. The original Node.js `req` and `res` are still available as the second and third callback parameters.
