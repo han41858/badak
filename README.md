@@ -210,12 +210,14 @@ app.route({
 #### `parseNumber: boolean`
 
 Converts the string-type number passed as an argument to the `number` type.
+It applies to the query string of `GET` requests and the body of `POST`/`PUT` requests, not to route params such as `:id`.
 
 The default is `false`.
 
 #### `parseDate: boolean`
 
 Converts the date in string format passed as an argument to the `Date` type.
+It applies to the query string of `GET` requests and the body of `POST`/`PUT` requests, not to route params such as `:id`.
 
 The default is `false`.
 

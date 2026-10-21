@@ -1107,7 +1107,11 @@ export class Badak {
 								&& queryStr !== ''
 							) {
 								// merge with route param (e.g. colon routing), same rule as POST/PUT body
-								param = Object.assign(param ?? {}, querystring.parse(queryStr));
+								// convert by parseNumber & parseDate options, same as POST/PUT body
+								param = Object.assign(
+									param ?? {},
+									this._paramConverter({ ...querystring.parse(queryStr) })
+								);
 							}
 							break;
 						}
