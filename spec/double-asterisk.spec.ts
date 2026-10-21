@@ -5,7 +5,7 @@ import { agent as request } from 'supertest';
 import { Badak } from '../src/badak';
 import { METHOD } from '../src/constants';
 import { HttpError } from '../src/http-error';
-import { RouteFunction, RouteRule } from '../src/interfaces';
+import { ParamContext, RouteFunction, RouteRule } from '../src/interfaces';
 import { checkUriDuplication, findRoute, mergeRouteRule, refineRouteRule } from '../src/router';
 import { promiseFail, TestPort } from './test-util';
 
@@ -155,7 +155,7 @@ describe('** routing', () => {
 		});
 
 		it('route function receives the rest of the path', async () => {
-			await app.get('/files/**', (param: unknown): unknown => param);
+			await app.get('/files/**', (ctx: ParamContext): unknown => ctx.params);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
@@ -168,7 +168,7 @@ describe('** routing', () => {
 		});
 
 		it('query string is not included', async () => {
-			await app.get('/files/**', (param: unknown): unknown => param);
+			await app.get('/files/**', (ctx: ParamContext): unknown => ctx.params);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
@@ -177,7 +177,7 @@ describe('** routing', () => {
 		});
 
 		it('malformed percent-encoding responds 400', async () => {
-			await app.get('/files/**', (param: unknown): unknown => param);
+			await app.get('/files/**', (ctx: ParamContext): unknown => ctx.params);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
