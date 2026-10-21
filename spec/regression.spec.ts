@@ -287,4 +287,53 @@ describe('regression', () => {
 			expect(res.body).to.be.eql({ a: 1 });
 		});
 	});
+
+	describe('query string for every method', () => {
+		it('DELETE', async () => {
+			await app.delete('/items', echoFnc);
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.delete('/items?id=3')
+				.expect(200);
+
+			expect(res.body).to.be.eql({ id: '3' });
+		});
+
+		it('POST, merged with body', async () => {
+			await app.post('/items', echoFnc);
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.post('/items?from=query')
+				.send({ name: 'a' })
+				.expect(200);
+
+			expect(res.body).to.be.eql({ from: 'query', name: 'a' });
+		});
+
+		it('merge order : route param -> query string -> body', async () => {
+			await app.patch('/users/:id', echoFnc);
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.patch('/users/7?id=8&name=query&q=1')
+				.send({ name: 'body' })
+				.expect(200);
+
+			expect(res.body).to.be.eql({ id: '8', name: 'body', q: '1' });
+		});
+
+		it('array body is passed as it is', async () => {
+			await app.post('/users/:id', echoFnc);
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.post('/users/7?q=1')
+				.send([1, 2])
+				.expect(200);
+
+			expect(res.body).to.be.eql([1, 2]);
+		});
+	});
 });

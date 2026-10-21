@@ -1113,34 +1113,44 @@ export class Badak {
 						throw new Error('no rule');
 					}
 
+					// params are merged in this order, the latter wins for the same key :
+					// route param (e.g. colon routing) -> query string -> request body
+
+					// query string, for every method
+					if (
+						queryStr !== undefined
+						&& queryStr !== ''
+					) {
+						// convert by parseNumber & parseDate options, same as request body
+						param = Object.assign(
+							param ?? {},
+							this._paramConverter({ ...querystring.parse(queryStr) })
+						);
+					}
+
+					// request body
 					switch (method) {
-						case METHOD.GET: {
-							// parse query string param
-							if (
-								queryStr !== undefined
-								&& queryStr !== ''
-							) {
-								// merge with route param (e.g. colon routing), same rule as POST/PUT body
-								// convert by parseNumber & parseDate options, same as POST/PUT body
-								param = Object.assign(
-									param ?? {},
-									this._paramConverter({ ...querystring.parse(queryStr) })
-								);
+						case METHOD.PUT:
+						case METHOD.POST:
+						case METHOD.PATCH: {
+							const bodyParam: TypedObject<unknown> | undefined = await this._paramParser(req);
+
+							if (bodyParam !== undefined) {
+								if (
+									param !== undefined
+									&& typeof bodyParam === 'object'
+									&& bodyParam !== null
+									&& !Array.isArray(bodyParam)
+								) {
+									param = Object.assign(param, bodyParam);
+								}
+								else {
+									// array or primitive JSON body can't be merged, passed as it is
+									param = bodyParam;
+								}
 							}
 							break;
 						}
-
-						case METHOD.PUT:
-						case METHOD.POST:
-						case METHOD.PATCH:
-							if (param) {
-								// TODO: overwrite? uri param & param object
-								param = Object.assign(param, await this._paramParser(req));
-							}
-							else {
-								param = await this._paramParser(req);
-							}
-							break;
 					}
 
 					if (

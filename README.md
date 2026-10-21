@@ -271,7 +271,7 @@ If you specify a routing path as `/user1*`, you can match paths such as `/user`,
 
 ### query string
 
-When requesting the `GET` method, the query string argument is parsed and passed to the routing function.
+The query string is parsed and passed to the routing function, for every method.
 
 The examples below all match the `/path` path, and the arguments passed are as follows.
 
@@ -281,3 +281,14 @@ The examples below all match the `/path` path, and the arguments passed are as f
 /path?key=      # { key: '' }
 /path?key=value # { key: 'value' }
 ```
+
+### merging params
+
+Route params (e.g. `:id`), the query string and the request body (`POST`, `PUT`, `PATCH`) are merged into one object in this order.
+If the same key exists, the latter wins.
+
+```bash
+PATCH /users/7?name=a  with body { "name": "b" }  # { id: '7', name: 'b' }
+```
+
+If the request body is not an object (e.g. a JSON array), it is passed as it is, without route params and the query string.
