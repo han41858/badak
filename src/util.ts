@@ -288,44 +288,82 @@ const getHeaderParam = (headerValue: string, paramName: string): string | undefi
 		: undefined;
 };
 
+interface MultipartDelimiter {
+	index: number; // index of '--boundary'
+	isClose: boolean; // '--boundary--'
+	nextIndex: number; // part body starts here (after CRLF), only for not close delimiter
+}
+
+// find delimiter line (RFC 2046) from fromIndex
+// delimiter should be at the beginning of a line,
+// and followed by '--' (close delimiter) or optional whitespaces (transport padding) & CRLF
+// returns undefined if not found
+const findMultipartDelimiter = (body: Buffer, boundary: string, fromIndex: number): MultipartDelimiter | undefined => {
+	const dashBoundary: Buffer = Buffer.from('--' + boundary);
+
+	let index: number = body.indexOf(dashBoundary, fromIndex);
+
+	while (index >= 0) {
+		const isLineStart: boolean = index === 0
+			|| (index >= 2 && body[index - 2] === 0x0D && body[index - 1] === 0x0A); // CR LF
+
+		if (isLineStart) {
+			let cursor: number = index + dashBoundary.byteLength;
+
+			if (body[cursor] === 0x2D && body[cursor + 1] === 0x2D) { // '--'
+				return {
+					index,
+					isClose: true,
+					nextIndex: -1
+				};
+			}
+
+			// skip transport padding
+			while (body[cursor] === 0x20 || body[cursor] === 0x09) { // SP, HTAB
+				cursor++;
+			}
+
+			if (body[cursor] === 0x0D && body[cursor + 1] === 0x0A) {
+				return {
+					index,
+					isClose: false,
+					nextIndex: cursor + 2
+				};
+			}
+		}
+
+		// not a delimiter, just same bytes in content
+		index = body.indexOf(dashBoundary, index + 1);
+	}
+
+	return undefined;
+};
+
 // parse multipart/form-data body (RFC 7578), works on Buffer to keep binary data
+// preamble before the first delimiter and epilogue after the close delimiter are ignored (RFC 2046)
 // throws 'Bad Request' on malformed body
 export const parseMultipart = (body: Buffer, boundary: string): MultipartPart[] => {
 	const CRLF: string = '\r\n';
 
-	const delimiter: Buffer = Buffer.from('--' + boundary);
-	const nextDelimiter: Buffer = Buffer.from(CRLF + '--' + boundary);
-
 	const parts: MultipartPart[] = [];
 
-	let delimiterIndex: number = body.indexOf(delimiter);
+	let delimiter: MultipartDelimiter | undefined = findMultipartDelimiter(body, boundary, 0);
 
-	if (delimiterIndex < 0) {
+	if (delimiter === undefined) {
 		throw new Error('Bad Request');
 	}
 
-	for (;;) {
-		const afterDelimiterIndex: number = delimiterIndex + delimiter.byteLength;
-		const afterDelimiterStr: string = body.subarray(afterDelimiterIndex, afterDelimiterIndex + 2).toString();
+	while (!delimiter.isClose) {
+		const partStartIndex: number = delimiter.nextIndex;
+		const nextDelimiter: MultipartDelimiter | undefined = findMultipartDelimiter(body, boundary, partStartIndex);
 
-		if (afterDelimiterStr === '--') {
-			// close delimiter
-			break;
-		}
-
-		if (afterDelimiterStr !== CRLF) {
-			throw new Error('Bad Request');
-		}
-
-		const partStartIndex: number = afterDelimiterIndex + CRLF.length;
-		const partEndIndex: number = body.indexOf(nextDelimiter, partStartIndex);
-
-		if (partEndIndex < 0) {
+		if (nextDelimiter === undefined) {
 			// no close delimiter
 			throw new Error('Bad Request');
 		}
 
-		const part: Buffer = body.subarray(partStartIndex, partEndIndex);
+		// CRLF before delimiter belongs to delimiter
+		const part: Buffer = body.subarray(partStartIndex, Math.max(partStartIndex, nextDelimiter.index - CRLF.length));
 		const headerEndIndex: number = part.indexOf(CRLF + CRLF);
 
 		if (headerEndIndex < 0) {
@@ -360,7 +398,7 @@ export const parseMultipart = (body: Buffer, boundary: string): MultipartPart[] 
 			});
 		}
 
-		delimiterIndex = partEndIndex + CRLF.length;
+		delimiter = nextDelimiter;
 	}
 
 	return parts;

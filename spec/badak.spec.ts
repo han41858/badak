@@ -589,6 +589,49 @@ describe('core', () => {
 				expect(receivedParam).to.be.eql({ a: '1' });
 			});
 
+			it('boundary-like bytes in content are not a delimiter', async () => {
+				const contents: string = 'line\r\n--abcNOT_A_DELIMITER\r\nmore';
+
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send([
+						'--abc',
+						'Content-Disposition: form-data; name="file"; filename="a.txt"',
+						'Content-Type: text/plain',
+						'',
+						contents,
+						'--abc--',
+						''
+					].join('\r\n'))
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ file: contents });
+			});
+
+			it('transport padding after boundary', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send('--abc  \r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--abc--\r\n')
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ a: '1' });
+			});
+
+			it('preamble and epilogue are ignored', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send('preamble\r\n--abc\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--abc--\r\nepilogue')
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ a: '1' });
+			});
+
 			it('malformed body responds 400', async () => {
 				await request(app.getHttpServer())
 					.post('/upload')
