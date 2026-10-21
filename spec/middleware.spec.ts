@@ -268,7 +268,7 @@ describe('middleware', () => {
 				};
 
 				const routeFnc: RouteFunction = async (ctx: ParamContext): Promise<unknown> => {
-					const param = ctx.query as TypedObject<unknown>;
+					const param = ctx.body as TypedObject<unknown>;
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified
