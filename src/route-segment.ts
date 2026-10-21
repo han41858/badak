@@ -14,6 +14,7 @@
 import { METHOD } from './constants.js';
 import { RouteRule } from './interfaces.js';
 import { decodeUriFrag } from './util.js';
+import { PatternToken } from './fragment-pattern.js';
 
 
 // split request path and decode each uri fragment, the first element is '/' for the root
@@ -100,7 +101,7 @@ export type RouteSegment =
 	{ kind: 'normal', literal: string }
 	| { kind: 'colon' }
 	| { kind: 'question' } // see question-pattern.ts
-	| { kind: 'plus', regExp: RegExp, shortest: string }
+	| { kind: 'plus', tokens: PatternToken[] } // see fragment-pattern.ts
 	| { kind: 'partialAsterisk', regExp: RegExp }
 	| { kind: 'asterisk' }
 	| { kind: 'doubleAsterisk' };
@@ -113,13 +114,13 @@ const compilePlus = (routeKey: string): RouteSegment => {
 		throw new Error(`invalid plus route, '+' can't be used with '*' : ${ routeKey }`);
 	}
 
-	const tokens: { char: string, repeat: boolean }[] = [];
+	const tokens: PatternToken[] = [];
 
 	for (const part of splitRouteKey(routeKey, '+')) {
 		if ('syntax' in part) {
-			const last: { char: string, repeat: boolean } | undefined = tokens[tokens.length - 1];
+			const last: PatternToken | undefined = tokens[tokens.length - 1];
 
-			if (last === undefined || last.repeat) {
+			if (last === undefined || last.repeat === true) {
 				// '+' at the beginning, or '++'
 				throw new Error(`invalid plus route : ${ routeKey }`);
 			}
@@ -127,20 +128,11 @@ const compilePlus = (routeKey: string): RouteSegment => {
 			last.repeat = true;
 		}
 		else {
-			tokens.push({ char: part.literal, repeat: false });
+			tokens.push({ char: part.literal, optional: false, repeat: false });
 		}
 	}
 
-	const source: string = tokens
-		.map(({ char, repeat }: { char: string, repeat: boolean }): string => escapeRegExpChar(char) + (repeat ? '+' : ''))
-		.join('');
-
-	return {
-		kind: 'plus',
-		regExp: new RegExp(`^(?:${ source })$`, 'u'),
-		// the shortest uri fragment matched, for duplication check
-		shortest: tokens.map(({ char }: { char: string }): string => char).join('')
-	};
+	return { kind: 'plus', tokens };
 };
 
 // '*' in a uri fragment : the character just before '*' and '*' match any characters (0 or more)

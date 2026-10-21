@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `+` routing paths that can match the same uri fragment throw `duplicated plus routing` when they are registered, regardless of the registration order. Only the shortest uri fragment of each `+` routing path was compared before, so e.g. `/aab+` and `/a+bb` (both match `/aabb`) could be registered together, and the route used for `/aabb` depended on the registration order. ([#62](https://github.com/han41858/badak/pull/62))
+- A `?` routing path and a `+` routing path that can match the same uri fragment throw `duplicated question and plus routing` when they are registered, e.g. `/colou?r` and `/colou+r` for `/colour`. They could be registered together before, and the `+` routing path was never used for those uri fragments. ([#62](https://github.com/han41858/badak/pull/62))
+  - routing paths registered together in 4.0.0 can throw now. Remove one of them, or merge them into one routing function.
+- `+` routing matches uri fragments without regular expressions, the duplication check and request matching use the same interpretation. Patterns like `a+a+a+…b` don't backtrack for long uri fragments. ([#62](https://github.com/han41858/badak/pull/62))
+
 ## 4.0.0 (2026-10-22)
 
 This release changes the first argument of routing functions to `ParamContext` (`{ params, query, body }`), and redefines `?` routing and non-ASCII / percent-encoded path matching.

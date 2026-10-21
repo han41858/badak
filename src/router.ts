@@ -1,6 +1,7 @@
 import { RouteFunction, RouteFunctionObj, RouteOption, RouteRule, RouteRuleSeed, TypedObject } from './interfaces.js';
 import { METHOD } from './constants.js';
 import { isValidBodyLimit, sift } from './util.js';
+import { matchPatternTokens, PatternToken, patternTokensIntersect } from './fragment-pattern.js';
 import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from './question-pattern.js';
 import {
 	canonicalRouteKey,
@@ -276,36 +277,37 @@ const checkSiblingUriKeys = (targetKeys: string[]): void => {
 		}
 	}
 
-	// plus routing, compare with normal uri fragments and the shortest uri fragments of other plus routes
+	// plus routing, same pattern interpretation as request matching
 	const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => segments.get(uri)?.kind === 'plus');
 	if (plusRouteArr.length > 0) {
-		plusRouteArr.forEach((plusUri: string): void => {
-			const { regExp } = segments.get(plusUri) as { kind: 'plus', regExp: RegExp };
+		const tokensOf = (uri: string): PatternToken[] => (segments.get(uri) as { kind: 'plus', tokens: PatternToken[] }).tokens;
 
-			const isDuplicated: boolean = targetKeys
-				.filter((uri: string): boolean => uri !== plusUri)
-				.map((uri: string): string | undefined => {
-					const segment: RouteSegment = segments.get(uri) as RouteSegment;
-
-					// other special routings are checked by themselves
-					switch (segment.kind) {
-						case 'normal':
-							return segment.literal;
-
-						case 'plus':
-							// shortest matching uri fragment : 'abc+' -> 'abc'
-							return segment.shortest;
-
-						default:
-							return undefined;
-					}
-				})
-				.some((literal: string | undefined): boolean => literal !== undefined && regExp.test(literal));
-
-			if (isDuplicated) {
-				throw new Error('duplicated plus routing');
+		// plus pattern and normal uri fragments (literal)
+		for (const plusUri of plusRouteArr) {
+			for (const [literal, normalUri] of normalLiterals) {
+				if (matchPatternTokens(tokensOf(plusUri), literal)) {
+					throw new Error(`duplicated plus routing : ${ plusUri }, ${ normalUri }`);
+				}
 			}
-		});
+		}
+
+		// plus patterns that can match the same uri fragment, e.g. 'aab+' and 'a+bb' for 'aabb'
+		for (let i: number = 0; i < plusRouteArr.length; i++) {
+			for (let j: number = i + 1; j < plusRouteArr.length; j++) {
+				if (patternTokensIntersect(tokensOf(plusRouteArr[i]), tokensOf(plusRouteArr[j]))) {
+					throw new Error(`duplicated plus routing : ${ plusRouteArr[i] }, ${ plusRouteArr[j] }`);
+				}
+			}
+		}
+
+		// question and plus patterns that can match the same uri fragment, e.g. 'colou?r' and 'colou+r' for 'colour'
+		for (const questionUri of questionRouteArr) {
+			for (const plusUri of plusRouteArr) {
+				if (patternTokensIntersect(parseQuestionPattern(questionUri), tokensOf(plusUri))) {
+					throw new Error(`duplicated question and plus routing : ${ questionUri }, ${ plusUri }`);
+				}
+			}
+		}
 	}
 
 	// asterisk routing, encoded '*' (%2A) is literal
@@ -479,7 +481,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 					? undefined
 					: compileRouteSegment(routeRuleKey);
 
-				return segment?.kind === 'plus' && segment.regExp.test(uriFrag);
+				return segment?.kind === 'plus' && matchPatternTokens(segment.tokens, uriFrag);
 			});
 
 			if (targetPlusKey !== undefined) {
