@@ -1,22 +1,13 @@
 # Changelog
 
-## Unreleased (4.0.0)
+## 4.0.0 (2026-10-22)
 
-These changes break backward compatibility and are planned for 4.0.0.
-
-### TypeScript improvements
-
-- Route handlers support one named generic type argument, e.g. `app.post<{ body: User }>()`, `app.get<{ params: IdParams; query: PageQuery }>()`. Typed callbacks also work inside `route()` objects. These declarations do not validate requests at runtime. ([#60](https://github.com/han41858/badak/pull/60))
-  - `params` values should be strings, same as the runtime values. Interfaces are supported.
-  - keys other than `params`, `query` and `body` are compile errors.
-  - `app.get()` and `app.delete()` can't declare `body`, the request body is not parsed for them.
-- Consumer-facing type tests also run against the packed package (`.d.ts`) for ESM (`node16`, `nodenext`, `bundler`) and CJS with `yarn test:types:dist` in CI.
-- Consumer-facing strict TypeScript compile checks run with `yarn test:types` in CI.
+This release changes the first argument of routing functions to `ParamContext` (`{ params, query, body }`), and redefines `?` routing and non-ASCII / percent-encoded path matching.
+Every route callback that reads the merged `param` object must be migrated, see [Breaking changes](#breaking-changes) and [Migration](#migration).
 
 ### Breaking changes
 
 - Routing functions receive a `ParamContext` first argument (`{ params, query, body }`) instead of one merged `param` object. `params` and `query` are always objects; `body` is `undefined` when missing. Route captures remain strings, and the `parseNumber` / `parseDate` options continue to affect query and body only. Existing route callbacks must be migrated. ([#59](https://github.com/han41858/badak/pull/59))
-
 - `?` routing is defined as "`?` makes the character just before it optional", and the duplication check and request matching use the same interpretation. ([#57](https://github.com/han41858/badak/pull/57))
   - `?` routing paths that can match the same uri fragment throw `duplicated question routing` when they are registered, regardless of the registration order.
   - other characters are literal. They were interpreted as a regular expression before.
@@ -56,6 +47,18 @@ Cases that differ from 3.0.0 :
 | `/100%`, `/%E0%A4%A` | registered, compared without decoding | throws when registered |
 | static files `:c.txt` and `한글.txt` in a folder | `:c.txt` is registered as a colon route, every file request of the folder responds `:c.txt` | each file is served by its name |
 | static files `a+b.txt`, `q?.txt`, `100%.txt` | interpreted as `+`, `?` routing, or not matched | served by their names |
+
+### Added
+
+- Route handlers support one named generic type argument, e.g. `app.post<{ body: User }>()`, `app.get<{ params: IdParams; query: PageQuery }>()`. Typed callbacks also work inside `route()` objects. These declarations do not validate requests at runtime. ([#60](https://github.com/han41858/badak/pull/60))
+  - `params` values should be strings, same as the runtime values. Interfaces are supported.
+  - keys other than `params`, `query` and `body` are compile errors.
+  - `app.get()` and `app.delete()` can't declare `body`, the request body is not parsed for them.
+
+### Others
+
+- Consumer-facing strict TypeScript compile checks run with `yarn test:types` in CI.
+- Consumer-facing type tests also run against the packed package (`.d.ts`) for ESM (`node16`, `nodenext`, `bundler`) and CJS with `yarn test:types:dist` in CI.
 
 ### Migration
 
