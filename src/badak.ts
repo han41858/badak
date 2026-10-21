@@ -1,7 +1,6 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import * as node_path from 'node:path';
 import * as querystring from 'node:querystring';
-import { Readable } from 'node:stream';
 
 import {
 	BadakOption,
@@ -10,108 +9,29 @@ import {
 	RouteFunctionObj,
 	RouteOption,
 	RouteRule,
-	RouteRuleSeed,
 	StaticCache,
 	StaticOption,
 	StaticRule,
 	TypedObject
 } from './interfaces.js';
 import {
-	CONTENT_TYPE,
 	DEFAULT_BODY_LIMIT,
-	DEFAULT_STATIC_CACHE_CONTROL,
-	HEADER_KEY,
 	MAX_TIMER_DELAY,
 	METHOD
 } from './constants.js';
 import { HttpError, isHttpError } from './http-error.js';
+import { convertParam, parseRequestBody } from './body-parser.js';
+import { sendErrorResponse, sendRouteResult } from './response.js';
+import { checkStaticOption, loadStaticRule, sendStaticFile } from './static.js';
+import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl } from './router.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
-	convertDateStr,
-	convertNumberStr,
-	decodeUriFrag,
-	getMultipartBoundary,
 	isExistFile,
 	isFolder,
-	isNotModified,
 	isResponseStarted,
-	isValidBodyLimit,
-	loadFolder,
-	MultipartPart,
-	parseMultipart,
-	SerializedBody,
-	serializeBody,
-	sift,
-	toContentTypeHeader
+	isValidBodyLimit
 } from './util.js';
-
-const checkStaticOption = (option: unknown): void => {
-	if (option === undefined) {
-		return;
-	}
-
-	if (typeof option !== 'object' || option === null || Array.isArray(option)) {
-		throw new Error('static option should be an object');
-	}
-
-	const unknownKeys: string[] = Object.keys(option).filter((key: string): boolean => key !== 'cacheControl');
-
-	if (unknownKeys.length > 0) {
-		throw new Error(`unknown static option : ${ unknownKeys.join(', ') }`);
-	}
-
-	const { cacheControl } = option as StaticOption;
-
-	if (
-		cacheControl !== undefined
-		&& cacheControl !== false
-		&& (typeof cacheControl !== 'string' || cacheControl.trim() === '' || /[\r\n]/.test(cacheControl))
-	) {
-		throw new Error(`invalid cacheControl : ${ String(cacheControl) }`);
-	}
-};
-
-// only bodyLimit is validated, other keys are not checked to keep the behavior of 2.0
-const checkRouteFunctionObj = (value: unknown): void => {
-	if (typeof value !== 'object' || value === null) {
-		// route function, checked by itself
-		return;
-	}
-
-	const option: unknown = (value as RouteFunctionObj).option;
-
-	if (
-		typeof option === 'object'
-		&& option !== null
-		&& (option as RouteOption).bodyLimit !== undefined
-		&& !isValidBodyLimit((option as RouteOption).bodyLimit)
-	) {
-		throw new Error(`invalid bodyLimit : ${ String((option as RouteOption).bodyLimit) }`);
-	}
-};
-
-/**
- * rule format, reserved keyword is 4-methods in upper cases
- * example)
- * {
- *     'users' : {
- *         'GET' : getUserList,
- *         'POST' : addUser,
- *
- *         ':id' : {
- *             'GET' : getUser,
- *             'PUT' : updateUser,
- *             'DELETE' : deleteUser
- *         }
- *     }
- * }
- */
-
-enum LOOP_CONTROL {
-	BREAK = 'B',
-	CONTINUE = 'C'
-}
 
 export class Badak {
 	private _http: Server | undefined;
@@ -153,215 +73,13 @@ export class Badak {
 		}
 	}
 
-	// refine route rule, this function can be called recursively
-	private _refineRouteRule (rule: RouteRule | RouteRuleSeed, isRoot: boolean = true): RouteRule {
-		if (rule === undefined) {
-			throw new Error('no rule');
-		}
-
-		const keys: string[] = Object.keys(rule);
-
-		if (keys.length === 0) {
-			throw new Error('no rule in rule object');
-		}
-
-		const refinedRuleObj: RouteRule = {};
-
-		// called recursively
-		for (const [uri, value] of Object.entries(rule)) {
-			if (uri.includes('//')) {
-				throw new Error('invalid double slash');
-			}
-
-			// make array for uri abbreviation
-			const uriArr: string[] = [
-				isRoot ? '/' : '', // start from root
-				...uri.split('/')
-			]
-				.filter((uriFrag: string): boolean => uriFrag !== '');
-
-			let targetObj: RouteRule = refinedRuleObj;
-
-			uriArr.forEach((uriFrag: string, i: number, arr: string[]): void => {
-				if (uriFrag.trim() === '') {
-					throw new Error('empty uri frag');
-				}
-
-				if (uriFrag.includes(' ')) {
-					throw new Error('uri include space');
-				}
-
-				if (uriFrag.includes(':') && !uriFrag.startsWith(':')) {
-					throw new Error('invalid colon route');
-				}
-
-				if (uriFrag.includes('?')) {
-					if (uriFrag === '?') {
-						throw new Error('invalid question character');
-					}
-				}
-
-				if (uriFrag.includes('?') && uriFrag.startsWith('?')) {
-					throw new Error('invalid question route');
-				}
-
-				if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
-					throw new Error('invalid plus route');
-				}
-
-				if (Object.values(METHOD).includes(uriFrag as METHOD)) {
-					const method: METHOD = uriFrag as METHOD; // re-assign for readability
-
-					checkRouteFunctionObj(rule[method]);
-
-					targetObj[method] = rule[method] as RouteRuleSeed;
-				}
-				else {
-					if (i < arr.length - 1) {
-						// unzip abbreviation path
-						if (!targetObj[uriFrag]) {
-							targetObj[uriFrag] = {};
-						}
-
-						targetObj = targetObj[uriFrag] as RouteRule;
-					}
-					else {
-						interface AnyRuleObj {
-							[key: string]: RouteRuleSeed | RouteFunction;
-						}
-
-						// last uri frag
-						const ruleAsAny: AnyRuleObj = rule as AnyRuleObj;
-
-						if (typeof value === 'object') {
-							targetObj[uriFrag] = this._refineRouteRule(value, false);
-						}
-						else if (typeof ruleAsAny[uri] === 'function') {
-							if (this._config.defaultMethod) {
-								targetObj[uriFrag] = {
-									[this._config.defaultMethod]: ruleAsAny[uri]
-								};
-							}
-							else {
-								throw new Error('invalid rule or defaultMethod not set');
-							}
-						}
-					}
-				}
-			});
-		}
-
-		return refinedRuleObj;
-	}
-
-	// check uri duplication among sibling uri fragments (same parent), call recursively
-	private _checkUriDuplication (currentRouteRule: RouteRule, newRouteRule: RouteRule): void {
-		const isMethodKey = (key: string): boolean => Object.values(METHOD).includes(key as METHOD);
-
-		this._checkSiblingUriKeys(
-			sift([
-				...Object.keys(currentRouteRule),
-				...Object.keys(newRouteRule)
-			])
-				.filter((key: string): boolean => !isMethodKey(key))
-		);
-
-		// current rule is checked already, so go deeper along new rule only
-		for (const [key, newChild] of Object.entries(newRouteRule)) {
-			if (isMethodKey(key) || typeof newChild !== 'object') {
-				continue;
-			}
-
-			const currentChild: RouteRule | RouteRuleSeed | RouteFunction | undefined = currentRouteRule[key];
-
-			this._checkUriDuplication(
-				typeof currentChild === 'object'
-					? currentChild as RouteRule
-					: {},
-				newChild as RouteRule
-			);
-		}
-	}
-
-	private _checkSiblingUriKeys (targetKeys: string[]): void {
-		// colon routing
-		const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
-		if (colonRouteArr.length > 1) {
-			throw new Error('duplicated colon routing');
-		}
-
-		// question routing
-		const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('?'));
-		if (questionRouteArr.length > 0) {
-			const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
-
-			const matchingResult: string | undefined = questionRouteArr.find((regSrc: string): boolean => {
-				// anchor to match whole uri fragment
-				return targetUris.some((uri: string): boolean => new RegExp(`^(?:${ regSrc })$`).test(uri));
-			});
-
-			if (matchingResult !== undefined) {
-				throw new Error('duplicated question routing');
-			}
-		}
-
-		// plus routing
-		const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('+'));
-		if (plusRouteArr.length > 0) {
-			plusRouteArr.forEach((plusUri: string): void => {
-				// same as request matching, match whole uri fragment
-				const plusRegExp: RegExp = new RegExp(`^(?:${ plusUri })$`);
-
-				const isDuplicated: boolean = targetKeys
-					.filter((uri: string): boolean => {
-						// other special routings are checked by themselves
-						return uri !== plusUri
-							&& !uri.startsWith(':')
-							&& !uri.includes('?')
-							&& !uri.includes('*');
-					})
-					// for other plus uri, compare with its shortest matching uri : 'abc+' -> 'abc'
-					.map((uri: string): string => uri.replace(/\+/g, ''))
-					.some((uri: string): boolean => plusRegExp.test(uri));
-
-				if (isDuplicated) {
-					throw new Error('duplicated plus routing');
-				}
-			});
-		}
-
-		// asterisk routing
-		const asteriskRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('*'));
-
-		if (asteriskRouteArr.length > 1) {
-			throw new Error('duplicated asterisk routing');
-		}
-	}
-
-	private _mergeRouteRule (a: RouteRule, b: RouteRule): RouteRule {
-		Object.entries(b).forEach(([key, value]) => {
-			if (a[key] === undefined) {
-				a[key] = {};
-			}
-
-			if (typeof value === 'object') {
-				this._mergeRouteRule((a ?? {})[key] as RouteRule, b[key] as RouteRule);
-			}
-			else {
-				a[key] = b[key];
-			}
-		});
-
-		return a;
-	}
-
 
 	private _assignRule (rule: RouteRule): void {
-		const refinedRule: RouteRule = this._refineRouteRule(rule);
+		const refinedRule: RouteRule = refineRouteRule(rule, this._config.defaultMethod);
 
-		this._checkUriDuplication(this._routeRule, refinedRule);
+		checkUriDuplication(this._routeRule, refinedRule);
 
-		this._mergeRouteRule(this._routeRule, refinedRule);
+		mergeRouteRule(this._routeRule, refinedRule);
 	}
 
 	// auth
@@ -546,239 +264,6 @@ export class Badak {
 		});
 	}
 
-	// convert string by parseDate & parseNumber options
-	// a string can't be both date and number format, so apply one of them
-	private _convertStr (value: string): unknown {
-		if (this._config.parseDate) {
-			const dateConverted: string | Date = convertDateStr(value);
-
-			if (dateConverted instanceof Date) {
-				return dateConverted;
-			}
-		}
-
-		if (this._config.parseNumber) {
-			return convertNumberStr(value);
-		}
-
-		return value;
-	}
-
-	// parameter can be object of string because request has string
-	// only work for string param
-	private _paramConverter (param: TypedObject<unknown>): TypedObject<unknown> {
-		if (Array.isArray(param)) {
-			const paramAsArray: unknown[] = param as unknown[];
-
-			paramAsArray.forEach((value: unknown, i: number, arr: unknown[]): void => {
-				if (!value) {
-					// null, undefined
-					arr[i] = value;
-				}
-				else if (typeof value === 'object') {
-					// call recursively
-					arr[i] = this._paramConverter(value as TypedObject<unknown>);
-				}
-				else if (typeof value === 'string') {
-					arr[i] = this._convertStr(value);
-				}
-			});
-		}
-		else {
-			for (const [key, value] of Object.entries(param)) {
-				if (!value) {
-					// null, undefined
-					param[key] = value;
-				}
-				else if (typeof value === 'object') {
-					// call recursively
-					param[key] = this._paramConverter(value as TypedObject<unknown>);
-				}
-				else if (typeof value === 'string') {
-					param[key] = this._convertStr(value);
-				}
-			}
-		}
-
-		return param;
-	}
-
-	// parse request body by content-type
-	// throws on malformed body, caller should handle it
-	private _parseBody (req: IncomingMessage, bodyBuffer: Buffer): TypedObject<unknown> | undefined {
-		let param: TypedObject<unknown> | undefined;
-
-		const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
-
-		if (contentTypeInHeader) {
-			const [contentType] = contentTypeInHeader
-				.split(';')
-				.map((s: string): string => s.trim());
-
-			if (bodyBuffer.byteLength > 0) {
-				switch (contentType) {
-					case 'multipart/form-data': {
-						const boundary: string | undefined = getMultipartBoundary(contentTypeInHeader);
-
-						if (boundary === undefined) {
-							// boundary is mandatory for multipart/form-data
-							throw new HttpError(400);
-						}
-
-						parseMultipart(bodyBuffer, boundary).forEach((part: MultipartPart): void => {
-							let value: string | Buffer;
-
-							if (part.filename === undefined) {
-								// normal field
-								value = part.data.toString();
-							}
-							else {
-								// file, text/plain is default by RFC 7578
-								const fileContentType: string = (part.contentType ?? CONTENT_TYPE.TEXT_PLAIN).toLowerCase();
-
-								value = fileContentType.startsWith(CONTENT_TYPE.TEXT_PLAIN)
-									? part.data.toString()
-									: part.data;
-							}
-
-							if (!param) {
-								param = {} as TypedObject<unknown>;
-							}
-
-							if (part.name.endsWith('[]')) {
-								// array
-								const arrayName: string = part.name.replace(/\[]$/g, '');
-
-								if (param[arrayName]) {
-									(param[arrayName] as Array<unknown>).push(value);
-								}
-								else {
-									param[arrayName] = [value];
-								}
-							}
-							else {
-								param[part.name] = value;
-							}
-						});
-						break;
-					}
-
-					case CONTENT_TYPE.APPLICATION_JSON:
-						if (bodyBuffer.byteLength > 0) {
-							try {
-								param = JSON.parse(bodyBuffer.toString());
-							}
-							catch (e: unknown) {
-								// malformed JSON is client's fault
-								throw new HttpError(400, { cause: e });
-							}
-						}
-						// no payload, but ok
-						break;
-
-					case CONTENT_TYPE.APPLICATION_WWW_FORM_URLENCODED:
-						if (bodyBuffer.byteLength > 0) {
-							// URLSearchParams decodes '+' and percent-encoding
-							new URLSearchParams(bodyBuffer.toString())
-								.forEach((value: string, key: string): void => {
-									if (!param) {
-										param = {} as TypedObject<unknown>;
-									}
-
-									if (key.endsWith('[]')) {
-										// array
-										const arrayName: string = key.replace(/\[]$/g, '');
-
-										if (param[arrayName] !== undefined) {
-											(param[arrayName] as Array<unknown>).push(value);
-										}
-										else {
-											param[arrayName] = [value];
-										}
-									}
-									else {
-										param[key] = value;
-									}
-								});
-						}
-
-						// no payload, but ok
-						break;
-				}
-
-				if (param) {
-					param = this._paramConverter(param);
-				}
-			}
-		}
-
-		return param;
-	}
-
-	// for POST, PUT
-	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req: IncomingMessage, bodyLimit: number): Promise<TypedObject<unknown> | undefined> {
-		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
-			// the body is read by a middleware function already, 'end' event is not emitted again
-			if (req.readableEnded) {
-				reject(new Error('request body is read before badak parses it, don\'t read it in before() or auth()'));
-				return;
-			}
-
-			// reject before receiving body if declared size is over the limit
-			const contentLength: number = Number(req.headers['content-length']);
-
-			if (contentLength > bodyLimit) {
-				// discard the body to keep the connection (keep-alive) usable
-				req.resume();
-
-				reject(new HttpError(413));
-				return;
-			}
-
-			const bodyBufferPool: Uint8Array[] = [];
-			let receivedSize: number = 0;
-			let limitExceeded: boolean = false;
-
-			req.on('data', (stream: Uint8Array): void => {
-				if (limitExceeded) {
-					// discard rest of the body to keep the connection (keep-alive) usable
-					return;
-				}
-
-				receivedSize += stream.byteLength;
-
-				// for chunked request without content-length, or wrong content-length
-				if (receivedSize > bodyLimit) {
-					limitExceeded = true;
-					bodyBufferPool.length = 0;
-
-					reject(new HttpError(413));
-					return;
-				}
-
-				bodyBufferPool.push(stream);
-			});
-
-			req.on('error', (err: Error): void => {
-				reject(err);
-			});
-
-			req.on('end', (): void => {
-				if (limitExceeded) {
-					return;
-				}
-
-				try {
-					resolve(this._parseBody(req, Buffer.concat(bodyBufferPool)));
-				}
-				catch (e: unknown) {
-					reject(e);
-				}
-			});
-		});
-	}
-
 	private async _static (uri: string, path: string, option?: StaticOption): Promise<void> {
 		checkStaticOption(option);
 
@@ -829,106 +314,6 @@ export class Badak {
 		this._spaRoot = uri;
 	}
 
-	// send cached static file, 304 Not Modified if the client has the same file
-	private _sendStaticFile (req: IncomingMessage, res: ServerResponse, cache: StaticCache): void {
-		// validators and Cache-Control are sent with 304 too (RFC 9110 15.4.5)
-		res.setHeader(HEADER_KEY.ETAG, cache.etag);
-		res.setHeader(HEADER_KEY.LAST_MODIFIED, cache.lastModified);
-
-		if (cache.cacheControl !== undefined) {
-			res.setHeader(HEADER_KEY.CACHE_CONTROL, cache.cacheControl);
-		}
-
-		if (isNotModified(req, cache.etag, cache.lastModified)) {
-			res.statusCode = 304;
-			res.end();
-			return;
-		}
-
-		res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(cache.mime));
-		// explicit content-length for HEAD, same as GET
-		res.setHeader(HEADER_KEY.CONTENT_LENGTH, cache.fileData.byteLength);
-		res.end(cache.fileData);
-	}
-
-	// send Readable stream returned by route function
-	// resolves when the response is finished or closed
-	// rejects only if the stream fails before sending the response headers, to respond with an error status code
-	private async _sendStream (req: IncomingMessage, res: ServerResponse, stream: Readable): Promise<void> {
-		if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
-			res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.APPLICATION_OCTET_STREAM);
-		}
-
-		// HEAD has no body, don't read the stream
-		if (req.method === 'HEAD') {
-			stream.destroy();
-			res.end();
-			return;
-		}
-
-		return new Promise<void>((resolve, reject): void => {
-			let settled: boolean = false;
-
-			const settle = (err?: unknown): void => {
-				if (settled) {
-					return;
-				}
-
-				settled = true;
-
-				if (err === undefined) {
-					resolve();
-				}
-				else {
-					reject(err);
-				}
-			};
-
-			stream.on('error', (err: Error): void => {
-				stream.unpipe(res);
-
-				// release resources, a stream with autoDestroy: false is not destroyed by itself
-				stream.destroy();
-
-				if (settled) {
-					// the response is finished or closed already, don't touch it
-					if (this._config.catchErrorLog) {
-						console.error('badak stream failed after response :', err);
-					}
-
-					return;
-				}
-
-				if (res.headersSent) {
-					// some data is sent already, close the connection so that the client can know the response is incomplete
-					if (this._config.catchErrorLog) {
-						console.error('badak stream failed while sending response :', err);
-					}
-
-					res.destroy(err);
-					settle();
-				}
-				else {
-					// respond with an error status code
-					settle(err);
-				}
-			});
-
-			res.on('finish', (): void => settle());
-
-			res.on('close', (): void => {
-				// client aborted, stop reading the stream
-				if (!res.writableFinished) {
-					stream.destroy();
-				}
-
-				settle();
-			});
-
-			stream.pipe(res);
-		});
-	}
-
 	async listen (port: number): Promise<void> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
@@ -944,19 +329,8 @@ export class Badak {
 			&& this._staticRules.length > 0
 		) {
 			const allCache: StaticCache[][] = await Promise.all<StaticCache[]>(
-				this._staticRules.map(async (staticRule: StaticRule): Promise<StaticCache[]> => {
-					const cacheSet: StaticCache[] = await loadFolder(staticRule.uri, staticRule.path);
-
-					const cacheControlOption: string | false | undefined = staticRule.option?.cacheControl;
-					const cacheControl: string | undefined = cacheControlOption === undefined
-						? DEFAULT_STATIC_CACHE_CONTROL
-						: (cacheControlOption || undefined);
-
-					cacheSet.forEach((oneCache: StaticCache): void => {
-						oneCache.cacheControl = cacheControl;
-					});
-
-					return cacheSet;
+				this._staticRules.map((staticRule: StaticRule): Promise<StaticCache[]> => {
+					return loadStaticRule(staticRule);
 				})
 			);
 
@@ -967,7 +341,7 @@ export class Badak {
 					this.get(
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-							this._sendStaticFile(req, res, oneCache);
+							sendStaticFile(req, res, oneCache);
 						},
 						{
 							auth: false
@@ -994,7 +368,7 @@ export class Badak {
 						});
 
 						if (targetCache) {
-							this._sendStaticFile(req, res, targetCache);
+							sendStaticFile(req, res, targetCache);
 						}
 						else {
 							res.end();
@@ -1011,6 +385,10 @@ export class Badak {
 		await new Promise<void>((resolve, reject): void => {
 			this._http = createServer(async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
 				let responseBody: unknown;
+
+				const setResponseBody = (body: unknown): void => {
+					responseBody = body;
+				};
 
 				try {
 					// run before middleware functions in parallel
@@ -1038,258 +416,16 @@ export class Badak {
 					}
 
 					const method: string = req.method.toUpperCase();
-					const uri: string = req.url as string;
+					const { path: uriSanitized, queryStr } = splitUrl(req.url as string);
 
-					let uriSanitized: string;
-					let queryStr: string | undefined;
+					const { rule: matchedRule, param: routeParam } = findRoute(this._routeRule, uriSanitized);
+					let param: TypedObject<unknown> | undefined = routeParam;
 
-					if (uri.includes('?')) {
-						const firstQuestionMarkIndex: number = uri.indexOf('?');
-
-						uriSanitized = uri.substring(0, firstQuestionMarkIndex);
-						queryStr = uri.substring(firstQuestionMarkIndex + 1);
-					}
-					else {
-						uriSanitized = uri;
-					}
-
-					let targetFncObj: RouteFunction | RouteFunctionObj | undefined;
-					let param: TypedObject<unknown> | undefined;
-
-					let checkTargetRule: RouteRule | undefined = this._routeRule;
-
-					// normal routing
-					const uriArr: string[] = [
-						'/', // start from root
-						...uriSanitized.split('/')
-					]
-						.filter((frag: string): boolean => {
-							return frag !== '';
-						});
-
-					// find target function
-					// use 'for' instead of 'forEach' to break
-					for (let depthIter: number = 0; depthIter < uriArr.length; depthIter++) {
-						let loopControl: LOOP_CONTROL | undefined;
-
-						const routeRuleKeyArr: string[] = Object.keys(checkTargetRule);
-
-						const uriFrag: string = uriArr[depthIter];
-
-
-						// normal routing
-						if (checkTargetRule[uriFrag] !== undefined) {
-							checkTargetRule = checkTargetRule[uriFrag] as RouteRule;
-
-							loopControl = LOOP_CONTROL.CONTINUE;
-						}
-
-						if (!loopControl) {
-							// colon routing
-							const colonParam: string | undefined = routeRuleKeyArr.find((_uriFrag: string): boolean => {
-								return _uriFrag.startsWith(':');
-							});
-
-							if (colonParam !== undefined) {
-								checkTargetRule = checkTargetRule[colonParam] as RouteRule;
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								// if (param.matcher === undefined) {
-								// 	param.matcher = [];
-								// }
-
-								// param.matcher.push(colonParam);
-								param[colonParam.replace(':', '')] = decodeUriFrag(uriFrag);
-
-								loopControl = LOOP_CONTROL.CONTINUE;
-							}
-						}
-
-						if (!loopControl) {
-							// question routing
-							const questionKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
-								return !!routeRuleKey.match(/.+\?/);
-							});
-
-							const targetQuestionKey: string | undefined = questionKeyArr.find((questionKey: string): boolean => {
-								const questionKeyIndex: number = questionKey.indexOf('?');
-
-								const optionalCharacter: string = questionKey.substring(
-									questionKeyIndex - 1,
-									questionKeyIndex
-								);
-
-								const mandatoryKey: string = questionKey.substring(0, questionKeyIndex - 1);
-								const restKey: string = questionKey.substring(questionKeyIndex + 1);
-
-								return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
-							});
-
-							if (targetQuestionKey !== undefined) {
-								checkTargetRule = checkTargetRule[targetQuestionKey] as RouteRule;
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								// if (param.matcher === undefined) {
-								// 	param.matcher = [];
-								// }
-
-								// param.matcher.push(targetQuestionKey);
-								param[targetQuestionKey] = decodeUriFrag(uriFrag);
-
-								loopControl = LOOP_CONTROL.CONTINUE;
-							}
-						}
-
-						if (!loopControl) {
-							// plus routing
-							const plusKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
-								return routeRuleKey.includes('+');
-							});
-
-							const targetPlusKey: string | undefined = plusKeyArr.find((plusKey: string): boolean => {
-								// anchor to match whole uri fragment
-								return new RegExp(`^(?:${ plusKey })$`).test(uriFrag);
-							});
-
-							if (targetPlusKey !== undefined) {
-								checkTargetRule = checkTargetRule[targetPlusKey] as RouteRule;
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								// if (param.matcher === undefined) {
-								// 	param.matcher = [];
-								// }
-
-								// param.matcher.push(targetPlusKey);
-								param[targetPlusKey] = decodeUriFrag(uriFrag);
-
-								loopControl = LOOP_CONTROL.CONTINUE;
-							}
-						}
-
-						if (!loopControl) {
-							// asterisk routing
-							if (routeRuleKeyArr.includes('*')) {
-								checkTargetRule = checkTargetRule['*'] as RouteRule;
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								param['*'] = decodeUriFrag(uriFrag);
-
-								loopControl = LOOP_CONTROL.CONTINUE;
-							}
-						}
-
-						if (!loopControl) {
-							// partial asterisk routing
-							const targetAsteriskKey: string | undefined = routeRuleKeyArr
-								.filter((routeRuleKey: string): boolean => {
-									// 'ab*cd', 'user1*', not '**'
-									return routeRuleKey !== '**' && /.\*/.test(routeRuleKey);
-								})
-								.find((asteriskKey: string): boolean => {
-									// replace 'b*' to '.*', anchor to match whole uri fragment
-									return new RegExp(
-										`^(?:${ asteriskKey.replace(/.\*/, '.*') })$`
-									).test(uriFrag);
-								});
-
-
-							if (targetAsteriskKey !== undefined) {
-								checkTargetRule = checkTargetRule[targetAsteriskKey] as RouteRule;
-
-								if (param === undefined) {
-									param = {};
-								}
-
-								// if (param.matcher === undefined) {
-								// 	param.matcher = [];
-								// }
-
-								// param.matcher.push(targetAsteriskKey);
-								param[targetAsteriskKey] = decodeUriFrag(uriFrag);
-
-								loopControl = LOOP_CONTROL.CONTINUE;
-							}
-						}
-
-
-						// * / ** asterisk child routing
-						const childRouteRuleKeyArr: string[] = Object.keys(checkTargetRule);
-
-						if (depthIter === uriArr.length - 1 // for urls like '/something/'
-							&& childRouteRuleKeyArr.includes('*')) {
-							checkTargetRule = checkTargetRule['*'] as RouteRule;
-
-							if (param === undefined) {
-								param = {};
-							}
-
-							param['*'] = decodeUriFrag(uriFrag);
-
-							loopControl = LOOP_CONTROL.BREAK;
-						}
-						else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
-							checkTargetRule = checkTargetRule['**'] as RouteRule;
-
-							if (param === undefined) {
-								param = {};
-							}
-
-							param['**'] = decodeUriFrag(uriFrag);
-
-							// ignore after uriFrag
-							loopControl = LOOP_CONTROL.BREAK;
-						}
-
-						// use if/else instead of switch to break for loop
-						if (
-							loopControl === LOOP_CONTROL.BREAK
-							|| uriFrag === '' // last frag with query string param
-						) {
-							break;
-						}
-						else if (loopControl === undefined) {
-							// not found
-							checkTargetRule = undefined;
-							break;
-						}
-						// loopControl === LoopControl.Continue : continue
-					}
-
-					// HEAD is handled by GET route function, Node.js doesn't send the body for HEAD
-					const ruleMethod: string = method === 'HEAD'
-						? METHOD.GET
-						: method;
-
-					if (checkTargetRule && checkTargetRule[ruleMethod]) {
-						targetFncObj = checkTargetRule[ruleMethod] as RouteFunctionObj;
-					}
+					const { targetFncObj, allowedMethods } = findRouteFunction(matchedRule, method);
 
 					if (targetFncObj === undefined) {
-						// path exists, but not for this method : 405 with allowed methods
-						const allowedMethods: string[] = checkTargetRule !== undefined
-							? Object.values(METHOD).filter((one: METHOD): boolean => {
-								return (checkTargetRule as RouteRule)[one] !== undefined;
-							})
-							: [];
-
 						if (allowedMethods.length > 0) {
-							// HEAD is handled by GET
-							if (allowedMethods.includes(METHOD.GET)) {
-								allowedMethods.splice(allowedMethods.indexOf(METHOD.GET) + 1, 0, 'HEAD');
-							}
-
+							// path exists, but not for this method
 							res.setHeader('Allow', allowedMethods.join(', '));
 
 							throw new HttpError(405);
@@ -1336,7 +472,7 @@ export class Badak {
 						// convert by parseNumber & parseDate options, same as request body
 						param = Object.assign(
 							param ?? {},
-							this._paramConverter({ ...querystring.parse(queryStr) })
+							convertParam({ ...querystring.parse(queryStr) }, this._config)
 						);
 					}
 
@@ -1349,7 +485,7 @@ export class Badak {
 							const bodyLimit: number = (targetFncObj as RouteFunctionObj)?.option?.bodyLimit
 								?? this._config.bodyLimit;
 
-							const bodyParam: TypedObject<unknown> | undefined = await this._paramParser(req, bodyLimit);
+							const bodyParam: TypedObject<unknown> | undefined = await parseRequestBody(req, bodyLimit, this._config);
 
 							if (bodyParam !== undefined) {
 								if (
@@ -1374,43 +510,7 @@ export class Badak {
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
 
-					if (isResponseStarted(res)) {
-						// route function started (res.writeHead(), res.write()) or ended (res.end()) response by itself,
-						// ignore returned value and leave ending the response to the route function (e.g. streaming)
-					}
-					else if (responseData instanceof Readable) {
-						await this._sendStream(req, res, responseData);
-					}
-					else if (responseData !== undefined) {
-						// string as text, Buffer as binary, others (object, array, number, boolean, null) as JSON
-						// only undefined (no return value) responds an empty body
-						const serialized: SerializedBody | undefined = serializeBody(responseData);
-
-						if (serialized === undefined) {
-							// e.g. circular reference, BigInt
-							throw new Error('returned value of route function can\'t be serialized', { cause: responseData });
-						}
-
-						if (!res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
-						}
-
-						responseBody = serialized.body;
-
-						// explicit content-length, so that HEAD has the same headers as GET
-						// (Node.js sets it by itself for GET only, because HEAD has no body)
-						if (
-							!res.hasHeader(HEADER_KEY.CONTENT_LENGTH)
-							&& (typeof responseBody === 'string' || responseBody instanceof Uint8Array)
-						) {
-							res.setHeader(HEADER_KEY.CONTENT_LENGTH, Buffer.byteLength(responseBody));
-						}
-
-						res.end(responseBody);
-					}
-					else {
-						res.end();
-					}
+					await sendRouteResult(req, res, responseData, this._config.catchErrorLog, setResponseBody);
 				}
 				catch (e) {
 					const err: Error | TypedObject<unknown> = e as Error | TypedObject<unknown>;
@@ -1424,97 +524,7 @@ export class Badak {
 						console.error('badak catch error : %o', err);
 					}
 
-					interface HttpResStatusCode {
-						code: number;
-						message: string;
-					}
-
-					const statusCodes: HttpResStatusCode[] = [
-						{ code: 400, message: 'Bad Request' },
-						{ code: 401, message: 'Unauthorized' },
-						{ code: 401, message: 'Unauthenticated' },
-						{ code: 403, message: 'Forbidden' },
-						{ code: 404, message: 'Not Found' },
-						{ code: 404, message: 'no rule' },
-						{ code: 405, message: 'Method Not Allowed' },
-						{ code: 406, message: 'Not Acceptable' },
-						{ code: 413, message: 'Payload Too Large' }
-					];
-
-					const foundResult: HttpResStatusCode | undefined = statusCodes.find((def: HttpResStatusCode): boolean => {
-						return def.message == err.message;
-					});
-
-					// writing the error response must not throw again, it would escape the request handler
-					try {
-						if (isResponseStarted(res)) {
-							// headersSent : status code and headers can't be changed anymore
-							// writableEnded : response is completed already
-							// just close the response if it is not completed
-							if (!res.writableEnded) {
-								res.end();
-							}
-						}
-						else if (isHttpError(err)) {
-							res.statusCode = err.status;
-
-							if (err.headers !== undefined) {
-								for (const [key, value] of Object.entries(err.headers)) {
-									if (value !== undefined) {
-										res.setHeader(key, value);
-									}
-								}
-							}
-
-							// status text (e.g. 'Forbidden') if body is not specified or not serializable
-							const serialized: SerializedBody = (
-								err.body !== undefined && err.body !== null
-									? serializeBody(err.body)
-									: undefined
-							) ?? {
-								body: err.message,
-								contentType: CONTENT_TYPE.TEXT_PLAIN
-							};
-
-							if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
-								res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
-							}
-
-							responseBody = serialized.body;
-							res.end(responseBody);
-						}
-						else if (foundResult) {
-							res.statusCode = foundResult.code;
-							res.end();
-						}
-						else {
-							res.statusCode = 500; // Internal Server Error
-
-							// don't expose internal error message to client, it is logged by catchErrorLog
-							// thrown non-Error value (e.g. throw { reason }) is sent as the body if serializable
-							const serialized: SerializedBody = (
-								!(err instanceof Error) && err !== undefined && err !== null
-									? serializeBody(err)
-									: undefined
-							) ?? {
-								body: 'Internal Server Error',
-								contentType: CONTENT_TYPE.TEXT_PLAIN
-							};
-
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
-
-							responseBody = serialized.body;
-							res.end(responseBody);
-						}
-					}
-					catch (responseError: unknown) {
-						if (this._config.catchErrorLog) {
-							console.error('badak failed to write error response :', responseError);
-						}
-
-						// can't respond properly, close the connection
-						res.destroy();
-					}
+					sendErrorResponse(res, err, this._config.catchErrorLog, setResponseBody);
 
 					if (!this._config.preventError) {
 						throw err;

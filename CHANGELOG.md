@@ -1,5 +1,43 @@
 # Changelog
 
+## 3.0.0 (2026-10-21)
+
+This release fixes the routing rules of `**` and `*`.
+`setSPARoot()` serves static files and other routes now, they responded `index.html` before.
+The public API is not changed, but some requests are handled by a different route, see [Breaking changes](#breaking-changes) and [Migration](#migration).
+
+### Breaking changes
+
+- `**` is a fallback. It is used only if the request path doesn't match other routes fully, and the deepest `**` along the matched path is used. `**` took precedence over sibling routes before. ([#53](https://github.com/han41858/badak/pull/53))
+  - with `setSPARoot()`, static files (e.g. `/style.css`) and other routes (e.g. `/api/users`) are handled by their own routes. They responded `index.html` before.
+  - e.g. with `/files/**` and `/files/x`, `GET /files/x` is handled by `/files/x`, and `GET /files/x/y` by `/files/**` with `{ '**': 'x/y' }`.
+  - if the path matches a route fully but the method is not registered, it responds `405` without using `**`.
+  - the result doesn't depend on the registration order.
+- `*` matches exactly one uri fragment. `/img/*` doesn't match `/img` and `/img/` (`{ '*': 'img' }` before). ([#53](https://github.com/han41858/badak/pull/53))
+  - with `/img` and `/img/*`, `GET /img` is handled by `/img`. It was handled by `/img/*` before.
+- The `**` param of `**` routing is the rest of the path, e.g. `{ '**': 'a/b/c' }` for `/files/a/b/c` of `/files/**`. It was the uri fragment before `**` (`'files'`). ([#52](https://github.com/han41858/badak/pull/52))
+  - each uri fragment is decoded and joined with `/`, so a malformed percent-encoding in the rest of the path responds `400`.
+- A routing path with `**` not at the end (e.g. `/files/**/edit`) throws an error when it is registered. It was registered, but never matched. ([#52](https://github.com/han41858/badak/pull/52))
+- The priority of normal, `:`, `?` and `+` routing, and `**` matching 0 or more uri fragments, are not changed.
+
+### Others
+
+- The TypeScript source (`src/`) and declaration maps (`.d.ts.map`) are published with the package. ([#51](https://github.com/han41858/badak/pull/51))
+  - "Go to Definition" in editors (tsserver) opens the TypeScript source instead of `.d.ts`, for both `import` and `require`.
+  - files referred by source maps exist in the package, so debuggers can show the TypeScript source. Stack traces with `node --enable-source-maps` point to existing files.
+  - the package size is about 74kB (it was about 52kB).
+- `badak.ts` is split into `router.ts`, `body-parser.ts`, `response.ts` and `static.ts`, without behavior change. ([#48](https://github.com/han41858/badak/pull/48), [#49](https://github.com/han41858/badak/pull/49), [#50](https://github.com/han41858/badak/pull/50))
+
+### Migration
+
+| If you ... | then |
+|---|---|
+| handle `/img` (or `/img/`) with `/img/*` | register `/img` separately, e.g. `app.get('/img', fnc)` |
+| expect `**` to take precedence over other routes on the same level | remove the other routes, or move them to another path |
+| read `param['**']` | it is the rest of the path now, e.g. `'a/b/c'` for `/files/a/b/c` of `/files/**` |
+| register a path with `**` in the middle (e.g. `/files/**/edit`) | remove it, it never matched; use `/files/**` and check `param['**']` in the routing function |
+| use `setSPARoot()` and expect `index.html` for a path of a static file or another route | nothing to do in most cases, the static file or the route responds now |
+
 ## 2.1.0 (2026-10-21)
 
 This release adds cache headers for static files and a request body size limit for each route,
@@ -32,7 +70,7 @@ and runs `auth()` before receiving the request body.
 
 This release fixes many bugs found in request handling, routing and packaging,
 and adds `HttpError`, `PATCH`, `HEAD`, stream responses and a request body size limit.
-Several fixes change existing behavior, see [Breaking changes](#breaking-changes) and [Migration](#migration) first.
+Several fixes change existing behavior, see [Breaking changes](#breaking-changes-1) and [Migration](#migration-1) first.
 
 ### Breaking changes
 

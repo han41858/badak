@@ -1,5 +1,3 @@
-// convert if number string
-// if not number string, return itself
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { Stats } from 'node:fs';
@@ -7,59 +5,13 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 
 import * as node_path from 'node:path';
 
-import { StaticCache } from './interfaces.js';
 import { CONTENT_TYPE } from './constants.js';
 import { HttpError } from './http-error.js';
 
-
-// only plain decimal format is converted : '5', '-1.5', '0.25'
-// kept as string : leading zero ('007'), '+5', '.5', '5.', exponent ('1e3'), hex ('0x10'), spaces (' 5'), '', 'Infinity',
-// and integers out of safe range ('12345678901234567890') to keep IDs as they are
-const decimalNumberRegExp: RegExp = /^-?(0|[1-9]\d*)(\.\d+)?$/;
-
-export const convertNumberStr = (param: string): string | number => {
-	if (!decimalNumberRegExp.test(param)) {
-		return param;
-	}
-
-	const converted: number = Number(param);
-
-	if (Number.isInteger(converted) && !Number.isSafeInteger(converted)) {
-		return param;
-	}
-
-	return converted;
-};
-
-// convert if date string
-// if not date string, return itself
-export const convertDateStr = (param: string): string | Date => {
-	let result: string | Date = param;
-
-	// only work for ISO 8601 date format
-	const dateExps: RegExp[] = [
-		/^(\d){4}-(\d){2}-(\d){2}$/, // date : '2018-06-20'
-		/^(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}\+(\d){2}:(\d){2}$/, // combined date and time in UTC : '2018-06-20T21:22:09+00:00'
-		/^(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}(.(\d){3})?Z$/, // combined date and time in UTC : '2018-06-20T21:22:09Z', '2018-06-20T22:00:30.296Z'
-		/^(\d){8}T(\d){6}Z$/, // combined date and time in UTC : '20180620T212209Z'
-		/^(\d){4}-W(\d){2}$/, // week : '2018-W25'
-		/^(\d){4}-W(\d){2}-(\d)$/, // date with week number : '2018-W25-3'
-		/^--(\d){2}-(\d){2}$/, // date without year : '--06-20'
-		/^(\d){4}-(\d){3}$/ // ordinal dates : '2018-171'
-	];
+// moved to body-parser.ts, re-exported for existing imports
+export { convertDateStr, convertNumberStr } from './body-parser.js';
 
 
-	if (dateExps.some((dateExp: RegExp): boolean => {
-		return dateExp.test(param);
-	})) {
-		result = new Date(param);
-	}
-
-	return result;
-};
-
-// response is started (headersSent) or completed (writableEnded) already,
-// status code & headers can't be changed
 // bytes, positive integer or Infinity (no limit)
 // NaN or decimal is rejected, NaN disables every size comparison
 export const isValidBodyLimit = (value: unknown): value is number => {
@@ -68,6 +20,8 @@ export const isValidBodyLimit = (value: unknown): value is number => {
 		&& (Number.isInteger(value) || value === Infinity);
 };
 
+// response is started (headersSent) or completed (writableEnded) already,
+// status code & headers can't be changed
 export const isResponseStarted = (res: ServerResponse): boolean => {
 	return res.headersSent || res.writableEnded;
 };
@@ -126,57 +80,6 @@ export const isFolder = async (path: string): Promise<boolean> => {
 			}
 		});
 	});
-};
-
-
-export const loadFolder = async (uri: string, path: string): Promise<StaticCache[]> => {
-	const foldersAndFiles: string[] = await new Promise<string[]>((resolve, reject) => {
-		fs.readdir(path, (err: Error | null, _foldersAndFiles: string[]) => {
-			if (!err) {
-				resolve(_foldersAndFiles);
-			}
-			else {
-				reject(new Error(`loadFolder() failed : ${ path }`));
-			}
-		});
-	});
-
-	const cache: StaticCache[] = [];
-
-	const allFileData: StaticCache[][] = await Promise.all(foldersAndFiles.map(async (folderOrFileName: string): Promise<StaticCache[]> => {
-		const uriSanitized: string = node_path
-			.join(uri, folderOrFileName)
-			.replace(/\\/g, '/'); // path \\ changed to /
-
-		const fullPath: string = node_path.join(path, folderOrFileName);
-
-		let cacheSet: StaticCache[];
-
-		if (await isFolder(fullPath)) {
-			// call recursively
-			cacheSet = await loadFolder(uriSanitized, fullPath);
-		}
-		else {
-			const { fileData, fileStat } = await loadFile(fullPath);
-			const mimeType: CONTENT_TYPE = getContentType(fileData, folderOrFileName);
-
-			cacheSet = [{
-				uri: uriSanitized,
-				mime: mimeType,
-				fileData: fileData,
-				etag: createEtag(fileData),
-				lastModified: fileStat.mtime.toUTCString()
-			}];
-		}
-
-		return cacheSet;
-	}));
-
-	allFileData.forEach((oneFileData) => {
-		cache.push(...oneFileData);
-	});
-
-	return cache;
 };
 
 // strong ETag from file content : "<size in hex>-<sha1 in base64url>"
@@ -300,28 +203,6 @@ export const isNotModified = (req: IncomingMessage, etag: string, lastModified: 
 	}
 
 	return false;
-};
-
-// read the content and the metadata through the same file handle,
-// so that they are from the same file even if the path is replaced (e.g. by rename) in the meantime
-// it doesn't guarantee atomicity for the file modified while reading
-const loadFile = async (path: string): Promise<{ fileData: Buffer, fileStat: Stats }> => {
-	let fileHandle: fs.promises.FileHandle | undefined;
-
-	try {
-		fileHandle = await fs.promises.open(path, 'r');
-
-		const fileStat: Stats = await fileHandle.stat();
-		const fileData: Buffer = await fileHandle.readFile();
-
-		return { fileData, fileStat };
-	}
-	catch (err: unknown) {
-		throw new Error(`loadFile() failed : ${ path }`, { cause: err });
-	}
-	finally {
-		await fileHandle?.close();
-	}
 };
 
 
@@ -518,148 +399,3 @@ export function sift<T> (arr: T[]): T[] {
 		return acc;
 	}, []);
 }
-
-
-export interface MultipartPart {
-	name: string;
-	filename?: string;
-	contentType?: string;
-	data: Buffer;
-}
-
-// get boundary parameter from content-type header, quoted or not
-// e.g. 'multipart/form-data; boundary=abc', 'multipart/form-data; charset=utf-8; boundary="abc"'
-export const getMultipartBoundary = (contentTypeHeader: string): string | undefined => {
-	const matching: RegExpMatchArray | null = contentTypeHeader.match(/;\s*boundary\s*=\s*(?:"([^"]+)"|([^;\s]+))/i);
-
-	return matching !== null
-		? matching[1] ?? matching[2]
-		: undefined;
-};
-
-// get parameter from header value, e.g. name from 'form-data; name="a"; filename="b.txt"'
-const getHeaderParam = (headerValue: string, paramName: string): string | undefined => {
-	const matching: RegExpMatchArray | null = headerValue.match(
-		new RegExp(`(?:^|;)\\s*${ paramName }\\s*=\\s*(?:"([^"]*)"|([^;\\s]+))`, 'i')
-	);
-
-	return matching !== null
-		? matching[1] ?? matching[2]
-		: undefined;
-};
-
-interface MultipartDelimiter {
-	index: number; // index of '--boundary'
-	isClose: boolean; // '--boundary--'
-	nextIndex: number; // part body starts here (after CRLF), only for not close delimiter
-}
-
-// find delimiter line (RFC 2046) from fromIndex
-// delimiter should be at the beginning of a line,
-// and followed by '--' (close delimiter) or optional whitespaces (transport padding) & CRLF
-// returns undefined if not found
-const findMultipartDelimiter = (body: Buffer, boundary: string, fromIndex: number): MultipartDelimiter | undefined => {
-	const dashBoundary: Buffer = Buffer.from('--' + boundary);
-
-	let index: number = body.indexOf(dashBoundary, fromIndex);
-
-	while (index >= 0) {
-		const isLineStart: boolean = index === 0
-			|| (index >= 2 && body[index - 2] === 0x0D && body[index - 1] === 0x0A); // CR LF
-
-		if (isLineStart) {
-			let cursor: number = index + dashBoundary.byteLength;
-
-			if (body[cursor] === 0x2D && body[cursor + 1] === 0x2D) { // '--'
-				return {
-					index,
-					isClose: true,
-					nextIndex: -1
-				};
-			}
-
-			// skip transport padding
-			while (body[cursor] === 0x20 || body[cursor] === 0x09) { // SP, HTAB
-				cursor++;
-			}
-
-			if (body[cursor] === 0x0D && body[cursor + 1] === 0x0A) {
-				return {
-					index,
-					isClose: false,
-					nextIndex: cursor + 2
-				};
-			}
-		}
-
-		// not a delimiter, just same bytes in content
-		index = body.indexOf(dashBoundary, index + 1);
-	}
-
-	return undefined;
-};
-
-// parse multipart/form-data body (RFC 7578), works on Buffer to keep binary data
-// preamble before the first delimiter and epilogue after the close delimiter are ignored (RFC 2046)
-// throws 'Bad Request' on malformed body
-export const parseMultipart = (body: Buffer, boundary: string): MultipartPart[] => {
-	const CRLF: string = '\r\n';
-
-	const parts: MultipartPart[] = [];
-
-	let delimiter: MultipartDelimiter | undefined = findMultipartDelimiter(body, boundary, 0);
-
-	if (delimiter === undefined) {
-		throw new HttpError(400);
-	}
-
-	while (!delimiter.isClose) {
-		const partStartIndex: number = delimiter.nextIndex;
-		const nextDelimiter: MultipartDelimiter | undefined = findMultipartDelimiter(body, boundary, partStartIndex);
-
-		if (nextDelimiter === undefined) {
-			// no close delimiter
-			throw new HttpError(400);
-		}
-
-		// CRLF before delimiter belongs to delimiter
-		const part: Buffer = body.subarray(partStartIndex, Math.max(partStartIndex, nextDelimiter.index - CRLF.length));
-		const headerEndIndex: number = part.indexOf(CRLF + CRLF);
-
-		if (headerEndIndex < 0) {
-			throw new HttpError(400);
-		}
-
-		const headers: Record<string, string> = {};
-
-		part.subarray(0, headerEndIndex)
-			.toString()
-			.split(CRLF)
-			.forEach((line: string): void => {
-				const colonIndex: number = line.indexOf(':');
-
-				if (colonIndex > 0) {
-					headers[line.slice(0, colonIndex).trim().toLowerCase()] = line.slice(colonIndex + 1).trim();
-				}
-			});
-
-		const disposition: string | undefined = headers['content-disposition'];
-		const name: string | undefined = disposition !== undefined
-			? getHeaderParam(disposition, 'name')
-			: undefined;
-
-		// part without name can't be a parameter, skip it
-		if (name !== undefined) {
-			parts.push({
-				name,
-				filename: getHeaderParam(disposition as string, 'filename'),
-				contentType: headers['content-type'],
-				data: part.subarray(headerEndIndex + (CRLF + CRLF).length)
-			});
-		}
-
-		delimiter = nextDelimiter;
-	}
-
-	return parts;
-};
