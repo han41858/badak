@@ -74,9 +74,12 @@ const appWithLog: Badak = new Badak({
 ### `auth(fnc: MiddlewareFunction): Promise<void>`
 
 Set a middleware function for authentication. Only one authentication function can be specified.
-The registered function is executed after `before()` and before the routing function is executed.
+The registered function is executed after `before()`, and before the request body is received and the routing function is executed.
+So an unauthenticated request is rejected without receiving its body, even for a route with a large `bodyLimit`.
 If an error occurs in this middleware function, a `401 Unauthorized` error occurs.
 If the error is an `HttpError`, its status code is used instead (e.g. `throw new HttpError(403)`).
+
+Don't read the request body (`req`) in this function or in `before()`, badak responds `500 Internal Server Error` if the body is read already.
 
 ### `before(fnc: MiddlewareFunction): Promise<void>`
 
@@ -155,7 +158,7 @@ Registers a routing function that responds to `DELETE` method requests.
 Registers a routing function that responds to `PATCH` method requests.
 The request body is parsed in the same way as `POST` and `PUT`.
 
-### `static(uri: string, path: string): Promise<void>`
+### `static(uri: string, path: string, option?: StaticOption): Promise<void>`
 
 Concatenate the address and file path to be provided as a static file.
 
@@ -164,10 +167,32 @@ For an unknown extension or a file without extension, it is determined by the fi
 and `application/octet-stream` is used if it is not known either.
 Text files (`text/*`) and JavaScript files are served with `charset=utf-8`, so save them in UTF-8.
 
-### `setSPARoot(uri: string, path: string): Promise<void>`
+Files are loaded into memory when `listen()` is called, so restart the server to serve changed files.
+
+Static files are served with `ETag` (from the file content) and `Last-Modified` (from the file modification time),
+and respond `304 Not Modified` without the body if `If-None-Match` or `If-Modified-Since` of the request matches.
+`If-Modified-Since` is ignored if `If-None-Match` exists, and `If-None-Match` with invalid syntax doesn't match.
+
+`Cache-Control` is `no-cache` by default: browsers cache the file, but check whether it is changed every time.
+Set `cacheControl` to change it.
+
+```typescript
+// files with hashed names, e.g. main.3f2a1b.js
+await app.static('/assets', '/var/www/assets', { cacheControl: 'public, max-age=31536000, immutable' });
+
+// no Cache-Control header, ETag and Last-Modified are still sent
+await app.static('/public', '/var/www/public', { cacheControl: false });
+```
+
+| option | type | default | description |
+|---|---|---|---|
+| `cacheControl` | `string \| false` | `'no-cache'` | `Cache-Control` header value, `false` to omit the header |
+
+### `setSPARoot(uri: string, path: string, option?: StaticOption): Promise<void>`
 
 Connect the address and file path to be used with the SPA app.
-Files within the specified folder are served statically and cached.
+Files within the specified folder are served statically and cached, in the same way as `static()`.
+`option` is the same as `static()`.
 
 ## Error Response
 
@@ -321,6 +346,7 @@ If the request body is larger than this value, a `413 Payload Too Large` error o
 For `multipart/form-data`, the whole request body is counted, including part headers and boundaries,
 so increase this value if you accept file uploads.
 Specify `Infinity` to remove the limit.
+To allow a larger body for specific routes only (e.g. file uploads), use `bodyLimit` of `RouteOption`.
 
 The default is `102400` (100KB).
 
@@ -333,6 +359,30 @@ Determines the behavior of routing functions.
 If specified as `false`, the `auth()` function will not be executed when this routing function is executed.
 
 The default is `true`.
+
+#### `bodyLimit: number`
+
+The maximum size of the request body in bytes for this routing function, used instead of `bodyLimit` of the app option.
+The value is the same as `bodyLimit` of the app option: a positive integer, or `Infinity` to remove the limit.
+It applies to `POST`, `PUT` and `PATCH`, whose request body is parsed.
+
+```typescript
+const app: Badak = new Badak({ bodyLimit: 100 * 1024 }); // 100KB for other routes
+
+await app.post('/upload', uploadFnc, { bodyLimit: 10 * 1024 * 1024 }); // 10MB
+
+await app.route({
+	'/avatar': {
+		PUT: {
+			fnc: avatarFnc,
+			option: { bodyLimit: 1024 * 1024 }
+		}
+	}
+});
+```
+
+The `auth()` function is executed before the request body is received,
+so an unauthenticated request is rejected without receiving the body up to this limit.
 
 ## Special Routing
 

@@ -12,10 +12,18 @@ import {
 	RouteRule,
 	RouteRuleSeed,
 	StaticCache,
+	StaticOption,
 	StaticRule,
 	TypedObject
 } from './interfaces.js';
-import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, MAX_TIMER_DELAY, METHOD } from './constants.js';
+import {
+	CONTENT_TYPE,
+	DEFAULT_BODY_LIMIT,
+	DEFAULT_STATIC_CACHE_CONTROL,
+	HEADER_KEY,
+	MAX_TIMER_DELAY,
+	METHOD
+} from './constants.js';
 import { HttpError, isHttpError } from './http-error.js';
 import {
 	checkAbsolutePath,
@@ -26,7 +34,9 @@ import {
 	getMultipartBoundary,
 	isExistFile,
 	isFolder,
+	isNotModified,
 	isResponseStarted,
+	isValidBodyLimit,
 	loadFolder,
 	MultipartPart,
 	parseMultipart,
@@ -35,6 +45,51 @@ import {
 	sift,
 	toContentTypeHeader
 } from './util.js';
+
+const checkStaticOption = (option: unknown): void => {
+	if (option === undefined) {
+		return;
+	}
+
+	if (typeof option !== 'object' || option === null || Array.isArray(option)) {
+		throw new Error('static option should be an object');
+	}
+
+	const unknownKeys: string[] = Object.keys(option).filter((key: string): boolean => key !== 'cacheControl');
+
+	if (unknownKeys.length > 0) {
+		throw new Error(`unknown static option : ${ unknownKeys.join(', ') }`);
+	}
+
+	const { cacheControl } = option as StaticOption;
+
+	if (
+		cacheControl !== undefined
+		&& cacheControl !== false
+		&& (typeof cacheControl !== 'string' || cacheControl.trim() === '' || /[\r\n]/.test(cacheControl))
+	) {
+		throw new Error(`invalid cacheControl : ${ String(cacheControl) }`);
+	}
+};
+
+// only bodyLimit is validated, other keys are not checked to keep the behavior of 2.0
+const checkRouteFunctionObj = (value: unknown): void => {
+	if (typeof value !== 'object' || value === null) {
+		// route function, checked by itself
+		return;
+	}
+
+	const option: unknown = (value as RouteFunctionObj).option;
+
+	if (
+		typeof option === 'object'
+		&& option !== null
+		&& (option as RouteOption).bodyLimit !== undefined
+		&& !isValidBodyLimit((option as RouteOption).bodyLimit)
+	) {
+		throw new Error(`invalid bodyLimit : ${ String((option as RouteOption).bodyLimit) }`);
+	}
+};
 
 /**
  * rule format, reserved keyword is 4-methods in upper cases
@@ -156,6 +211,8 @@ export class Badak {
 
 				if (Object.values(METHOD).includes(uriFrag as METHOD)) {
 					const method: METHOD = uriFrag as METHOD; // re-assign for readability
+
+					checkRouteFunctionObj(rule[method]);
 
 					targetObj[method] = rule[method] as RouteRuleSeed;
 				}
@@ -368,13 +425,7 @@ export class Badak {
 				break;
 
 			case 'bodyLimit':
-				// bytes, positive integer or Infinity (no limit)
-				// NaN or decimal is rejected, NaN disables every size comparison
-				if (
-					typeof value !== 'number'
-					|| value <= 0
-					|| (!Number.isInteger(value) && value !== Infinity)
-				) {
+				if (!isValidBodyLimit(value)) {
 					throw new Error('invalid value');
 				}
 
@@ -666,9 +717,13 @@ export class Badak {
 
 	// for POST, PUT
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
-	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | undefined> {
+	private async _paramParser (req: IncomingMessage, bodyLimit: number): Promise<TypedObject<unknown> | undefined> {
 		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
-			const bodyLimit: number = this._config.bodyLimit;
+			// the body is read by a middleware function already, 'end' event is not emitted again
+			if (req.readableEnded) {
+				reject(new Error('request body is read before badak parses it, don\'t read it in before() or auth()'));
+				return;
+			}
 
 			// reject before receiving body if declared size is over the limit
 			const contentLength: number = Number(req.headers['content-length']);
@@ -724,17 +779,19 @@ export class Badak {
 		});
 	}
 
-	private async _static (uri: string, path: string): Promise<void> {
+	private async _static (uri: string, path: string, option?: StaticOption): Promise<void> {
+		checkStaticOption(option);
+
 		// not assign to route rule
 		if (!this._staticRules) {
-			this._staticRules = [{ uri, path }];
+			this._staticRules = [{ uri, path, option }];
 		}
 		else {
-			this._staticRules.push({ uri, path });
+			this._staticRules.push({ uri, path, option });
 		}
 	}
 
-	async static (uri: string, path: string): Promise<void> {
+	async static (uri: string, path: string, option?: StaticOption): Promise<void> {
 		await checkAbsoluteUri(uri);
 
 		await checkAbsolutePath(path);
@@ -743,7 +800,7 @@ export class Badak {
 			throw new Error(`target should be a folder : ${ path }`);
 		}
 
-		await this._static(uri, path);
+		await this._static(uri, path, option);
 	}
 
 	async route (rule: RouteRule): Promise<void> {
@@ -751,7 +808,7 @@ export class Badak {
 	}
 
 	// add folder to static & add route rule for Single Page Application
-	async setSPARoot (uri: string, path: string): Promise<void> {
+	async setSPARoot (uri: string, path: string, option?: StaticOption): Promise<void> {
 		await checkAbsoluteUri(uri);
 
 		await checkAbsolutePath(path);
@@ -767,9 +824,31 @@ export class Badak {
 			throw new Error(`index.html not exists in : ${ path }`);
 		}
 
-		await this._static(uri, path);
+		await this._static(uri, path, option);
 
 		this._spaRoot = uri;
+	}
+
+	// send cached static file, 304 Not Modified if the client has the same file
+	private _sendStaticFile (req: IncomingMessage, res: ServerResponse, cache: StaticCache): void {
+		// validators and Cache-Control are sent with 304 too (RFC 9110 15.4.5)
+		res.setHeader(HEADER_KEY.ETAG, cache.etag);
+		res.setHeader(HEADER_KEY.LAST_MODIFIED, cache.lastModified);
+
+		if (cache.cacheControl !== undefined) {
+			res.setHeader(HEADER_KEY.CACHE_CONTROL, cache.cacheControl);
+		}
+
+		if (isNotModified(req, cache.etag, cache.lastModified)) {
+			res.statusCode = 304;
+			res.end();
+			return;
+		}
+
+		res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(cache.mime));
+		// explicit content-length for HEAD, same as GET
+		res.setHeader(HEADER_KEY.CONTENT_LENGTH, cache.fileData.byteLength);
+		res.end(cache.fileData);
 	}
 
 	// send Readable stream returned by route function
@@ -866,7 +945,18 @@ export class Badak {
 		) {
 			const allCache: StaticCache[][] = await Promise.all<StaticCache[]>(
 				this._staticRules.map(async (staticRule: StaticRule): Promise<StaticCache[]> => {
-					return loadFolder(staticRule.uri, staticRule.path);
+					const cacheSet: StaticCache[] = await loadFolder(staticRule.uri, staticRule.path);
+
+					const cacheControlOption: string | false | undefined = staticRule.option?.cacheControl;
+					const cacheControl: string | undefined = cacheControlOption === undefined
+						? DEFAULT_STATIC_CACHE_CONTROL
+						: (cacheControlOption || undefined);
+
+					cacheSet.forEach((oneCache: StaticCache): void => {
+						oneCache.cacheControl = cacheControl;
+					});
+
+					return cacheSet;
 				})
 			);
 
@@ -877,10 +967,7 @@ export class Badak {
 					this.get(
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(oneCache.mime));
-							// explicit content-length for HEAD, same as GET
-							res.setHeader(HEADER_KEY.CONTENT_LENGTH, oneCache.fileData.byteLength);
-							res.end(oneCache.fileData);
+							this._sendStaticFile(req, res, oneCache);
 						},
 						{
 							auth: false
@@ -907,18 +994,7 @@ export class Badak {
 						});
 
 						if (targetCache) {
-							const resFileObj: {
-								mime: string;
-								fileData: Uint8Array;
-							} = {
-								mime: targetCache.mime,
-								fileData: targetCache.fileData
-							};
-
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(resFileObj.mime));
-							// explicit content-length for HEAD, same as GET
-							res.setHeader(HEADER_KEY.CONTENT_LENGTH, resFileObj.fileData.byteLength);
-							res.end(resFileObj.fileData);
+							this._sendStaticFile(req, res, targetCache);
 						}
 						else {
 							res.end();
@@ -1222,51 +1298,13 @@ export class Badak {
 						throw new HttpError(404);
 					}
 
-					// params are merged in this order, the latter wins for the same key :
-					// route param (e.g. colon routing) -> query string -> request body
-
-					// query string, for every method
-					if (
-						queryStr !== undefined
-						&& queryStr !== ''
-					) {
-						// convert by parseNumber & parseDate options, same as request body
-						param = Object.assign(
-							param ?? {},
-							this._paramConverter({ ...querystring.parse(queryStr) })
-						);
-					}
-
-					// request body
-					switch (method) {
-						case METHOD.PUT:
-						case METHOD.POST:
-						case METHOD.PATCH: {
-							const bodyParam: TypedObject<unknown> | undefined = await this._paramParser(req);
-
-							if (bodyParam !== undefined) {
-								if (
-									param !== undefined
-									&& typeof bodyParam === 'object'
-									&& bodyParam !== null
-									&& !Array.isArray(bodyParam)
-								) {
-									param = Object.assign(param, bodyParam);
-								}
-								else {
-									// array or primitive JSON body can't be merged, passed as it is
-									param = bodyParam;
-								}
-							}
-							break;
-						}
-					}
-
 					if (
 						this._authFnc
 						&& typeof this._authFnc === 'function'
 						&& (targetFncObj as RouteFunctionObj)?.option?.auth !== false
 					) {
+						// before receiving the request body, so that unauthenticated requests are not received up to bodyLimit
+						// the unread body is discarded by Node.js after the response
 						// can be normal or async function
 						try {
 							await this._authFnc(req, res);
@@ -1287,6 +1325,49 @@ export class Badak {
 						}
 					}
 
+					// params are merged in this order, the latter wins for the same key :
+					// route param (e.g. colon routing) -> query string -> request body
+
+					// query string, for every method
+					if (
+						queryStr !== undefined
+						&& queryStr !== ''
+					) {
+						// convert by parseNumber & parseDate options, same as request body
+						param = Object.assign(
+							param ?? {},
+							this._paramConverter({ ...querystring.parse(queryStr) })
+						);
+					}
+
+					// request body
+					switch (method) {
+						case METHOD.PUT:
+						case METHOD.POST:
+						case METHOD.PATCH: {
+							// bodyLimit of the route option overrides the app option
+							const bodyLimit: number = (targetFncObj as RouteFunctionObj)?.option?.bodyLimit
+								?? this._config.bodyLimit;
+
+							const bodyParam: TypedObject<unknown> | undefined = await this._paramParser(req, bodyLimit);
+
+							if (bodyParam !== undefined) {
+								if (
+									param !== undefined
+									&& typeof bodyParam === 'object'
+									&& bodyParam !== null
+									&& !Array.isArray(bodyParam)
+								) {
+									param = Object.assign(param, bodyParam);
+								}
+								else {
+									// array or primitive JSON body can't be merged, passed as it is
+									param = bodyParam;
+								}
+							}
+							break;
+						}
+					}
 
 					const responseData: unknown = typeof targetFncObj === 'function'
 						? await targetFncObj(param, req, res)

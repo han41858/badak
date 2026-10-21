@@ -1,8 +1,9 @@
 // convert if number string
 // if not number string, return itself
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { Stats } from 'node:fs';
-import { ServerResponse } from 'node:http';
+import { IncomingMessage, ServerResponse } from 'node:http';
 
 import * as node_path from 'node:path';
 
@@ -59,6 +60,14 @@ export const convertDateStr = (param: string): string | Date => {
 
 // response is started (headersSent) or completed (writableEnded) already,
 // status code & headers can't be changed
+// bytes, positive integer or Infinity (no limit)
+// NaN or decimal is rejected, NaN disables every size comparison
+export const isValidBodyLimit = (value: unknown): value is number => {
+	return typeof value === 'number'
+		&& value > 0
+		&& (Number.isInteger(value) || value === Infinity);
+};
+
 export const isResponseStarted = (res: ServerResponse): boolean => {
 	return res.headersSent || res.writableEnded;
 };
@@ -148,13 +157,15 @@ export const loadFolder = async (uri: string, path: string): Promise<StaticCache
 			cacheSet = await loadFolder(uriSanitized, fullPath);
 		}
 		else {
-			const fileData: Buffer<ArrayBufferLike> = await loadFile(fullPath);
+			const { fileData, fileStat } = await loadFile(fullPath);
 			const mimeType: CONTENT_TYPE = getContentType(fileData, folderOrFileName);
 
 			cacheSet = [{
 				uri: uriSanitized,
 				mime: mimeType,
-				fileData: fileData
+				fileData: fileData,
+				etag: createEtag(fileData),
+				lastModified: fileStat.mtime.toUTCString()
 			}];
 		}
 
@@ -168,17 +179,149 @@ export const loadFolder = async (uri: string, path: string): Promise<StaticCache
 	return cache;
 };
 
-const loadFile = async (path: string): Promise<Buffer> => {
-	return new Promise<Buffer>((resolve, reject) => {
-		fs.readFile(path, (err: Error | null, data: Buffer) => {
-			if (!err) {
-				resolve(data);
-			}
-			else {
-				reject(new Error(`loadFile() failed : ${ path }`));
-			}
-		});
+// strong ETag from file content : "<size in hex>-<sha1 in base64url>"
+export const createEtag = (data: Buffer): string => {
+	const hash: string = createHash('sha1')
+		.update(data)
+		.digest('base64url');
+
+	return `"${ data.byteLength.toString(16) }-${ hash }"`;
+};
+
+// remove weak indicator for weak comparison
+const toOpaqueTag = (etag: string): string => {
+	return etag.startsWith('W/')
+		? etag.slice(2)
+		: etag;
+};
+
+// etagc = %x21 / %x23-7E / obs-text, header values are decoded as latin1 by Node.js
+const opaqueTagCharsRegExp: RegExp = /^[\x21\x23-\x7E\x80-\xFF]*$/;
+
+const isOws = (char: string): boolean => {
+	return char === ' ' || char === '\t';
+};
+
+/**
+ * parse entity-tag list of If-None-Match, returns undefined if the syntax is invalid
+ *
+ * RFC 9110 8.8.3 : entity-tag = [ "W/" ] DQUOTE *etagc DQUOTE
+ * RFC 9110 5.6.1 : list elements are separated by comma with optional whitespace, empty elements are ignored
+ * etagc includes comma, so the list can't be split by comma
+ */
+export const parseEtagList = (value: string): string[] | undefined => {
+	const etags: string[] = [];
+
+	let index: number = 0;
+	let expectingElement: boolean = true;
+
+	while (index < value.length) {
+		const char: string = value[index];
+
+		if (isOws(char)) {
+			index++;
+			continue;
+		}
+
+		if (char === ',') {
+			expectingElement = true;
+			index++;
+			continue;
+		}
+
+		if (!expectingElement) {
+			// no comma between elements, e.g. '"a" "b"', '"a"b'
+			return undefined;
+		}
+
+		const start: number = index;
+
+		// weak indicator is case-sensitive
+		if (value.startsWith('W/', index)) {
+			index += 2;
+		}
+
+		if (value[index] !== '"') {
+			// e.g. 'invalid"abc"', 'abc', '*' in a list
+			return undefined;
+		}
+
+		const end: number = value.indexOf('"', index + 1);
+
+		if (end === -1 || !opaqueTagCharsRegExp.test(value.slice(index + 1, end))) {
+			return undefined;
+		}
+
+		etags.push(value.slice(start, end + 1));
+
+		index = end + 1;
+		expectingElement = false;
+	}
+
+	return etags;
+};
+
+// RFC 9110 13.1.2 If-None-Match : weak comparison, '*' matches any
+// invalid syntax doesn't match, responds the file
+const matchEtag = (ifNoneMatch: string, etag: string): boolean => {
+	if (ifNoneMatch.trim() === '*') {
+		return true;
+	}
+
+	const etagsInHeader: string[] | undefined = parseEtagList(ifNoneMatch);
+
+	if (etagsInHeader === undefined) {
+		return false;
+	}
+
+	const target: string = toOpaqueTag(etag);
+
+	return etagsInHeader.some((etagInHeader: string): boolean => {
+		return toOpaqueTag(etagInHeader) === target;
 	});
+};
+
+// RFC 9110 13.2.2 : If-None-Match takes precedence, If-Modified-Since is ignored if If-None-Match exists
+export const isNotModified = (req: IncomingMessage, etag: string, lastModified: string): boolean => {
+	const ifNoneMatch: string | undefined = req.headers['if-none-match'];
+
+	if (ifNoneMatch !== undefined) {
+		return matchEtag(ifNoneMatch, etag);
+	}
+
+	const ifModifiedSince: string | undefined = req.headers['if-modified-since'];
+
+	if (ifModifiedSince !== undefined) {
+		const since: number = Date.parse(ifModifiedSince);
+
+		// invalid date is ignored
+		return !Number.isNaN(since)
+			&& Date.parse(lastModified) <= since;
+	}
+
+	return false;
+};
+
+// read the content and the metadata through the same file handle,
+// so that they are from the same file even if the path is replaced (e.g. by rename) in the meantime
+// it doesn't guarantee atomicity for the file modified while reading
+const loadFile = async (path: string): Promise<{ fileData: Buffer, fileStat: Stats }> => {
+	let fileHandle: fs.promises.FileHandle | undefined;
+
+	try {
+		fileHandle = await fs.promises.open(path, 'r');
+
+		const fileStat: Stats = await fileHandle.stat();
+		const fileData: Buffer = await fileHandle.readFile();
+
+		return { fileData, fileStat };
+	}
+	catch (err: unknown) {
+		throw new Error(`loadFile() failed : ${ path }`, { cause: err });
+	}
+	finally {
+		await fileHandle?.close();
+	}
 };
 
 
