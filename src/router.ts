@@ -1,5 +1,6 @@
 import { RouteFunction, RouteFunctionObj, RouteOption, RouteRule, RouteRuleSeed, TypedObject } from './interfaces.js';
 import { METHOD } from './constants.js';
+import { HttpError } from './http-error.js';
 import { isValidBodyLimit, sift } from './util.js';
 import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from './question-pattern.js';
 import {
@@ -344,6 +345,34 @@ export interface RouteMatch {
 }
 
 // split request url into path and query string (without '?')
+// request target (RFC 9112 3.2) to origin-form ('/path?query')
+// - origin-form : as it is
+// - absolute-form (e.g. 'http://host/path?query', sent to proxies) : path and query, the authority is ignored
+//   the path is not normalized (e.g. dot segments), same as origin-form
+// - asterisk-form ('*', OPTIONS for the server) : no resource, 404
+// - authority-form ('host:port', CONNECT) and others : 400
+export const toOriginForm = (target: string): string => {
+	if (target.startsWith('/')) {
+		return target;
+	}
+
+	if (target === '*') {
+		throw new HttpError(404);
+	}
+
+	const absolute: RegExpMatchArray | null = target.match(/^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]*(.*)$/);
+
+	if (absolute !== null) {
+		const rest: string = absolute[1];
+
+		return rest.startsWith('/')
+			? rest
+			: '/' + rest; // 'http://host' -> '/', 'http://host?a=1' -> '/?a=1'
+	}
+
+	throw new HttpError(400);
+};
+
 export const splitUrl = (url: string): { path: string, queryStr: string | undefined } => {
 	if (url.includes('?')) {
 		const firstQuestionMarkIndex: number = url.indexOf('?');

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `Content-Type` of the request body is compared case-insensitively, e.g. `Application/JSON` is parsed as JSON. The request body was not parsed before, and `ctx.body` was `undefined`. ([#64](https://github.com/han41858/badak/pull/64))
+- absolute-form request targets (e.g. `GET http://example.com/users/7 HTTP/1.1`) are routed by their path and query. They responded `404` before. `OPTIONS *` responds `404`, and other request targets not starting with `/` respond `400`. ([#64](https://github.com/han41858/badak/pull/64))
+
 ## 4.0.0 (2026-10-22)
 
 This release changes the first argument of routing functions to `ParamContext` (`{ params, query, body }`), and redefines `?` routing and non-ASCII / percent-encoded path matching.
