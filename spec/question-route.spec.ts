@@ -381,7 +381,7 @@ describe('? routing', () => {
 				.expect(200, { 'colou?r': 'colour' });
 		});
 
-		it('get() throws for overlap, the second route is not registered', async (;
+		it('get() throws for overlap, the second route is not registered', async () => {
 			await app.get('/ab?c', (): string => 'first');
 
 			await promiseFail(
