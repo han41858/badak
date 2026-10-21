@@ -245,6 +245,48 @@ const signatureMap: Signature[] = [
 	{ type: CONTENT_TYPE.APPLICATION_PDF, sign: [0x25, 0x50, 0x44, 0x46] }
 ];
 
+export interface SerializedBody {
+	body: string | Buffer;
+	contentType: CONTENT_TYPE;
+}
+
+// make a value sendable by res.end()
+// string : as it is (text), Buffer & Uint8Array : as it is (binary), others : JSON
+// returns undefined if it can't be serialized (e.g. circular reference, BigInt, function, symbol)
+export const serializeBody = (value: unknown): SerializedBody | undefined => {
+	if (typeof value === 'string') {
+		return {
+			body: value,
+			contentType: CONTENT_TYPE.TEXT_PLAIN
+		};
+	}
+
+	if (value instanceof Uint8Array) {
+		const buffer: Buffer = Buffer.isBuffer(value)
+			? value
+			: Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+
+		return {
+			body: buffer,
+			contentType: getContentType(buffer)
+		};
+	}
+
+	try {
+		const json: string | undefined = JSON.stringify(value);
+
+		return json !== undefined
+			? {
+				body: json,
+				contentType: CONTENT_TYPE.APPLICATION_JSON
+			}
+			: undefined;
+	}
+	catch (e: unknown) {
+		return undefined;
+	}
+};
+
 // add charset=utf-8 to text types for Content-Type header, like Express (serve-static)
 // JSON is always UTF-8 (RFC 8259) and has no charset parameter
 export const toContentTypeHeader = (mime: string): string => {

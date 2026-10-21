@@ -74,6 +74,7 @@ const appWithLog: Badak = new Badak({
 인증용 미들웨어 함수를 지정합니다. 인증 함수는 하나만 지정할 수 있습니다.
 인증 미들웨어로 등록된 함수는 `before()` 이후에, 라우팅 함수가 실행되기 전에 실행됩니다.
 인증 미들웨어 함수에서 오류가 발생하면 `401 Unauthorized` 에러가 발생합니다.
+`HttpError`를 던지면 그 상태 코드로 응답합니다(예: `throw new HttpError(403)`).
 
 ### `before(fnc: MiddlewareFunction): Promise<void>`
 
@@ -158,6 +159,41 @@ HTTP 서버를 정지합니다.
 
 SPA 앱으로 사용할 주소와 파일 경로를 연결합니다.
 지정된 폴더 안에 있는 파일은 정적으로 제공되며, 캐싱됩니다.
+
+## 에러 응답
+
+### `HttpError`
+
+라우팅 함수나 미들웨어 함수에서 `HttpError`를 던지면 지정한 상태 코드로 응답합니다.
+
+```typescript
+import { HttpError } from 'badak';
+
+app.get('/admin', () => {
+	throw new HttpError(403); // 403, 'Forbidden'
+});
+
+app.post('/users', () => {
+	// 객체 본문은 JSON으로 응답합니다.
+	throw new HttpError(422, { body: { field: 'email', reason: 'invalid' } });
+});
+
+app.get('/limited', () => {
+	throw new HttpError(429, { headers: { 'Retry-After': 60 } });
+});
+```
+
+- `status` : `400`부터 `599`까지의 정수입니다.
+- `option.body` : 응답 본문입니다. 문자열은 텍스트로, `Buffer`는 바이너리로, 그 외의 값(객체, 배열, 숫자, 불리언)은 JSON으로 응답합니다.
+  생략하거나 `null`이거나 직렬화할 수 없는 값(순환 참조 등)이면 상태 문구(예: `Forbidden`)로 응답합니다.
+- `option.headers` : 응답 헤더입니다. 여기에 지정한 `Content-Type`은 그대로 유지합니다.
+- `option.cause` : 로그용 원본 에러입니다.
+
+그 외의 에러는 에러 메시지 없이 `500 Internal Server Error`로 응답합니다.
+호환성을 위해 `new Error('Forbidden')`처럼 메시지가 상태 문구인 `Error`는 해당 상태 코드로 응답합니다
+(`Bad Request`, `Unauthorized`, `Forbidden`, `Not Found`, `Method Not Allowed`, `Not Acceptable`, `Payload Too Large`).
+
+어떤 값이 `HttpError`인지는 `isHttpError(value)`로 확인할 수 있습니다.
 
 ## 인터페이스
 

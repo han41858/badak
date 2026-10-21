@@ -76,6 +76,7 @@ const appWithLog: Badak = new Badak({
 Set a middleware function for authentication. Only one authentication function can be specified.
 The registered function is executed after `before()` and before the routing function is executed.
 If an error occurs in this middleware function, a `401 Unauthorized` error occurs.
+If the error is an `HttpError`, its status code is used instead (e.g. `throw new HttpError(403)`).
 
 ### `before(fnc: MiddlewareFunction): Promise<void>`
 
@@ -165,6 +166,41 @@ Text files (`text/*`) and JavaScript files are served with `charset=utf-8`, so s
 
 Connect the address and file path to be used with the SPA app.
 Files within the specified folder are served statically and cached.
+
+## Error Response
+
+### `HttpError`
+
+Throw an `HttpError` in routing functions or middleware functions to respond with a specific status code.
+
+```typescript
+import { HttpError } from 'badak';
+
+app.get('/admin', () => {
+	throw new HttpError(403); // 403, 'Forbidden'
+});
+
+app.post('/users', () => {
+	// object body is sent as JSON
+	throw new HttpError(422, { body: { field: 'email', reason: 'invalid' } });
+});
+
+app.get('/limited', () => {
+	throw new HttpError(429, { headers: { 'Retry-After': 60 } });
+});
+```
+
+- `status` : an integer from `400` to `599`.
+- `option.body` : the response body. A string is sent as text, a `Buffer` as binary, and other values (object, array, number, boolean) as JSON.
+  If omitted, `null`, or not serializable (e.g. circular reference), the status text (e.g. `Forbidden`) is sent.
+- `option.headers` : response headers. `Content-Type` in it is kept.
+- `option.cause` : the original error, for logging.
+
+Other errors respond `500 Internal Server Error`, without the error message.
+For compatibility, an `Error` whose message is a status text such as `new Error('Forbidden')` responds with the matching status code
+(`Bad Request`, `Unauthorized`, `Forbidden`, `Not Found`, `Method Not Allowed`, `Not Acceptable`, `Payload Too Large`).
+
+Use `isHttpError(value)` to check if a value is an `HttpError`.
 
 ## Interfaces
 
