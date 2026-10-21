@@ -238,6 +238,10 @@ badak 앱의 동작 방식을 지정합니다.
 
 에러가 발생하면 콘솔에 로그를 출력합니다.
 
+- 기록함 : `5xx` `HttpError`, 그리고 `auth()` 함수에서 발생한 에러를 포함한 `Error` 등 그 외의 에러
+- 기록하지 않음 : `4xx` `HttpError`, 그리고 badak이 만드는 `404 Not Found`, `405 Method Not Allowed`,
+  `400 Bad Request`(잘못된 본문), `413 Payload Too Large` 같은 `4xx` 응답. 의도된 클라이언트 에러 응답이기 때문입니다.
+
 기본값은 `true` 입니다.
 
 #### `preventError: boolean`

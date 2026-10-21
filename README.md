@@ -245,6 +245,10 @@ Specifies how the badak app should behave.
 
 If an error occurs, a log is output to the console.
 
+- Logged : `5xx` `HttpError`, and other errors such as `Error`, including an error thrown in the `auth()` function.
+- Not logged : `4xx` `HttpError`, and `4xx` responses made by badak such as `404 Not Found`, `405 Method Not Allowed`,
+  `400 Bad Request` (malformed body) and `413 Payload Too Large`, because they are intended client error responses.
+
 The default is `true`.
 
 #### `preventError: boolean`
