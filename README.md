@@ -1,5 +1,5 @@
 ![npm](https://img.shields.io/npm/v/badak?logo=npm)
-![NPM Last Update](https://img.shields.io/npm/last-update/ejv)
+![NPM Last Update](https://img.shields.io/npm/last-update/badak)
 
 ![logo](https://github.com/han41858/badak/raw/main/docs/logo/badak_200.png)
 
@@ -8,7 +8,7 @@
 # badak
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-black?color=3178C6&logo=typescript&logoColor=white)
-![TypeScript](https://img.shields.io/badge/node.js-black?color=5FA04E&logo=nodedotjs&logoColor=white)
+![Node.js](https://img.shields.io/badge/node.js-black?color=5FA04E&logo=nodedotjs&logoColor=white)
 
 badak is a backend framework developed based on Promises and TypeScript.
 
@@ -28,7 +28,11 @@ yarn add badak
 ## Usage
 
 ```typescript
-import { Badak } from 'badak';
+import { Badak, RouteRule } from 'badak';
+
+interface User {
+	name: string;
+}
 
 const rule: RouteRule = {
 	users: {
@@ -36,20 +40,20 @@ const rule: RouteRule = {
 			// returns a list of users.
 			return {
 				list: ['han', 'kim', 'lee']
-			}
+			};
 		},
 		POST: (user: User) => {
 			// add a user.
 			return {
 				result: 'ok'
-			}
+			};
 		}
 	}
 };
 
 
 const app: Badak = new Badak();
-await app.route(routeRule);
+await app.route(rule);
 await app.listen(3000);
 ```
 
@@ -284,8 +288,8 @@ The query string is parsed and passed to the routing function, for every method.
 The examples below all match the `/path` path, and the arguments passed are as follows.
 
 ```bash
-/path?          # {}
-/path?key       # { key: null }
+/path?          # undefined
+/path?key       # { key: '' }
 /path?key=      # { key: '' }
 /path?key=value # { key: 'value' }
 ```
