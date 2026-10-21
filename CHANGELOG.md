@@ -11,6 +11,15 @@ These changes break backward compatibility and are planned for 4.0.0.
   - other characters are literal. They were interpreted as a regular expression before.
   - `??`, and `?` with `+` or `*` in the same uri fragment, throw `invalid question route` when they are registered.
   - the priority with normal, `:`, `+`, `*` and `**` routing is not changed.
+- Non-ASCII and percent-encoded paths are matched by decoded characters. ([#58](https://github.com/han41858/badak/pull/58))
+  - the request path is split by real `/` first, then each uri fragment is decoded separately. `%2F` is a `/` in a uri fragment, not a separator.
+  - a malformed percent-encoding in any uri fragment of the request path responds `400`.
+  - percent-encoded characters in routing paths are decoded and literal. Different spellings of the same path (e.g. `/한글` and `/%ED%95%9C%EA%B8%80`) are one routing node, routing functions of different methods are merged. The same method registered again replaces the previous one, same as the same spelling.
+  - `route()` merges keys of one rule object that make the same node, e.g. `{ '/b/c': { GET }, '/b': { c: { POST } } }`. The latter key replaced the node made by the former one before, and `GET /b/c` responded `405`.
+  - `+` and `*` in a uri fragment interpret other characters literally, same as `?`. They were interpreted as a regular expression before.
+  - `++`, `+` with `*`, more than one `*`, or `*` without a character before it in one uri fragment, and malformed percent-encoding in routing paths, throw when they are registered.
+  - static file names are literal, they were interpreted as routing paths before.
+  - the priority of routings, and the behavior for ASCII paths without special characters, are not changed.
 
 Cases that differ from 3.0.0 :
 
@@ -24,6 +33,18 @@ Cases that differ from 3.0.0 :
 | `/a[bc]?` | matches `/a`, `/ab`, `/ac` (character class) | matches `/a[bc]`, `/a[bc` only |
 | `/a??`, `/ab?c+` | registered | throws when registered |
 | `/a?*` | registered alone, but a request that reaches the pattern responds `500`, and registering a sibling route throws `SyntaxError` (invalid regular expression) | throws `invalid question route` when registered |
+| `/한글` | doesn't match `GET /%ED%95%9C%EA%B8%80` (request uri fragments were compared without decoding) | matches |
+| `GET /한글` and `POST /%ED%95%9C%EA%B8%80` | registered as different routes, `GET` responds `405` (`/한글` doesn't match encoded requests) | one routing node, both `GET` and `POST` are matched |
+| `route({ '/b/c': { GET }, '/b': { c: { POST } } })` | `GET /b/c` responds `405`, the `/b` key replaced the node | both `GET` and `POST` are matched |
+| `/lit/%2A` | matches `GET /lit/%2A` only | matches `GET /lit/*` and `GET /lit/%2A` (literal `*`) |
+| a request with malformed percent-encoding, e.g. `GET /static/%E0%A4%A` | `404`, or matched by a normal route | `400` |
+| `/a.+` | matches `/ab` (`.` is any character) | matches `/a.`, `/a..` only |
+| `/a.b*` | matches `/axyz` | matches `/a.xyz` (prefix `a.` is literal) |
+| `/a*b*c` | registered, `*` after the first one is a quantifier of regular expression | throws when registered |
+| `/*abc` | registered, but never matched | throws when registered |
+| `/100%`, `/%E0%A4%A` | registered, compared without decoding | throws when registered |
+| static files `:c.txt` and `한글.txt` in a folder | `:c.txt` is registered as a colon route, every file request of the folder responds `:c.txt` | each file is served by its name |
+| static files `a+b.txt`, `q?.txt`, `100%.txt` | interpreted as `+`, `?` routing, or not matched | served by their names |
 
 ### Migration
 
@@ -32,6 +53,10 @@ Cases that differ from 3.0.0 :
 | register `?` routing paths that match the same uri fragment | remove one of them, or merge them into one routing function |
 | use regular expression syntax in `?` routing paths (e.g. `(cd)?`, `[bc]`, `.`) | register each path separately, or use `:` routing and check the value in the routing function |
 | use `??`, or `?` with `+` or `*` in one uri fragment | split the routing path into simple patterns |
+| register the same path & method in different spellings (e.g. `GET /한글` and `GET /%ED%95%9C%EA%B8%80`) | keep one of them, the latter replaces the former now |
+| use regular expression syntax in `+` or `*` routing paths, or more than one `*` in a uri fragment | register each path separately, or use `:` routing and check the value in the routing function |
+| use `%` in a routing path | encode it as `%25` |
+| expect `404` for a malformed percent-encoding in the request path | expect `400` |
 
 ## 3.0.0 (2026-10-21)
 
