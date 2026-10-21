@@ -1375,17 +1375,43 @@ export class Badak {
 		return this._http;
 	}
 
-	async stop (): Promise<void> {
+	// stop accepting new connections, and wait for in-flight requests to finish (graceful)
+	// timeout (ms) : close remaining connections forcibly after this time, e.g. long polling or SSE
+	async stop (timeout?: number): Promise<void> {
 		if (this._http === undefined) {
 			throw new Error('server is not running, call listen() before stop()');
 		}
 
+		if (
+			timeout !== undefined
+			&& (typeof timeout !== 'number' || Number.isNaN(timeout) || timeout < 0)
+		) {
+			throw new Error('invalid timeout');
+		}
+
+		const server: Server = this._http;
+
 		return new Promise<void>((resolve): void => {
-			this._http?.close((): void => {
+			let forceCloseTimer: NodeJS.Timeout | undefined;
+
+			server.close((): void => {
+				if (forceCloseTimer !== undefined) {
+					clearTimeout(forceCloseTimer);
+				}
+
 				delete this._http;
 
 				resolve();
 			});
+
+			// idle keep-alive connections, server.close() does it by itself since Node.js 19
+			server.closeIdleConnections();
+
+			if (timeout !== undefined && timeout !== Infinity) {
+				forceCloseTimer = setTimeout((): void => {
+					server.closeAllConnections();
+				}, timeout);
+			}
 		});
 	}
 }

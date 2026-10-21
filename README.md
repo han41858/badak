@@ -109,9 +109,15 @@ and becomes `false` after terminating with `stop()`.
 Returns the HTTP server instance.
 Used to access badak internal members.
 
-### `stop(): Promise<void>`
+### `stop(timeout?: number): Promise<void>`
 
 Stop the HTTP server.
+It stops accepting new connections, closes idle keep-alive connections,
+and waits for in-flight requests to finish.
+
+If `timeout` (ms) is specified, the remaining connections are closed forcibly after this time.
+Use it if there are long-running responses like long polling or Server-Sent Events,
+because `stop()` doesn't resolve until they finish.
 
 ### `route(rule: RouteRule): Promise<void>`
 

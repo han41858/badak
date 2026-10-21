@@ -104,9 +104,13 @@ badak 앱이 실행되는 동작을 조정합니다.
 HTTP 서버 인스턴스를 반환합니다.
 Badak 내부 멤버에 접근할 때 사용합니다.
 
-### `stop(): Promise<void>`
+### `stop(timeout?: number): Promise<void>`
 
 HTTP 서버를 정지합니다.
+새 연결을 받지 않고, 유휴 상태인 keep-alive 연결을 닫은 뒤, 처리 중인 요청이 끝날 때까지 기다립니다.
+
+`timeout`(ms)을 지정하면 이 시간이 지난 뒤 남은 연결을 강제로 닫습니다.
+롱 폴링이나 Server-Sent Events처럼 오래 유지되는 응답이 있으면 `stop()`이 끝나지 않으므로 이 값을 지정하세요.
 
 ### `route(rule: RouteRule): Promise<void>`
 
