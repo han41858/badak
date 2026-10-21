@@ -116,6 +116,7 @@ It stops accepting new connections, closes idle keep-alive connections,
 and waits for in-flight requests to finish.
 
 If `timeout` (ms) is specified, the remaining connections are closed forcibly after this time.
+`timeout` should be an integer from `0` to `2147483647` (about 24.8 days, the limit of Node.js timers), or `Infinity` to wait without limit.
 Use it if there are long-running responses like long polling or Server-Sent Events,
 because `stop()` doesn't resolve until they finish.
 

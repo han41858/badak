@@ -960,7 +960,7 @@ describe('core', () => {
 				);
 			});
 
-			[-1, NaN, '1000'].forEach((timeout: unknown): void => {
+			[-1, NaN, '1000', 1.5, -Infinity, 2 ** 31, Number.MAX_SAFE_INTEGER].forEach((timeout: unknown): void => {
 				it(`invalid timeout : ${ String(timeout) }`, async () => {
 					await app.listen(TestPort);
 
@@ -1043,6 +1043,25 @@ describe('core', () => {
 
 				expect(stopped).to.be.true;
 				expect(app.isRunning()).to.be.false;
+			});
+
+			[2 ** 31 - 1, Infinity].forEach((timeout: number): void => {
+				it(`timeout ${ timeout } waits, not closes immediately`, async () => {
+					const req: ClientRequest = await openEndlessRequest();
+
+					let stopped: boolean = false;
+					const stopPromise: Promise<void> = app.stop(timeout).then((): void => {
+						stopped = true;
+					});
+
+					await new Promise((resolve) => setTimeout(resolve, 200));
+					expect(stopped).to.be.false;
+
+					req.destroy();
+					await stopPromise;
+
+					expect(stopped).to.be.true;
+				});
 			});
 
 			it('closes remaining connections after timeout', async () => {

@@ -14,7 +14,7 @@ import {
 	StaticRule,
 	TypedObject
 } from './interfaces.js';
-import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, METHOD } from './constants.js';
+import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, MAX_TIMER_DELAY, METHOD } from './constants.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -1377,6 +1377,9 @@ export class Badak {
 
 	// stop accepting new connections, and wait for in-flight requests to finish (graceful)
 	// timeout (ms) : close remaining connections forcibly after this time, e.g. long polling or SSE
+	//   integer from 0 to MAX_TIMER_DELAY, or Infinity (wait without limit, same as undefined)
+	// note : upgraded connections (e.g. WebSocket) are not closed by closeAllConnections(),
+	//   badak doesn't handle 'upgrade' now so Node.js destroys them, but they need their own handling if supported
 	async stop (timeout?: number): Promise<void> {
 		if (this._http === undefined) {
 			throw new Error('server is not running, call listen() before stop()');
@@ -1384,7 +1387,14 @@ export class Badak {
 
 		if (
 			timeout !== undefined
-			&& (typeof timeout !== 'number' || Number.isNaN(timeout) || timeout < 0)
+			&& timeout !== Infinity
+			&& (
+				typeof timeout !== 'number'
+				|| !Number.isInteger(timeout)
+				|| timeout < 0
+				// larger delay is set to 1ms by Node.js, closes connections immediately
+				|| timeout > MAX_TIMER_DELAY
+			)
 		) {
 			throw new Error('invalid timeout');
 		}

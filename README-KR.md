@@ -110,6 +110,7 @@ HTTP 서버를 정지합니다.
 새 연결을 받지 않고, 유휴 상태인 keep-alive 연결을 닫은 뒤, 처리 중인 요청이 끝날 때까지 기다립니다.
 
 `timeout`(ms)을 지정하면 이 시간이 지난 뒤 남은 연결을 강제로 닫습니다.
+`timeout`은 `0`부터 `2147483647`(약 24.8일, Node.js 타이머의 한계)까지의 정수이거나, 제한 없이 기다리는 `Infinity`여야 합니다.
 롱 폴링이나 Server-Sent Events처럼 오래 유지되는 응답이 있으면 `stop()`이 끝나지 않으므로 이 값을 지정하세요.
 
 ### `route(rule: RouteRule): Promise<void>`
