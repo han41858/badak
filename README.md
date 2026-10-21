@@ -28,34 +28,50 @@ yarn add badak
 ## Usage
 
 ```typescript
-import { Badak, RouteRule } from 'badak';
+import { Badak, HttpError } from 'badak';
 
 interface User {
+	id: string;
 	name: string;
 }
 
-const rule: RouteRule = {
-	users: {
-		GET: () => {
-			// returns a list of users.
-			return {
-				list: ['han', 'kim', 'lee']
-			};
-		},
-		POST: (user: User) => {
-			// add a user.
-			return {
-				result: 'ok'
-			};
-		}
-	}
-};
-
-
+const users: Map<string, User> = new Map();
 const app: Badak = new Badak();
-await app.route(rule);
+
+// returned values are the response : object -> JSON, string -> text
+await app.get('/users', () => [...users.values()]);
+
+// typed route captures, e.g. GET /users/7 -> params.id === '7'
+await app.get<{ params: { id: string } }>('/users/:id', ({ params }) => {
+	const user: User | undefined = users.get(params.id);
+
+	if (user === undefined) {
+		throw new HttpError(404);
+	}
+
+	return user;
+});
+
+// the request body is parsed for POST, PUT and PATCH (JSON, form, multipart)
+// it is not validated, check it before use
+await app.post('/users', ({ body }) => {
+	const name: unknown = (body as { name?: unknown } | undefined)?.name;
+
+	if (typeof name !== 'string') {
+		throw new HttpError(400, { body: { message: 'name is required' } });
+	}
+
+	const user: User = { id: String(users.size + 1), name };
+	users.set(user.id, user);
+
+	return user;
+});
+
 await app.listen(3000);
 ```
+
+Routing functions receive `ctx` (`{ params, query, body }`), and the Node.js `req` and `res`, see [Routing parameters](#routing-parameters).
+See [Examples](#examples) for authentication, file upload, streaming and SPA.
 
 ## Methods
 
@@ -544,3 +560,91 @@ await app.patch('/users/:id', (ctx) => ctx);
 ```
 
 `parseNumber` and `parseDate` apply to query and body strings, but never to path captures. The original Node.js `req` and `res` are still available as the second and third callback parameters.
+
+## Examples
+
+[`sample/app.ts`](https://github.com/han41858/badak/blob/main/sample/app.ts) is a small app with the examples below, and it is tested with the current version. Run it with `npx tsx sample/index.ts`.
+
+### Authentication and public routes
+
+`auth()` runs before the request body is received. Routes with `{ auth: false }`, static files and the SPA skip it.
+
+```typescript
+await app.auth((req) => {
+	if (req.headers.authorization !== `Bearer ${ token }`) {
+		throw new HttpError(401, { headers: { 'WWW-Authenticate': 'Bearer' } });
+	}
+});
+
+await app.get('/api/health', () => ({ status: 'ok' }), { auth: false });
+```
+
+### Status code and headers
+
+Set them with `res`, and return the body.
+
+```typescript
+await app.post('/api/users', ({ body }, req, res) => {
+	const user: User = createUser(body); // validate body, throw HttpError(400) if invalid
+
+	res.statusCode = 201;
+	res.setHeader('Location', `/api/users/${ user.id }`);
+
+	return user;
+});
+
+await app.delete<{ params: { id: string } }>('/api/users/:id', ({ params }, req, res) => {
+	deleteUser(params.id);
+	res.statusCode = 204; // no return value : empty body
+});
+```
+
+### File upload
+
+For `multipart/form-data`, fields are strings, and files are `Buffer` (or strings for `text/plain` files).
+`bodyLimit` of a route allows larger bodies for this route only.
+
+```typescript
+await app.post('/api/files', ({ body }) => {
+	const { name, file } = body as { name?: string, file?: Buffer | string };
+
+	if (file === undefined) {
+		throw new HttpError(400);
+	}
+
+	return { name, size: Buffer.byteLength(file) };
+}, { bodyLimit: 10 * 1024 * 1024 });
+```
+
+### Streaming response
+
+```typescript
+import { Readable } from 'node:stream';
+
+await app.get('/api/users.csv', (ctx, req, res) => {
+	res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+
+	return Readable.from(['id,name\n', ...rows]);
+});
+```
+
+### API with a SPA
+
+API routes and static files are matched first, and `index.html` is served for other paths.
+
+```typescript
+await app.get('/api/users', listUsers);
+await app.setSPARoot('/', path.join(__dirname, 'public'));
+
+// GET /api/users  -> listUsers
+// GET /app.css    -> public/app.css
+// GET /users/1    -> public/index.html
+```
+
+### Access log
+
+```typescript
+await app.after((req, res) => {
+	console.log(`${ req.method } ${ req.url } ${ res.statusCode }`);
+});
+```

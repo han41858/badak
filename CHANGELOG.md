@@ -37,6 +37,12 @@ This is classified as a bug fix, not a new restriction :
 
 To migrate, remove one of the routing paths, merge them into one routing function, or split them into patterns that don't overlap (e.g. `/colou?r` and `/colouu+r`).
 
+### Documentation
+
+- `Usage` of README uses the 4.0.0 routing function signature (`ctx`), it showed the 3.x signature (`(user: User) => ...`). ([#66](https://github.com/han41858/badak/pull/66))
+- `Examples` section in README : authentication and public routes, status code and headers, file upload, streaming response, API with a SPA, access log. ([#66](https://github.com/han41858/badak/pull/66))
+- `sample/` is an example app with these examples. It is type-checked by `yarn test:types`, linted, and tested by `spec/sample.spec.ts`. ([#66](https://github.com/han41858/badak/pull/66))
+
 ## 4.0.0 (2026-10-22)
 
 This release changes the first argument of routing functions to `ParamContext` (`{ params, query, body }`), and redefines `?` routing and non-ASCII / percent-encoded path matching.
