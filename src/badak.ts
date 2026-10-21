@@ -1299,8 +1299,9 @@ export class Badak {
 					else if (responseData instanceof Readable) {
 						await this._sendStream(req, res, responseData);
 					}
-					else if (responseData !== undefined && responseData !== null) {
-						// string as text, Buffer as binary, others (object, array, number, boolean) as JSON
+					else if (responseData !== undefined) {
+						// string as text, Buffer as binary, others (object, array, number, boolean, null) as JSON
+						// only undefined (no return value) responds an empty body
 						const serialized: SerializedBody | undefined = serializeBody(responseData);
 
 						if (serialized === undefined) {

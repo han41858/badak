@@ -62,14 +62,21 @@ describe('value returned by route function', () => {
 		expect(res.headers['content-length']).to.be.eql('0');
 	});
 
-	[undefined, null].forEach((value: unknown): void => {
-		it(`${ String(value) } : empty response`, async () => {
-			const res: SuperTestResponse = await getRes(value);
+	it('undefined (no return value) : empty response', async () => {
+		const res: SuperTestResponse = await getRes(undefined);
 
-			expect(res.status).to.be.eql(200);
-			expect(res.headers['content-type']).to.be.undefined;
-			expect(res.text).to.be.eql('');
-		});
+		expect(res.status).to.be.eql(200);
+		expect(res.headers['content-type']).to.be.undefined;
+		expect(res.text).to.be.eql('');
+	});
+
+	it('null : JSON null', async () => {
+		const res: SuperTestResponse = await getRes(null);
+
+		expect(res.status).to.be.eql(200);
+		expect(res.headers['content-type']).to.be.eql('application/json');
+		expect(res.headers['content-length']).to.be.eql('4');
+		expect(res.text).to.be.eql('null');
 	});
 
 	it('Buffer in object is sent as base64, the original object is not modified', async () => {
