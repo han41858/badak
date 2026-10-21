@@ -75,7 +75,7 @@ describe('regression', () => {
 				.timeout(500)
 				.expect(200);
 
-			expect(res.body).to.be.eql({ a: 1 } as TypedObject<unknown>);
+			expect(res.body).to.be.eql({ params: {}, query: {}, body: { a: 1 } });
 		});
 	});
 
@@ -90,7 +90,7 @@ describe('regression', () => {
 				.get('/users/7?sort=name')
 				.expect(200);
 
-			expect(res.body).to.be.eql({ id: '7', sort: 'name' });
+			expect(res.body).to.be.eql({ params: { id: '7' }, query: { sort: 'name' } });
 		});
 
 		it('colon param without query string', async () => {
@@ -98,7 +98,7 @@ describe('regression', () => {
 				.get('/users/7')
 				.expect(200);
 
-			expect(res.body).to.be.eql({ id: '7' });
+			expect(res.body).to.be.eql({ params: { id: '7' }, query: {} });
 		});
 	});
 
@@ -117,9 +117,13 @@ describe('regression', () => {
 				.expect(200);
 
 			expect(res.body).to.be.eql({
-				name: 'Hong Gil Dong',
+				params: {},
+				query: {},
+				body: {
+					name: 'Hong Gil Dong',
 				expr: 'a&b=c',
-				list: ['한', 'b']
+					list: ['한', 'b']
+				}
 			});
 		});
 
@@ -128,7 +132,7 @@ describe('regression', () => {
 				.get('/users/' + encodeURIComponent('홍 길동'))
 				.expect(200);
 
-			expect(res.body).to.be.eql({ name: '홍 길동' });
+			expect(res.body).to.be.eql({ params: { name: '홍 길동' }, query: {} });
 		});
 
 		it('malformed percent-encoding in route param responds 400', async () => {
@@ -217,11 +221,11 @@ describe('regression', () => {
 			return value instanceof Date ? 'date' : typeof value;
 		};
 
-		const typeFnc = (ctx: ParamContext): TypedObject<string>  => {
-			const param = ctx.body as TypedObject<unknown>;
-			return Object.fromEntries(
-				Object.entries(param).map(([key, value]) => [key, typeOf(value)])
+		const typeFnc = (ctx: ParamContext): unknown => {
+			const typeEntries = (record: Record<string, unknown>): TypedObject<string> => Object.fromEntries(
+				Object.entries(record).map(([key, value]) => [key, typeOf(value)])
 			);
+			return { params: typeEntries(ctx.params), query: typeEntries(ctx.query) };
 		};
 
 		it('converted when options are on', async () => {
@@ -239,12 +243,14 @@ describe('regression', () => {
 				.expect(200);
 
 			expect(res.body).to.be.eql({
-				id: 'string', // route param is not converted
+				params: { id: 'string' }, // route param is not converted
+				query: {
 				num: 'number',
 				str: 'string',
 				date: 'date',
 				list: 'array<number,number>',
-				empty: 'string'
+					empty: 'string'
+				}
 			});
 		});
 
@@ -257,8 +263,8 @@ describe('regression', () => {
 				.expect(200);
 
 			expect(res.body).to.be.eql({
-				num: 'string',
-				date: 'string'
+				params: {},
+				query: { num: 'string', date: 'string' }
 			});
 		});
 	});
@@ -273,7 +279,7 @@ describe('regression', () => {
 				.send({ name: 'han' })
 				.expect(200);
 
-			expect(res.body).to.be.eql({ id: '7', name: 'han' });
+			expect(res.body).to.be.eql({ params: { id: '7' }, query: {}, body: { name: 'han' } });
 		});
 
 		it('route() with PATCH key', async () => {
@@ -290,7 +296,7 @@ describe('regression', () => {
 				.send({ a: 1 })
 				.expect(200);
 
-			expect(res.body).to.be.eql({ a: 1 });
+			expect(res.body).to.be.eql({ params: {}, query: {}, body: { a: 1 } });
 		});
 	});
 
@@ -303,10 +309,10 @@ describe('regression', () => {
 				.delete('/items?id=3')
 				.expect(200);
 
-			expect(res.body).to.be.eql({ id: '3' });
+			expect(res.body).to.be.eql({ params: {}, query: { id: '3' } });
 		});
 
-		it('POST, merged with body', async () => {
+		it('POST query is independent of body', async () => {
 			await app.post('/items', echoFnc);
 			await app.listen(TestPort);
 
@@ -315,10 +321,10 @@ describe('regression', () => {
 				.send({ name: 'a' })
 				.expect(200);
 
-			expect(res.body).to.be.eql({ from: 'query', name: 'a' });
+			expect(res.body).to.be.eql({ params: {}, query: { from: 'query' }, body: { name: 'a' } });
 		});
 
-		it('merge order : route param -> query string -> body', async () => {
+		it('colliding keys are kept in separate sources', async () => {
 			await app.patch('/users/:id', echoFnc);
 			await app.listen(TestPort);
 
@@ -327,7 +333,7 @@ describe('regression', () => {
 				.send({ name: 'body' })
 				.expect(200);
 
-			expect(res.body).to.be.eql({ id: '8', name: 'body', q: '1' });
+			expect(res.body).to.be.eql({ params: { id: '7' }, query: { id: '8', name: 'query', q: '1' }, body: { name: 'body' } });
 		});
 
 		it('array body is passed as it is', async () => {
@@ -339,7 +345,7 @@ describe('regression', () => {
 				.send([1, 2])
 				.expect(200);
 
-			expect(res.body).to.be.eql([1, 2]);
+			expect(res.body).to.be.eql({ params: { id: '7' }, query: { q: '1' }, body: [1, 2] });
 		});
 	});
 
