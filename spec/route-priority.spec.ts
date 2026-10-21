@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
-import { RouteFunction, RouteRule, TypedObject } from '../src/interfaces';
+import { ParamContext, RouteFunction, RouteRule, TypedObject } from '../src/interfaces';
 import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule } from '../src/router';
 import { TestPort } from './test-util';
 
@@ -127,7 +127,7 @@ describe('route priority', () => {
 
 	// route function for each uri, to know which route is matched
 	const fncOf = (uri: string): RouteFunction => {
-		const fnc: RouteFunction = (param: unknown): unknown => ({ uri, param });
+		const fnc: RouteFunction = (ctx: ParamContext): unknown => ({ uri, ...(Object.keys(ctx.params).length ? { param: ctx.params } : {}) });
 		Object.defineProperty(fnc, 'name', { value: uri });
 
 		return fnc;
