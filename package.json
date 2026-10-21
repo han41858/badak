@@ -18,7 +18,8 @@
 	"types": "build/cjs/index.d.ts",
 	"main": "build/cjs/index.js",
 	"files": [
-		"build"
+		"build",
+		"src"
 	],
 	"scripts": {
 		"prebuild": "rimraf ./build",
