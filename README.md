@@ -120,6 +120,7 @@ Register a routing function.
 ### `get(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 Registers a routing function that responds to `GET` method requests.
+`HEAD` requests are also handled by this routing function, and only the headers are sent without the body.
 
 ### `post(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 

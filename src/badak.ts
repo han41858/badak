@@ -1105,8 +1105,13 @@ export class Badak {
 						// loopControl === LoopControl.Continue : continue
 					}
 
-					if (checkTargetRule && checkTargetRule[method]) {
-						targetFncObj = checkTargetRule[method] as RouteFunctionObj;
+					// HEAD is handled by GET route function, Node.js doesn't send the body for HEAD
+					const ruleMethod: string = method === 'HEAD'
+						? METHOD.GET
+						: method;
+
+					if (checkTargetRule && checkTargetRule[ruleMethod]) {
+						targetFncObj = checkTargetRule[ruleMethod] as RouteFunctionObj;
 					}
 
 					if (targetFncObj === undefined) {

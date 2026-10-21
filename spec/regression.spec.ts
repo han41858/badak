@@ -1,3 +1,5 @@
+import * as path from 'node:path';
+
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse } from 'supertest';
@@ -334,6 +336,47 @@ describe('regression', () => {
 				.expect(200);
 
 			expect(res.body).to.be.eql([1, 2]);
+		});
+	});
+
+	describe('HEAD', () => {
+		it('handled by GET route function, without body', async () => {
+			let routeFncRunCount: number = 0;
+
+			await app.get('/data', (): TypedObject<number> => {
+				routeFncRunCount++;
+				return { a: 1 };
+			});
+
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.head('/data')
+				.expect(200)
+				.expect('content-type', 'application/json');
+
+			expect(res.text).to.be.undefined;
+			expect(routeFncRunCount).to.be.eql(1);
+		});
+
+		it('static file', async () => {
+			await app.static('/static', path.join(__dirname, 'static'));
+			await app.listen(TestPort);
+
+			await request(app.getHttpServer())
+				.head('/static/test.html')
+				.expect(200)
+				.expect('content-type', 'text/html');
+		});
+
+		it('not handled without GET route', async () => {
+			await app.post('/data', (): string => 'post');
+			await app.listen(TestPort);
+
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.head('/data');
+
+			expect(res.status).not.to.be.eql(200);
 		});
 	});
 });

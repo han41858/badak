@@ -115,6 +115,7 @@ HTTP 서버를 정지합니다.
 ### `get(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 `GET` 메서드 요청에 반응하는 라우팅 함수를 등록합니다.
+`HEAD` 요청도 이 라우팅 함수로 처리하며, 본문 없이 헤더만 응답합니다.
 
 ### `post(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
