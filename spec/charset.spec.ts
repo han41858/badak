@@ -91,8 +91,8 @@ describe('charset of Content-Type', () => {
 	});
 
 	it('Content-Type set by route function is kept', async () => {
-		await app.get('/custom', (ctx: ParamContext): string  => {
-			const param = ctx.body as unknown, req: IncomingMessage, res: ServerResponse;
+		await app.get('/custom', (ctx: ParamContext, req: IncomingMessage, res: ServerResponse): string => {
+
 			res.setHeader('Content-Type', 'text/plain; charset=euc-kr');
 			return 'abc';
 		});
