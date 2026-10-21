@@ -169,8 +169,13 @@ The default is `true`.
 
 #### `preventError: boolean`
 
-If an error occurs, it is transmitted to the node.
-If you specify a value of `false`, the error will not be passed and will be ignored.
+Determines whether an error that occurs while handling a request stays in badak.
+
+- `true` : badak catches the error and responds with an error status code. The server keeps running.
+- `false` : badak responds with an error status code, and then rethrows the error.
+  The error is rethrown inside the request handler, so it becomes an unhandled promise rejection,
+  and the process terminates with the Node.js default setting (`--unhandled-rejections=throw`).
+  Use this value only if you want the process to stop on errors (fail-fast), e.g. with a process manager that restarts it.
 
 The default is `true`.
 
