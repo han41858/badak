@@ -148,7 +148,7 @@ describe('regression', () => {
 			});
 
 			await app.post('/test', (ctx: ParamContext): TypedObject<string>  => {
-			const param = ctx.body as TypedObject<unknown>;
+				const param = ctx.body as TypedObject<unknown>;
 				return Object.fromEntries(
 					Object.entries(param).map(([key, value]) => {
 						return [key, value instanceof Date ? 'date' : typeof value];
@@ -390,7 +390,7 @@ describe('regression', () => {
 
 		it('streaming route function', async () => {
 			await app.get('/stream', (ctx: ParamContext): void  => {
-			const param = ctx.body as unknown, req: IncomingMessage, res: ServerResponse;
+				const param = ctx.body as unknown, req: IncomingMessage, res: ServerResponse;
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
 				res.write('a');
 
