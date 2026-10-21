@@ -1098,13 +1098,14 @@ export class Badak {
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
 
-					if (res.writableEnded) {
-						// route function ended response by itself, ignore returned value
+					if (isResponseStarted(res)) {
+						// route function started (res.writeHead(), res.write()) or ended (res.end()) response by itself,
+						// ignore returned value and leave ending the response to the route function (e.g. streaming)
 					}
 					else if (responseData) {
 						const contentType: CONTENT_TYPE = getContentType(responseData);
 
-						if (!res.headersSent && !res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
+						if (!res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
 							res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
 						}
 
@@ -1172,7 +1173,9 @@ export class Badak {
 					});
 
 					if (isResponseStarted(res)) {
-						// status code and headers can't be changed anymore, just close the response
+						// headersSent : status code and headers can't be changed anymore
+						// writableEnded : response is completed already
+						// just close the response if it is not completed
 						if (!res.writableEnded) {
 							res.end();
 						}

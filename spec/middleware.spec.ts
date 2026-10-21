@@ -498,6 +498,26 @@ describe('middleware', () => {
 				.expect(202, 'done');
 		});
 
+		it('route function starts response and returns value, ending is left to route function', async () => {
+			await app.get('/stream', (param: unknown, req: IncomingMessage, res: ServerResponse): string => {
+				res.writeHead(200, { 'Content-Type': 'text/plain' });
+				res.write('partial');
+
+				// streaming, end later
+				setTimeout((): void => {
+					res.end('-end');
+				}, 20);
+
+				return 'ignored';
+			});
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get('/stream')
+				.expect(200, 'partial-end');
+		});
+
 		it('route function sends headers and throws', async () => {
 			await app.get('/partial', (param: unknown, req: IncomingMessage, res: ServerResponse): never => {
 				res.writeHead(200, { 'Content-Type': 'text/plain' });

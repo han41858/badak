@@ -43,7 +43,8 @@ export const convertDateStr = (param: string): string | Date => {
 	return result;
 };
 
-// response is sent (or being sent) already, status code & headers can't be changed
+// response is started (headersSent) or completed (writableEnded) already,
+// status code & headers can't be changed
 export const isResponseStarted = (res: ServerResponse): boolean => {
 	return res.headersSent || res.writableEnded;
 };
