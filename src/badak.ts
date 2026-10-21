@@ -839,20 +839,12 @@ export class Badak {
 				try {
 					// run before middleware functions in parallel
 					// before functions can't modify parameters
-					// use try {} to run route function
-					try {
-						await Promise.all(
-							this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
-								return middlewareFnc(req, res);
-							})
-						);
-					}
-					catch (err) {
-						// catch middleware exception
-						if (this._config.catchErrorLog) {
-							console.error('badak before() middleware failed :', err);
-						}
-					}
+					// if one of them throws, route function is not executed and the error is handled below like route errors
+					await Promise.all(
+						this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
+							return middlewareFnc(req, res);
+						})
+					);
 
 					if (isResponseStarted(res)) {
 						// before() middleware responded already (e.g. 429), skip routing
