@@ -1127,13 +1127,13 @@ describe('route()', () => {
 					.get('/users/1')
 					.expect(200);
 
-				expect(userRes.body).to.be.eql({ id: '1' });
+				expect(userRes.body).to.be.eql({ params: { id: '1' }, query: {} });
 
 				const postRes: SuperTestResponse = await request(app.getHttpServer())
 					.get('/posts/2')
 					.expect(200);
 
-				expect(postRes.body).to.be.eql({ postId: '2' });
+				expect(postRes.body).to.be.eql({ params: { postId: '2' }, query: {} });
 			});
 
 			it('colon routing in different parents, in same time', async () => {
@@ -2068,7 +2068,7 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(Object.keys(res.body)).to.be.lengthOf(0);
+									expect(Object.keys(res.body.query)).to.be.lengthOf(0);
 								});
 						});
 
@@ -2078,8 +2078,8 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.eql('');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.eql('');
 								});
 						});
 
@@ -2090,9 +2090,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('');
 								});
 						});
 
@@ -2102,9 +2102,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('null');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('null');
 								});
 						});
 
@@ -2114,9 +2114,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('value');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('value');
 								});
 						});
 
@@ -2126,9 +2126,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('this is sentence.');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('this is sentence.');
 								});
 						});
 
@@ -2138,9 +2138,9 @@ describe('route()', () => {
 								.expect(200)
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.instanceOf(Array);
-									expect(res.body['key1']).to.be.lengthOf(2);
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.instanceOf(Array);
+									expect(res.body.query['key1']).to.be.lengthOf(2);
 								});
 						});
 
@@ -2151,13 +2151,13 @@ describe('route()', () => {
 								.expect((res: SuperTestResponse): void => {
 									expect(res.body).to.be.a('object');
 
-									expect(res.body).to.have.property('key1');
-									expect(res.body['key1']).to.be.a('string');
-									expect(res.body['key1']).to.be.eql('value1');
+									expect(res.body.query).to.have.property('key1');
+									expect(res.body.query['key1']).to.be.a('string');
+									expect(res.body.query['key1']).to.be.eql('value1');
 
-									expect(res.body).to.have.property('key2');
-									expect(res.body['key2']).to.be.a('string');
-									expect(res.body['key2']).to.be.eql('value2');
+									expect(res.body.query).to.have.property('key2');
+									expect(res.body.query['key2']).to.be.a('string');
+									expect(res.body.query['key2']).to.be.eql('value2');
 								});
 						});
 					});
@@ -2184,7 +2184,7 @@ describe('route()', () => {
 							.expect(200)
 							.expect((res: SuperTestResponse): void => {
 								expect(res.body).to.be.a('object');
-								expect(Object.keys(res.body)).to.be.lengthOf(0);
+								expect(Object.keys(res.body.query)).to.be.lengthOf(0);
 							});
 					});
 
@@ -2204,7 +2204,7 @@ describe('route()', () => {
 								expect(res.body).to.be.a('object');
 
 								keyValues.forEach(([key, value]: [string, string]): void => {
-									expect(res.body).to.have.property(key, value);
+									expect(res.body.query).to.have.property(key, value);
 								});
 							});
 					});
