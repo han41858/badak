@@ -8,7 +8,7 @@ import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { HttpError } from '../src/http-error';
-import { RouteFunction, RouteRule, TypedObject } from '../src/interfaces';
+import { ParamContext, RouteFunction, RouteRule, TypedObject } from '../src/interfaces';
 import { canonicalRouteKey, compileRouteSegment, normalizeLiteral, tokenizeRequestPath } from '../src/route-segment';
 import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule } from '../src/router';
 import { TestPort } from './test-util';
@@ -550,8 +550,8 @@ describe('non-ASCII & percent-encoded routing', () => {
 		});
 
 		it('route functions receive decoded params', async () => {
-			await app.get('/한글/:id', (param: unknown): unknown => param);
-			await app.get('/files/**', (param: unknown): unknown => param);
+			await app.get('/한글/:id', (ctx: ParamContext): unknown => ctx.params);
+			await app.get('/files/**', (ctx: ParamContext): unknown => ctx.params);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
