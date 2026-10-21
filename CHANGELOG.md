@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Others
+
+- The TypeScript source (`src/`) and declaration maps (`.d.ts.map`) are published with the package. ([#51](https://github.com/han41858/badak/pull/51))
+  - "Go to Definition" in editors (tsserver) opens the TypeScript source instead of `.d.ts`, for both `import` and `require`.
+  - files referred by source maps exist in the package, so debuggers can show the TypeScript source. Stack traces with `node --enable-source-maps` point to existing files.
+  - the package size is about 74kB (it was about 52kB).
+
 ## 2.1.0 (2026-10-21)
 
 This release adds cache headers for static files and a request body size limit for each route,
