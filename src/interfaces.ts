@@ -1,7 +1,7 @@
 // function type definition for IDE
 import { IncomingMessage, ServerResponse } from 'node:http';
 
-import { METHOD } from './constants';
+import { METHOD } from './constants.js';
 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,10 +30,11 @@ export interface RouteRuleSeed {
 	GET?: RouteFunction | RouteFunctionObj;
 	POST?: RouteFunction | RouteFunctionObj;
 	PUT?: RouteFunction | RouteFunctionObj;
+	PATCH?: RouteFunction | RouteFunctionObj;
 	DELETE?: RouteFunction | RouteFunctionObj;
 }
 
-export interface BadakOption extends TypedObject<boolean | METHOD | undefined> {
+export interface BadakOption extends TypedObject<boolean | number | METHOD | undefined> {
 	catchErrorLog: boolean; // default true, if false, badak will not show error catching log
 	preventError: boolean; // default true, if false, badak pass error to node
 
@@ -54,6 +55,8 @@ export interface BadakOption extends TypedObject<boolean | METHOD | undefined> {
 
 	parseNumber: boolean; // default false, if true, convert number string to Number
 	parseDate: boolean; // default false, if true, convert date string to Date object
+
+	bodyLimit: number; // default 100KB (102400), max request body size in bytes, 413 Payload Too Large if exceeded
 }
 
 export interface StaticRule {

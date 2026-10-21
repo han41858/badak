@@ -1,5 +1,5 @@
 ![npm](https://img.shields.io/npm/v/badak?logo=npm)
-![NPM Last Update](https://img.shields.io/npm/last-update/ejv)
+![NPM Last Update](https://img.shields.io/npm/last-update/badak)
 
 ![logo](https://github.com/han41858/badak/raw/main/docs/logo/badak_200.png)
 
@@ -8,7 +8,7 @@
 # badak
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-black?color=3178C6&logo=typescript&logoColor=white)
-![TypeScript](https://img.shields.io/badge/node.js-black?color=5FA04E&logo=nodedotjs&logoColor=white)
+![Node.js](https://img.shields.io/badge/node.js-black?color=5FA04E&logo=nodedotjs&logoColor=white)
 
 badak is a backend framework developed based on Promises and TypeScript.
 
@@ -28,7 +28,11 @@ yarn add badak
 ## Usage
 
 ```typescript
-import { Badak } from 'badak';
+import { Badak, RouteRule } from 'badak';
+
+interface User {
+	name: string;
+}
 
 const rule: RouteRule = {
 	users: {
@@ -36,20 +40,20 @@ const rule: RouteRule = {
 			// returns a list of users.
 			return {
 				list: ['han', 'kim', 'lee']
-			}
+			};
 		},
 		POST: (user: User) => {
 			// add a user.
 			return {
 				result: 'ok'
-			}
+			};
 		}
 	}
 };
 
 
 const app: Badak = new Badak();
-await app.route(routeRule);
+await app.route(rule);
 await app.listen(3000);
 ```
 
@@ -72,12 +76,18 @@ const appWithLog: Badak = new Badak({
 Set a middleware function for authentication. Only one authentication function can be specified.
 The registered function is executed after `before()` and before the routing function is executed.
 If an error occurs in this middleware function, a `401 Unauthorized` error occurs.
+If the error is an `HttpError`, its status code is used instead (e.g. `throw new HttpError(403)`).
 
 ### `before(fnc: MiddlewareFunction): Promise<void>`
 
 Registers a middleware function to run **before** the routing function is executed.
 Multiple middleware functions can be specified,
 and they are executed in parallel regardless of the order in which they are specified.
+
+If a middleware function throws an error (or returns a rejected Promise), the routing function is not executed
+and badak responds with an error status code, in the same way as an error thrown in the routing function.
+For example, `throw new Error('Forbidden')` responds `403 Forbidden`, and other errors respond `500 Internal Server Error`.
+If a middleware function responds by itself (e.g. `res.end()`), the routing function is not executed either.
 
 ### `after(fnc: MiddlewareFunction): Promise<void>`
 
@@ -104,17 +114,29 @@ and becomes `false` after terminating with `stop()`.
 Returns the HTTP server instance.
 Used to access badak internal members.
 
-### `stop(): Promise<void>`
+### `stop(timeout?: number): Promise<void>`
 
 Stop the HTTP server.
+It stops accepting new connections, closes idle keep-alive connections,
+and waits for in-flight requests to finish.
+
+If `timeout` (ms) is specified, the remaining connections are closed forcibly after this time.
+`timeout` should be an integer from `0` to `2147483647` (about 24.8 days, the limit of Node.js timers), or `Infinity` to wait without limit.
+Use it if there are long-running responses like long polling or Server-Sent Events,
+because `stop()` doesn't resolve until they finish.
 
 ### `route(rule: RouteRule): Promise<void>`
 
 Register a routing function.
 
+If a request matches a registered path but no routing function is registered for its method,
+badak responds `405 Method Not Allowed` with the `Allow` header listing the available methods.
+If no path matches, badak responds `404 Not Found`.
+
 ### `get(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 Registers a routing function that responds to `GET` method requests.
+`HEAD` requests are also handled by this routing function, and only the headers are sent without the body.
 
 ### `post(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
@@ -128,14 +150,59 @@ Registers a routing function that responds to `PUT` method requests.
 
 Registers a routing function that responds to `DELETE` method requests.
 
+### `patch(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
+
+Registers a routing function that responds to `PATCH` method requests.
+The request body is parsed in the same way as `POST` and `PUT`.
+
 ### `static(uri: string, path: string): Promise<void>`
 
 Concatenate the address and file path to be provided as a static file.
+
+The `Content-Type` is determined by the file extension.
+For an unknown extension or a file without extension, it is determined by the file signature (e.g. PNG),
+and `application/octet-stream` is used if it is not known either.
+Text files (`text/*`) and JavaScript files are served with `charset=utf-8`, so save them in UTF-8.
 
 ### `setSPARoot(uri: string, path: string): Promise<void>`
 
 Connect the address and file path to be used with the SPA app.
 Files within the specified folder are served statically and cached.
+
+## Error Response
+
+### `HttpError`
+
+Throw an `HttpError` in routing functions or middleware functions to respond with a specific status code.
+
+```typescript
+import { HttpError } from 'badak';
+
+app.get('/admin', () => {
+	throw new HttpError(403); // 403, 'Forbidden'
+});
+
+app.post('/users', () => {
+	// object body is sent as JSON
+	throw new HttpError(422, { body: { field: 'email', reason: 'invalid' } });
+});
+
+app.get('/limited', () => {
+	throw new HttpError(429, { headers: { 'Retry-After': 60 } });
+});
+```
+
+- `status` : an integer from `400` to `599`.
+- `option.body` : the response body. A string is sent as text, a `Buffer` as binary, and other values (object, array, number, boolean) as JSON.
+  If omitted, `null`, or not serializable (e.g. circular reference), the status text (e.g. `Forbidden`) is sent.
+- `option.headers` : response headers. `Content-Type` in it is kept.
+- `option.cause` : the original error, for logging.
+
+Other errors respond `500 Internal Server Error`, without the error message.
+For compatibility, an `Error` whose message is a status text such as `new Error('Forbidden')` responds with the matching status code
+(`Bad Request`, `Unauthorized`, `Forbidden`, `Not Found`, `Method Not Allowed`, `Not Acceptable`, `Payload Too Large`).
+
+Use `isHttpError(value)` to check if a value is an `HttpError`.
 
 ## Interfaces
 
@@ -157,6 +224,30 @@ export type RouteFunction = (param: any, req: IncomingMessage, res: ServerRespon
 Register a routing function to respond to HTTP requests.
 The value returned by the routing function is returned as an HTTP response.
 
+| returned value | response |
+|---|---|
+| `string` | text (`text/plain; charset=utf-8`) |
+| `Buffer` | binary, `Content-Type` by its signature |
+| object, array, number, boolean, `null` | JSON (`application/json`), `Buffer` in an object as base64 |
+| `undefined` (no return value) | empty body |
+
+A value that can't be serialized to JSON (e.g. circular reference, `BigInt`) responds `500 Internal Server Error`.
+
+If the routing function returns a `Readable` stream, badak pipes it to the response.
+`Content-Type` is `application/octet-stream` unless the routing function sets it.
+
+```typescript
+import { createReadStream } from 'node:fs';
+
+app.get('/download', (param, req, res) => {
+	res.setHeader('Content-Type', 'application/pdf');
+	return createReadStream('/path/to/file.pdf');
+});
+```
+
+If the stream fails before sending data, badak responds `500 Internal Server Error`.
+If it fails while sending data, the connection is closed so that the client can know the response is incomplete.
+
 ### `BadakOption`
 
 Specifies how the badak app should behave.
@@ -165,12 +256,21 @@ Specifies how the badak app should behave.
 
 If an error occurs, a log is output to the console.
 
+- Logged : `5xx` `HttpError`, and other errors such as `Error`, including an error thrown in the `auth()` function.
+- Not logged : `4xx` `HttpError`, and `4xx` responses made by badak such as `404 Not Found`, `405 Method Not Allowed`,
+  `400 Bad Request` (malformed body) and `413 Payload Too Large`, because they are intended client error responses.
+
 The default is `true`.
 
 #### `preventError: boolean`
 
-If an error occurs, it is transmitted to the node.
-If you specify a value of `false`, the error will not be passed and will be ignored.
+Determines whether an error that occurs while handling a request stays in badak.
+
+- `true` : badak catches the error and responds with an error status code. The server keeps running.
+- `false` : badak responds with an error status code, and then rethrows the error.
+  The error is rethrown inside the request handler, so it becomes an unhandled promise rejection,
+  and the process terminates with the Node.js default setting (`--unhandled-rejections=throw`).
+  Use this value only if you want the process to stop on errors (fail-fast), e.g. with a process manager that restarts it.
 
 The default is `true`.
 
@@ -200,14 +300,29 @@ app.route({
 #### `parseNumber: boolean`
 
 Converts the string-type number passed as an argument to the `number` type.
+Only plain decimal numbers such as `5`, `-1.5` are converted.
+Values like `007` (leading zero), `1e3`, `0x10`, ` 5` (with spaces), and integers out of the safe integer range are kept as strings,
+so zip codes and IDs are not changed.
+It applies to the query string of `GET` requests and the body of `POST`/`PUT` requests, not to route params such as `:id`.
 
 The default is `false`.
 
 #### `parseDate: boolean`
 
 Converts the date in string format passed as an argument to the `Date` type.
+It applies to the query string of `GET` requests and the body of `POST`/`PUT` requests, not to route params such as `:id`.
 
 The default is `false`.
+
+#### `bodyLimit: number`
+
+The maximum size of the request body in bytes, a positive integer.
+If the request body is larger than this value, a `413 Payload Too Large` error occurs.
+For `multipart/form-data`, the whole request body is counted, including part headers and boundaries,
+so increase this value if you accept file uploads.
+Specify `Infinity` to remove the limit.
+
+The default is `102400` (100KB).
 
 ### `RouteOption`
 
@@ -244,13 +359,29 @@ If you specify a routing path as `/user1*`, you can match paths such as `/user`,
 
 ### query string
 
-When requesting the `GET` method, the query string argument is parsed and passed to the routing function.
+The query string is parsed and passed to the routing function, for every method.
 
 The examples below all match the `/path` path, and the arguments passed are as follows.
 
 ```bash
-/path?          # {}
-/path?key       # { key: null }
+/path?          # undefined
+/path?key       # { key: '' }
 /path?key=      # { key: '' }
 /path?key=value # { key: 'value' }
 ```
+
+### merging params
+
+Route params (e.g. `:id`), the query string and the request body (`POST`, `PUT`, `PATCH`) are merged into one object in this order.
+If the same key exists, the latter wins.
+
+```bash
+PATCH /users/7?name=a  with body { "name": "b" }  # { id: '7', name: 'b' }
+```
+
+> **Warning** : the query string and the request body can override route params.
+> For example, `PATCH /users/7?id=8` with body `{ "id": 9 }` passes `{ id: 9 }` to the route function `/users/:id`.
+> Don't trust a key that can come from the client as the route param.
+> Name route params so that they don't collide with query and body keys (e.g. `/users/:userId`).
+
+If the request body is not an object (e.g. a JSON array), it is passed as it is, without route params and the query string.

@@ -1,8 +1,9 @@
 {
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
+		"declaration": true,
 		"outDir": "build/esm",
-		"module": "NodeNext",
-		"moduleResolution": "NodeNext"
+		"module": "ES2022",
+		"moduleResolution": "bundler"
 	}
 }

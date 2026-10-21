@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 import { afterEach, beforeEach } from 'mocha';
@@ -6,6 +7,7 @@ import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { toContentTypeHeader } from '../src/util';
 import { CONTENT_TYPE, HEADER_KEY } from '../src/constants';
 import { StaticCache, StaticRule, TypedObject } from '../src/interfaces';
 import { promiseFail, TestPort } from './test-util';
@@ -140,15 +142,15 @@ describe('static()', () => {
 								.expect(200)
 								.then((res: SuperTestResponse): void => {
 									const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-									expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_PLAIN);
+									expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_PLAIN));
 
 									expect(res).to.be.a('object');
 									expect(res.text).to.be.a('string');
 									expect(res.text).to.be.eql(fileData);
 								}),
-							request(app.getHttpServer()).post(fullUri).expect(404),
-							request(app.getHttpServer()).put(fullUri).expect(404),
-							request(app.getHttpServer()).delete(fullUri).expect(404)
+							request(app.getHttpServer()).post(fullUri).expect(405).expect('Allow', 'GET, HEAD'),
+							request(app.getHttpServer()).put(fullUri).expect(405),
+							request(app.getHttpServer()).delete(fullUri).expect(405)
 						]);
 
 						if (i === 0) {
@@ -314,6 +316,66 @@ describe('static()', () => {
 			});
 	});
 
+	describe('about MIME - file name', () => {
+		let tempDir: string;
+
+		const files: [string, string, string][] = [
+			// [file name, contents, expected MIME]
+			['app.min.js', 'console.log(1);', CONTENT_TYPE.APPLICATION_JAVASCRIPT],
+			['main.chunk.abc123.css', 'body {}', CONTENT_TYPE.TEXT_CSS],
+			['module.mjs', 'export {};', CONTENT_TYPE.APPLICATION_JAVASCRIPT],
+			['app.js.map', '{}', CONTENT_TYPE.APPLICATION_JSON],
+			['icon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>', CONTENT_TYPE.IMAGE_SVG],
+			['font.woff2', 'wOF2', CONTENT_TYPE.FONT_WOFF2],
+			['font.woff', 'wOFF', CONTENT_TYPE.FONT_WOFF],
+			['module.wasm', '\0asm', CONTENT_TYPE.APPLICATION_WASM],
+			['site.webmanifest', '{}', CONTENT_TYPE.APPLICATION_MANIFEST_JSON],
+			['UPPER.HTML', '<html></html>', CONTENT_TYPE.TEXT_HTML],
+			// extension wins over short signature : 'BM' is the signature of bitmap
+			['bm.txt', 'BM is not a bitmap', CONTENT_TYPE.TEXT_PLAIN],
+			// unknown extension or no extension : binary
+			['data.unknownext', 'some data', CONTENT_TYPE.APPLICATION_OCTET_STREAM],
+			['LICENSE', 'MIT License', CONTENT_TYPE.APPLICATION_OCTET_STREAM]
+		];
+
+		beforeEach(() => {
+			tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'badak-mime-'));
+
+			files.forEach(([fileName, contents]: [string, string, string]): void => {
+				fs.writeFileSync(path.join(tempDir, fileName), contents);
+			});
+		});
+
+		afterEach(() => {
+			fs.rmSync(tempDir, { recursive: true, force: true });
+		});
+
+		it('unknown extension with known signature : by signature', async () => {
+			// PNG signature
+			fs.writeFileSync(path.join(tempDir, 'image.unknownext'), Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]));
+
+			await app.static('/static', tempDir);
+			await app.listen(TestPort);
+
+			await request(app.getHttpServer())
+				.get('/static/image.unknownext')
+				.expect(200)
+				.expect(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.IMAGE_PNG);
+		});
+
+		files.forEach(([fileName, , mime]: [string, string, string]): void => {
+			it(`ok : ${ fileName }`, async () => {
+				await app.static('/static', tempDir);
+				await app.listen(TestPort);
+
+				await request(app.getHttpServer())
+					.get(`/static/${ fileName }`)
+					.expect(200)
+					.expect(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(mime));
+			});
+		});
+	});
+
 	describe('about MIME', () => {
 		const defines: [string, string][] = [
 			['ico', CONTENT_TYPE.IMAGE_ICO],
@@ -359,13 +421,13 @@ describe('static()', () => {
 						expect(res).to.be.a('object');
 
 						const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-						expect(contentType).to.be.eql(mime);
+						expect(contentType).to.be.eql(toContentTypeHeader(mime));
 
 						expect(!!res.body || !!res.text).to.be.ok;
 					});
-				await request(app.getHttpServer()).post(fullUri).expect(404);
-				await request(app.getHttpServer()).put(fullUri).expect(404);
-				await request(app.getHttpServer()).delete(fullUri).expect(404);
+				await request(app.getHttpServer()).post(fullUri).expect(405);
+				await request(app.getHttpServer()).put(fullUri).expect(405);
+				await request(app.getHttpServer()).delete(fullUri).expect(405);
 
 				// request twice to check cache working
 				await request(app.getHttpServer())
@@ -375,14 +437,14 @@ describe('static()', () => {
 						expect(res).to.be.a('object');
 
 						const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-						expect(contentType).to.be.eql(mime);
+						expect(contentType).to.be.eql(toContentTypeHeader(mime));
 
 						expect(!!res.body || !!res.text).to.be.ok;
 					});
 
-				await request(app.getHttpServer()).post(fullUri).expect(404);
-				await request(app.getHttpServer()).put(fullUri).expect(404);
-				await request(app.getHttpServer()).delete(fullUri).expect(404);
+				await request(app.getHttpServer()).post(fullUri).expect(405);
+				await request(app.getHttpServer()).put(fullUri).expect(405);
+				await request(app.getHttpServer()).delete(fullUri).expect(405);
 			});
 		});
 	});

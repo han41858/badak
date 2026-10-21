@@ -45,6 +45,6 @@ switch (buildFormat) {
 }
 
 const fullStr: string = `{ "type": "${ typeInPackageJson }" }`;
-const filePath: string = `./build/${ buildFormat }/package1.json`;
+const filePath: string = `./build/${ buildFormat }/package.json`;
 
 writeFileSync(filePath, fullStr);

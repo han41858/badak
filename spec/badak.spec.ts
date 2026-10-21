@@ -1,4 +1,5 @@
 import { Server } from 'node:net';
+import { Agent, ClientRequest, IncomingMessage, request as httpRequest, ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
 
 import { afterEach, beforeEach } from 'mocha';
@@ -502,10 +503,149 @@ describe('core', () => {
 				expect(testFncCalled).to.be.true;
 			});
 		});
+
+		describe('multipart/form-data parsing', () => {
+			let receivedParam: Record<string, unknown> | undefined;
+
+			const pngFilePath: string = './spec/static/test.png';
+			let pngFileData: Buffer;
+
+			beforeEach(async () => {
+				receivedParam = undefined;
+				pngFileData = readFileSync(pngFilePath);
+
+				await app.post('/upload', (param: Record<string, unknown>): void => {
+					receivedParam = param;
+				});
+
+				await app.listen(TestPort);
+			});
+
+			it('multiline and non-ASCII field values', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.field('multiline', 'line1\r\nline2\nline3')
+					.field('korean', '한글 값')
+					.field('last', 'v')
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({
+					multiline: 'line1\r\nline2\nline3',
+					korean: '한글 값',
+					last: 'v'
+				});
+			});
+
+			it('array field', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.field('list[]', 'a')
+					.field('list[]', 'b')
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ list: ['a', 'b'] });
+			});
+
+			it('image file is passed as Buffer without corruption', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.attach('image', pngFilePath, { contentType: 'image/png' })
+					.expect(200);
+
+				expect(receivedParam).to.have.property('image');
+
+				const image: unknown = (receivedParam as Record<string, unknown>).image;
+
+				expect(Buffer.isBuffer(image)).to.be.true;
+				expect((image as Buffer).equals(pngFileData)).to.be.true;
+			});
+
+			it('text/plain file content is kept exactly', async () => {
+				const contents: string = 'hello\r\nworld';
+
+				await request(app.getHttpServer())
+					.post('/upload')
+					.attach('text', Buffer.from(contents), { filename: 'a.txt', contentType: 'text/plain' })
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ text: contents });
+			});
+
+			it('quoted boundary', async () => {
+				const boundary: string = 'my boundary';
+
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', `multipart/form-data; boundary="${ boundary }"`)
+					.send([
+						`--${ boundary }`,
+						'Content-Disposition: form-data; name="a"',
+						'',
+						'1',
+						`--${ boundary }--`,
+						''
+					].join('\r\n'))
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ a: '1' });
+			});
+
+			it('boundary-like bytes in content are not a delimiter', async () => {
+				const contents: string = 'line\r\n--abcNOT_A_DELIMITER\r\nmore';
+
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send([
+						'--abc',
+						'Content-Disposition: form-data; name="file"; filename="a.txt"',
+						'Content-Type: text/plain',
+						'',
+						contents,
+						'--abc--',
+						''
+					].join('\r\n'))
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ file: contents });
+			});
+
+			it('transport padding after boundary', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send('--abc  \r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--abc--\r\n')
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ a: '1' });
+			});
+
+			it('preamble and epilogue are ignored', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send('preamble\r\n--abc\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--abc--\r\nepilogue')
+					.timeout(500)
+					.expect(200);
+
+				expect(receivedParam).to.be.eql({ a: '1' });
+			});
+
+			it('malformed body responds 400', async () => {
+				await request(app.getHttpServer())
+					.post('/upload')
+					.set('Content-Type', 'multipart/form-data; boundary=abc')
+					.send('--abc\r\nContent-Disposition: form-data; name="a"\r\n\r\nno close delimiter')
+					.timeout(500)
+					.expect(400);
+			});
+		});
 	});
 
 	describe('4-methods', () => {
-		const methodArr: (keyof Badak)[] = ['get', 'post', 'put', 'delete'];
+		const methodArr: (keyof Badak)[] = ['get', 'post', 'put', 'patch', 'delete'];
 
 		methodArr.forEach((method: keyof Badak): void => {
 			const testFnc: RouteFunction = (): void => {
@@ -571,6 +711,10 @@ describe('core', () => {
 							requestFnc = requestObj.put(uri);
 							break;
 
+						case 'patch':
+							requestFnc = requestObj.patch(uri);
+							break;
+
 						case 'delete':
 							requestFnc = requestObj.delete(uri);
 							break;
@@ -624,6 +768,10 @@ describe('core', () => {
 
 						case 'put':
 							requestFnc = requestObj.put(uri);
+							break;
+
+						case 'patch':
+							requestFnc = requestObj.patch(uri);
 							break;
 
 						case 'delete':
@@ -681,6 +829,10 @@ describe('core', () => {
 
 						case 'put':
 							requestFnc = requestObj.put(uri);
+							break;
+
+						case 'patch':
+							requestFnc = requestObj.patch(uri);
 							break;
 
 						case 'delete':
@@ -748,6 +900,10 @@ describe('core', () => {
 							requestFnc1 = requestObj1.put(uri1);
 							break;
 
+						case 'patch':
+							requestFnc1 = requestObj1.patch(uri1);
+							break;
+
 						case 'delete':
 							requestFnc1 = requestObj1.delete(uri1);
 							break;
@@ -772,6 +928,10 @@ describe('core', () => {
 
 						case 'put':
 							requestFnc2 = requestObj2.put(uri2);
+							break;
+
+						case 'patch':
+							requestFnc2 = requestObj2.patch(uri2);
 							break;
 
 						case 'delete':
@@ -799,12 +959,124 @@ describe('core', () => {
 					app.stop()
 				);
 			});
+
+			[-1, NaN, '1000', 1.5, -Infinity, 2 ** 31, Number.MAX_SAFE_INTEGER].forEach((timeout: unknown): void => {
+				it(`invalid timeout : ${ String(timeout) }`, async () => {
+					await app.listen(TestPort);
+
+					await promiseFail(
+						app.stop(timeout as number)
+					);
+				});
+			});
 		});
 
 		it('ok', async () => {
 			await app.listen(TestPort);
 
 			await app.stop();
+		});
+
+		describe('with connections', () => {
+			// response is started but never ended, like SSE
+			const openEndlessRequest = async (): Promise<ClientRequest> => {
+				await app.get('/endless', (param: unknown, req: IncomingMessage, res: ServerResponse): void => {
+					res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+					res.write('data: 1\n\n');
+				});
+
+				await app.listen(TestPort);
+
+				return new Promise((resolve): void => {
+					const req: ClientRequest = httpRequest({ port: TestPort, path: '/endless' }, (res: IncomingMessage): void => {
+						res.resume();
+						resolve(req);
+					});
+
+					req.on('error', (): void => {
+						// closed by server
+					});
+
+					req.end();
+				});
+			};
+
+			it('idle keep-alive connection doesn\'t block', async () => {
+				await app.get('/test', (): string => 'ok');
+				await app.listen(TestPort);
+
+				const agent: Agent = new Agent({ keepAlive: true });
+
+				try {
+					await new Promise<void>((resolve): void => {
+						httpRequest({ port: TestPort, path: '/test', agent }, (res: IncomingMessage): void => {
+							res.resume();
+							res.on('end', resolve);
+						}).end();
+					});
+
+					const start: number = Date.now();
+					await app.stop();
+
+					expect(Date.now() - start).to.be.below(500);
+					expect(app.isRunning()).to.be.false;
+				}
+				finally {
+					agent.destroy();
+				}
+			});
+
+			it('waits for in-flight request without timeout', async () => {
+				const req: ClientRequest = await openEndlessRequest();
+
+				let stopped: boolean = false;
+				const stopPromise: Promise<void> = app.stop().then((): void => {
+					stopped = true;
+				});
+
+				await new Promise((resolve) => setTimeout(resolve, 200));
+				expect(stopped).to.be.false;
+
+				// client closes the connection
+				req.destroy();
+				await stopPromise;
+
+				expect(stopped).to.be.true;
+				expect(app.isRunning()).to.be.false;
+			});
+
+			[2 ** 31 - 1, Infinity].forEach((timeout: number): void => {
+				it(`timeout ${ timeout } waits, not closes immediately`, async () => {
+					const req: ClientRequest = await openEndlessRequest();
+
+					let stopped: boolean = false;
+					const stopPromise: Promise<void> = app.stop(timeout).then((): void => {
+						stopped = true;
+					});
+
+					await new Promise((resolve) => setTimeout(resolve, 200));
+					expect(stopped).to.be.false;
+
+					req.destroy();
+					await stopPromise;
+
+					expect(stopped).to.be.true;
+				});
+			});
+
+			it('closes remaining connections after timeout', async () => {
+				const req: ClientRequest = await openEndlessRequest();
+
+				const start: number = Date.now();
+				await app.stop(100);
+				const elapsed: number = Date.now() - start;
+
+				expect(elapsed).to.be.at.least(90);
+				expect(elapsed).to.be.below(500);
+				expect(app.isRunning()).to.be.false;
+
+				req.destroy();
+			});
 		});
 	});
 });

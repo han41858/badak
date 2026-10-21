@@ -6,6 +6,7 @@ import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { toContentTypeHeader } from '../src/util';
 import { promiseFail, TestPort } from './test-util';
 import { CONTENT_TYPE, HEADER_KEY } from '../src/constants';
 
@@ -118,7 +119,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -129,7 +130,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -149,7 +150,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -160,7 +161,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -183,7 +184,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -194,7 +195,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -205,7 +206,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -229,7 +230,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -240,7 +241,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});
@@ -251,7 +252,7 @@ describe('setSPARoot()', () => {
 				expect(res).to.be.a('object');
 
 				const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-				expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_HTML);
+				expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_HTML));
 
 				expect(res.text).to.be.eql(indexFileContents);
 			});

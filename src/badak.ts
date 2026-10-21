@@ -1,6 +1,7 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import * as node_path from 'node:path';
 import * as querystring from 'node:querystring';
+import { Readable } from 'node:stream';
 
 import {
 	BadakOption,
@@ -13,20 +14,27 @@ import {
 	StaticCache,
 	StaticRule,
 	TypedObject
-} from './interfaces';
-import { CONTENT_TYPE, HEADER_KEY, METHOD } from './constants';
+} from './interfaces.js';
+import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, MAX_TIMER_DELAY, METHOD } from './constants.js';
+import { HttpError, isHttpError } from './http-error.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
 	convertDateStr,
 	convertNumberStr,
 	decodeUriFrag,
-	getContentType,
+	getMultipartBoundary,
 	isExistFile,
 	isFolder,
+	isResponseStarted,
 	loadFolder,
-	sift
-} from './util';
+	MultipartPart,
+	parseMultipart,
+	SerializedBody,
+	serializeBody,
+	sift,
+	toContentTypeHeader
+} from './util.js';
 
 /**
  * rule format, reserved keyword is 4-methods in upper cases
@@ -74,13 +82,18 @@ export class Badak {
 		defaultMethod: undefined,
 
 		parseNumber: false,
-		parseDate: false
+		parseDate: false,
+
+		bodyLimit: DEFAULT_BODY_LIMIT
 	};
 
 	constructor (option?: Partial<BadakOption>) {
 		if (option) {
 			for (const [key, value] of Object.entries(option)) {
-				this._config[key] = value;
+				// undefined means not set (Partial<BadakOption>)
+				if (value !== undefined) {
+					this._setOption(key, value);
+				}
 			}
 		}
 	}
@@ -184,91 +197,87 @@ export class Badak {
 		return refinedRuleObj;
 	}
 
-	// call recursively
-	private getUriKeyArr (routeRule: RouteRule | RouteRuleSeed): string[][] {
-		const result: string[][] = [];
+	// check uri duplication among sibling uri fragments (same parent), call recursively
+	private _checkUriDuplication (currentRouteRule: RouteRule, newRouteRule: RouteRule): void {
+		const isMethodKey = (key: string): boolean => Object.values(METHOD).includes(key as METHOD);
 
-		for (const [key, value] of Object.entries(routeRule)) {
-			if (typeof value === 'object') {
-				if (!Object.values(METHOD).includes(key as METHOD)) {
-					this.getUriKeyArr(value).forEach((one: string[]): void => {
-						result.push([key, ...one]);
-					});
-				}
-				else {
-					result.push([key]);
-				}
+		this._checkSiblingUriKeys(
+			sift([
+				...Object.keys(currentRouteRule),
+				...Object.keys(newRouteRule)
+			])
+				.filter((key: string): boolean => !isMethodKey(key))
+		);
+
+		// current rule is checked already, so go deeper along new rule only
+		for (const [key, newChild] of Object.entries(newRouteRule)) {
+			if (isMethodKey(key) || typeof newChild !== 'object') {
+				continue;
 			}
-			else {
-				result.push([key]);
+
+			const currentChild: RouteRule | RouteRuleSeed | RouteFunction | undefined = currentRouteRule[key];
+
+			this._checkUriDuplication(
+				typeof currentChild === 'object'
+					? currentChild as RouteRule
+					: {},
+				newChild as RouteRule
+			);
+		}
+	}
+
+	private _checkSiblingUriKeys (targetKeys: string[]): void {
+		// colon routing
+		const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
+		if (colonRouteArr.length > 1) {
+			throw new Error('duplicated colon routing');
+		}
+
+		// question routing
+		const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('?'));
+		if (questionRouteArr.length > 0) {
+			const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
+
+			const matchingResult: string | undefined = questionRouteArr.find((regSrc: string): boolean => {
+				// anchor to match whole uri fragment
+				return targetUris.some((uri: string): boolean => new RegExp(`^(?:${ regSrc })$`).test(uri));
+			});
+
+			if (matchingResult !== undefined) {
+				throw new Error('duplicated question routing');
 			}
 		}
 
-		return result;
-	}
+		// plus routing
+		const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('+'));
+		if (plusRouteArr.length > 0) {
+			plusRouteArr.forEach((plusUri: string): void => {
+				// same as request matching, match whole uri fragment
+				const plusRegExp: RegExp = new RegExp(`^(?:${ plusUri })$`);
 
-	private _checkUriDuplication (currentRouteRule: RouteRule, newRouteRule: RouteRule): void {
-		const allUriKeys: string[][] = [
-			...this.getUriKeyArr(currentRouteRule),
-			...this.getUriKeyArr(newRouteRule)
-		];
+				const isDuplicated: boolean = targetKeys
+					.filter((uri: string): boolean => {
+						// other special routings are checked by themselves
+						return uri !== plusUri
+							&& !uri.startsWith(':')
+							&& !uri.includes('?')
+							&& !uri.includes('*');
+					})
+					// for other plus uri, compare with its shortest matching uri : 'abc+' -> 'abc'
+					.map((uri: string): string => uri.replace(/\+/g, ''))
+					.some((uri: string): boolean => plusRegExp.test(uri));
 
-		const maxDepthLength: number = allUriKeys.reduce((maxLength: number, cur: string[]): number => {
-			return maxLength > cur.length
-				? maxLength
-				: cur.length;
-		}, 0);
-
-		for (let i: number = 0; i <= maxDepthLength; i++) {
-			const targetKeys: string[] = sift(
-				allUriKeys
-					.map((oneTree: string[]): string => oneTree[i])
-					.filter((frag: string): frag is string => !!frag) // for different depth
-			);
-
-			// colon routing
-			const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
-			if (colonRouteArr.length > 1) {
-				throw new Error('duplicated colon routing');
-			}
-
-			// question routing
-			const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('?'));
-			if (questionRouteArr.length > 0) {
-				const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
-
-				const matchingResult: string | undefined = questionRouteArr.find((regSrc: string): boolean => {
-					return targetUris.some((uri: string): boolean => new RegExp(regSrc).test(uri));
-				});
-
-				if (matchingResult !== undefined) {
-					throw new Error('duplicated question routing');
+				if (isDuplicated) {
+					throw new Error('duplicated plus routing');
 				}
-			}
+			});
+		}
 
-			// plus routing
-			const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('+'));
-			if (plusRouteArr.length > 0) {
-				const plusUrisSanitized: string[] = [...targetKeys]; // start with all keys
-				plusRouteArr.forEach((uri: string): void => {
-					const plusIncluded: string = uri.replace('+', '');
-					const plusExcluded: string = uri.replace(/.\+/, '');
+		// asterisk routing
+		const asteriskRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('*'));
 
-					if (plusUrisSanitized.includes(plusIncluded) || plusUrisSanitized.includes(plusExcluded)) {
-						throw new Error('duplicated plus routing');
-					}
-					else {
-						plusUrisSanitized.push(plusIncluded, plusExcluded);
-					}
-				});
-			}
-
-			// asterisk routing
-			const asteriskRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('*'));
-
-			if (asteriskRouteArr.length > 1) {
-				throw new Error('duplicated asterisk routing');
-			}
+		if (asteriskRouteArr.length > 1) {
+			throw new Error('duplicated asterisk routing');
 		}
 	}
 
@@ -343,43 +352,62 @@ export class Badak {
 		this._middlewaresAfter.push(middleware);
 	}
 
+	// validate & set an option, shared by constructor and config()
+	private _setOption (key: string, value: unknown): void {
+		switch (key) {
+			// boolean keys
+			case 'catchErrorLog':
+			case 'preventError':
+			case 'parseNumber':
+			case 'parseDate':
+				if (typeof value !== 'boolean') {
+					throw new Error('invalid value');
+				}
+
+				this._config[key] = value;
+				break;
+
+			case 'bodyLimit':
+				// bytes, positive integer or Infinity (no limit)
+				// NaN or decimal is rejected, NaN disables every size comparison
+				if (
+					typeof value !== 'number'
+					|| value <= 0
+					|| (!Number.isInteger(value) && value !== Infinity)
+				) {
+					throw new Error('invalid value');
+				}
+
+				this._config.bodyLimit = value;
+				break;
+
+			case 'defaultMethod':
+				if (value !== null) {
+					if (typeof value !== 'string') {
+						throw new Error('invalid method parameter');
+					}
+
+					if (!Object.values(METHOD).some((method: string): boolean => {
+						return value.toUpperCase() === method;
+					})) {
+						throw new Error('not defined method');
+					}
+
+					this._config.defaultMethod = value.toUpperCase() as METHOD;
+				}
+				else {
+					// null is clearing
+					delete this._config[key];
+				}
+				break;
+
+			default:
+				throw new Error('not defined option');
+		}
+	}
+
 	async config (key: string, value: unknown): Promise<void> {
-		if (Object.keys(this._config).includes(key)) {
-			switch (key) {
-				// boolean keys
-				case 'parseNumber':
-				case 'parseDate':
-					if (typeof value !== 'boolean') {
-						throw new Error('invalid value');
-					}
-
-					this._config[key] = value;
-					break;
-
-				case 'defaultMethod':
-					if (value !== null) {
-						if (typeof value !== 'string') {
-							throw new Error('invalid method parameter');
-						}
-
-						if (!Object.values(METHOD).some((method: string): boolean => {
-							return value.toUpperCase() === method;
-						})) {
-							throw new Error('not defined method');
-						}
-
-						this._config.defaultMethod = value.toUpperCase() as METHOD;
-					}
-					else {
-						// null is clearing
-						delete this._config[key];
-					}
-					break;
-			}
-		}
-		else {
-			throw new Error('not defined option');
-		}
+		this._setOption(key, value);
 	}
 
 	private _routeAbbrValidator (address: string, fnc: RouteFunction): void {
@@ -432,6 +460,20 @@ export class Badak {
 		this._assignRule({
 			[address]: {
 				[METHOD.PUT]: {
+					fnc: fnc,
+					option: option
+				}
+			}
+		});
+	}
+
+	async patch (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+		this._routeAbbrValidator(address, fnc);
+
+		// assign to route rule
+		this._assignRule({
+			[address]: {
+				[METHOD.PATCH]: {
 					fnc: fnc,
 					option: option
 				}
@@ -518,151 +560,55 @@ export class Badak {
 		const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
 
 		if (contentTypeInHeader) {
-			const [contentType, boundaryStrPair] = contentTypeInHeader
+			const [contentType] = contentTypeInHeader
 				.split(';')
 				.map((s: string): string => s.trim());
 
 			if (bodyBuffer.byteLength > 0) {
 				switch (contentType) {
 					case 'multipart/form-data': {
-						if (boundaryStrPair === undefined) {
+						const boundary: string | undefined = getMultipartBoundary(contentTypeInHeader);
+
+						if (boundary === undefined) {
 							// boundary is mandatory for multipart/form-data
-							throw new Error('Bad Request');
+							throw new HttpError(400);
 						}
 
-						const boundaryStrMatching: RegExpMatchArray | null = boundaryStrPair.match(/boundary\s*=\s*(.+)$/);
+						parseMultipart(bodyBuffer, boundary).forEach((part: MultipartPart): void => {
+							let value: string | Buffer;
 
-						if (
-							boundaryStrMatching !== null
-							&& boundaryStrMatching.length > 1
-						) {
-							const midBoundaryBuffer: Buffer = Buffer.from('--' + boundaryStrMatching[1] + '\r\n');
-							const endBoundaryBuffer: Buffer = Buffer.from('\r\n--' + boundaryStrMatching[1] + '--\r\n');
+							if (part.filename === undefined) {
+								// normal field
+								value = part.data.toString();
+							}
+							else {
+								// file, text/plain is default by RFC 7578
+								const fileContentType: string = (part.contentType ?? CONTENT_TYPE.TEXT_PLAIN).toLowerCase();
 
-							const endBoundaryIndex: number = bodyBuffer.indexOf(endBoundaryBuffer);
-
-							// remove end boundary
-							let partialBody: Buffer = Buffer.from(bodyBuffer).subarray(0, endBoundaryIndex);
-
-							const bodyBufferDivided: Buffer[] = [];
-
-							while (partialBody.byteLength > 0) {
-								const index: number = partialBody.indexOf(midBoundaryBuffer);
-
-								if (index >= 0) {
-									const nextIndex: number = partialBody
-										.subarray(index + midBoundaryBuffer.byteLength)
-										.indexOf(midBoundaryBuffer);
-
-									if (nextIndex >= 0) {
-										bodyBufferDivided.push(
-											partialBody.subarray(
-												index + midBoundaryBuffer.byteLength,
-												index + midBoundaryBuffer.byteLength + nextIndex
-											)
-										);
-
-										partialBody = partialBody.subarray(
-											nextIndex + midBoundaryBuffer.byteLength
-										);
-									}
-									else {
-										// last
-										bodyBufferDivided.push(
-											partialBody.subarray(
-												index + midBoundaryBuffer.byteLength
-											)
-										);
-
-										partialBody = partialBody.subarray(
-											index + midBoundaryBuffer.byteLength
-										);
-									}
-								}
-								else {
-									partialBody = Buffer.from('');
-								}
+								value = fileContentType.startsWith(CONTENT_TYPE.TEXT_PLAIN)
+									? part.data.toString()
+									: part.data;
 							}
 
-							bodyBufferDivided.forEach((one: Buffer): void => {
-								const oneStr: string = one.toString();
+							if (!param) {
+								param = {} as TypedObject<unknown>;
+							}
 
-								const filenameMatching: RegExpMatchArray | null = oneStr
-									.match(/filename\s*=\s*["']([^"']+)["']/);
+							if (part.name.endsWith('[]')) {
+								// array
+								const arrayName: string = part.name.replace(/\[]$/g, '');
 
-								if (filenameMatching === null) {
-									const keyMatching: RegExpMatchArray | null = oneStr
-										.match(/name\s*=\s*["']([^"']+)["']/);
-									const valueMatching: RegExpMatchArray | null = oneStr
-										.match(/\r\n\r\n(.*)(\r\n)*$/);
-
-									if (
-										keyMatching !== null
-										&& keyMatching.length > 1
-										&& valueMatching !== null
-										&& valueMatching.length > 1
-									) {
-										const key: string = keyMatching[1];
-										const value: string = valueMatching[1];
-
-
-										if (!param) {
-											param = {} as TypedObject<unknown>;
-										}
-
-										if (key.endsWith('[]')) {
-											// array
-											const arrayName: string = key.replace(/\[]$/g, '');
-
-											if (param[arrayName]) {
-												(param[arrayName] as Array<unknown>).push(value);
-											}
-											else {
-												param[arrayName] = [value];
-											}
-										}
-										else {
-											param[key] = value;
-										}
-									}
+								if (param[arrayName]) {
+									(param[arrayName] as Array<unknown>).push(value);
 								}
 								else {
-									const keyMatching: RegExpMatchArray | null = oneStr
-										.match(/name\s*=\s*["']([^"']+)["']/);
-									const fileContentTypeMatching: RegExpMatchArray | null = oneStr
-										.match(/[cC]ontent-[tT]ype\s*:\s*(.+)(\r\n)*/); // file doesn't end with \r\n, skip $
-
-									if (
-										keyMatching !== null
-										&& keyMatching.length > 1
-										&& fileContentTypeMatching !== null
-										&& fileContentTypeMatching.length > 1
-									) {
-										const fileContentTypeStr: string = fileContentTypeMatching[0];
-
-										const key: string = keyMatching[1];
-										const fileContentType: string = fileContentTypeMatching[1];
-										const cutStartIndex: number = (fileContentTypeMatching.index as number) + fileContentTypeStr.length;
-
-										if (!param) {
-											param = {} as TypedObject<unknown>;
-										}
-
-										switch (fileContentType.toLowerCase()) {
-											case 'text/plain': {
-												param[key] = oneStr.slice(cutStartIndex);
-												break;
-											}
-
-											case 'application/octet-stream': {
-												param[key] = one.subarray(cutStartIndex);
-												break;
-											}
-										}
-									}
+									param[arrayName] = [value];
 								}
-							});
-						}
+							}
+							else {
+								param[part.name] = value;
+							}
+						});
 						break;
 					}
 
@@ -673,7 +619,7 @@ export class Badak {
 							}
 							catch (e: unknown) {
 								// malformed JSON is client's fault
-								throw new Error('Bad Request', { cause: e });
+								throw new HttpError(400, { cause: e });
 							}
 						}
 						// no payload, but ok
@@ -722,9 +668,40 @@ export class Badak {
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
 	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | undefined> {
 		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
+			const bodyLimit: number = this._config.bodyLimit;
+
+			// reject before receiving body if declared size is over the limit
+			const contentLength: number = Number(req.headers['content-length']);
+
+			if (contentLength > bodyLimit) {
+				// discard the body to keep the connection (keep-alive) usable
+				req.resume();
+
+				reject(new HttpError(413));
+				return;
+			}
+
 			const bodyBufferPool: Uint8Array[] = [];
+			let receivedSize: number = 0;
+			let limitExceeded: boolean = false;
 
 			req.on('data', (stream: Uint8Array): void => {
+				if (limitExceeded) {
+					// discard rest of the body to keep the connection (keep-alive) usable
+					return;
+				}
+
+				receivedSize += stream.byteLength;
+
+				// for chunked request without content-length, or wrong content-length
+				if (receivedSize > bodyLimit) {
+					limitExceeded = true;
+					bodyBufferPool.length = 0;
+
+					reject(new HttpError(413));
+					return;
+				}
+
 				bodyBufferPool.push(stream);
 			});
 
@@ -733,6 +710,10 @@ export class Badak {
 			});
 
 			req.on('end', (): void => {
+				if (limitExceeded) {
+					return;
+				}
+
 				try {
 					resolve(this._parseBody(req, Buffer.concat(bodyBufferPool)));
 				}
@@ -791,6 +772,84 @@ export class Badak {
 		this._spaRoot = uri;
 	}
 
+	// send Readable stream returned by route function
+	// resolves when the response is finished or closed
+	// rejects only if the stream fails before sending the response headers, to respond with an error status code
+	private async _sendStream (req: IncomingMessage, res: ServerResponse, stream: Readable): Promise<void> {
+		if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
+			res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.APPLICATION_OCTET_STREAM);
+		}
+
+		// HEAD has no body, don't read the stream
+		if (req.method === 'HEAD') {
+			stream.destroy();
+			res.end();
+			return;
+		}
+
+		return new Promise<void>((resolve, reject): void => {
+			let settled: boolean = false;
+
+			const settle = (err?: unknown): void => {
+				if (settled) {
+					return;
+				}
+
+				settled = true;
+
+				if (err === undefined) {
+					resolve();
+				}
+				else {
+					reject(err);
+				}
+			};
+
+			stream.on('error', (err: Error): void => {
+				stream.unpipe(res);
+
+				// release resources, a stream with autoDestroy: false is not destroyed by itself
+				stream.destroy();
+
+				if (settled) {
+					// the response is finished or closed already, don't touch it
+					if (this._config.catchErrorLog) {
+						console.error('badak stream failed after response :', err);
+					}
+
+					return;
+				}
+
+				if (res.headersSent) {
+					// some data is sent already, close the connection so that the client can know the response is incomplete
+					if (this._config.catchErrorLog) {
+						console.error('badak stream failed while sending response :', err);
+					}
+
+					res.destroy(err);
+					settle();
+				}
+				else {
+					// respond with an error status code
+					settle(err);
+				}
+			});
+
+			res.on('finish', (): void => settle());
+
+			res.on('close', (): void => {
+				// client aborted, stop reading the stream
+				if (!res.writableFinished) {
+					stream.destroy();
+				}
+
+				settle();
+			});
+
+			stream.pipe(res);
+		});
+	}
+
 	async listen (port: number): Promise<void> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
@@ -818,9 +877,10 @@ export class Badak {
 					this.get(
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, oneCache.mime);
-							res.write(oneCache.fileData);
-							res.end();
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(oneCache.mime));
+							// explicit content-length for HEAD, same as GET
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, oneCache.fileData.byteLength);
+							res.end(oneCache.fileData);
 						},
 						{
 							auth: false
@@ -855,11 +915,14 @@ export class Badak {
 								fileData: targetCache.fileData
 							};
 
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, resFileObj.mime);
-							res.write(resFileObj.fileData);
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(resFileObj.mime));
+							// explicit content-length for HEAD, same as GET
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, resFileObj.fileData.byteLength);
+							res.end(resFileObj.fileData);
 						}
-
-						res.end();
+						else {
+							res.end();
+						}
 					},
 					{
 						auth: false
@@ -876,29 +939,26 @@ export class Badak {
 				try {
 					// run before middleware functions in parallel
 					// before functions can't modify parameters
-					// use try {} to run route function
-					try {
-						await Promise.all(
-							this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
-								return middlewareFnc(req, res);
-							})
-						);
-					}
-					catch (err) {
-						// catch middleware exception
-						if (this._config.catchErrorLog) {
-							console.error('badak before() middleware failed :', err);
-						}
+					// if one of them throws, route function is not executed and the error is handled below like route errors
+					await Promise.all(
+						this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
+							return middlewareFnc(req, res);
+						})
+					);
+
+					if (isResponseStarted(res)) {
+						// before() middleware responded already (e.g. 429), skip routing
+						return;
 					}
 
 					if (this._staticRules === null) {
 						// no rule assigned
-						throw new Error('no rule');
+						throw new HttpError(404);
 					}
 
 
 					if (!req.method) {
-						throw new Error('no method');
+						throw new HttpError(400);
 					}
 
 					const method: string = req.method.toUpperCase();
@@ -1017,7 +1077,8 @@ export class Badak {
 							});
 
 							const targetPlusKey: string | undefined = plusKeyArr.find((plusKey: string): boolean => {
-								return new RegExp(plusKey).test(uriFrag);
+								// anchor to match whole uri fragment
+								return new RegExp(`^(?:${ plusKey })$`).test(uriFrag);
 							});
 
 							if (targetPlusKey !== undefined) {
@@ -1057,12 +1118,13 @@ export class Badak {
 							// partial asterisk routing
 							const targetAsteriskKey: string | undefined = routeRuleKeyArr
 								.filter((routeRuleKey: string): boolean => {
-									return /.\*./.test(routeRuleKey);
+									// 'ab*cd', 'user1*', not '**'
+									return routeRuleKey !== '**' && /.\*/.test(routeRuleKey);
 								})
 								.find((asteriskKey: string): boolean => {
-									// replace '*' to '(.)*'
+									// replace 'b*' to '.*', anchor to match whole uri fragment
 									return new RegExp(
-										asteriskKey.replace(/.\*/, '.*')
+										`^(?:${ asteriskKey.replace(/.\*/, '.*') })$`
 									).test(uriFrag);
 								});
 
@@ -1129,37 +1191,75 @@ export class Badak {
 						// loopControl === LoopControl.Continue : continue
 					}
 
-					if (checkTargetRule && checkTargetRule[method]) {
-						targetFncObj = checkTargetRule[method] as RouteFunctionObj;
+					// HEAD is handled by GET route function, Node.js doesn't send the body for HEAD
+					const ruleMethod: string = method === 'HEAD'
+						? METHOD.GET
+						: method;
+
+					if (checkTargetRule && checkTargetRule[ruleMethod]) {
+						targetFncObj = checkTargetRule[ruleMethod] as RouteFunctionObj;
 					}
 
 					if (targetFncObj === undefined) {
-						throw new Error('no rule');
+						// path exists, but not for this method : 405 with allowed methods
+						const allowedMethods: string[] = checkTargetRule !== undefined
+							? Object.values(METHOD).filter((one: METHOD): boolean => {
+								return (checkTargetRule as RouteRule)[one] !== undefined;
+							})
+							: [];
+
+						if (allowedMethods.length > 0) {
+							// HEAD is handled by GET
+							if (allowedMethods.includes(METHOD.GET)) {
+								allowedMethods.splice(allowedMethods.indexOf(METHOD.GET) + 1, 0, 'HEAD');
+							}
+
+							res.setHeader('Allow', allowedMethods.join(', '));
+
+							throw new HttpError(405);
+						}
+
+						throw new HttpError(404);
 					}
 
+					// params are merged in this order, the latter wins for the same key :
+					// route param (e.g. colon routing) -> query string -> request body
+
+					// query string, for every method
+					if (
+						queryStr !== undefined
+						&& queryStr !== ''
+					) {
+						// convert by parseNumber & parseDate options, same as request body
+						param = Object.assign(
+							param ?? {},
+							this._paramConverter({ ...querystring.parse(queryStr) })
+						);
+					}
+
+					// request body
 					switch (method) {
-						case METHOD.GET: {
-							// parse query string param
-							if (
-								queryStr !== undefined
-								&& queryStr !== ''
-							) {
-								// merge with route param (e.g. colon routing), same rule as POST/PUT body
-								param = Object.assign(param ?? {}, querystring.parse(queryStr));
+						case METHOD.PUT:
+						case METHOD.POST:
+						case METHOD.PATCH: {
+							const bodyParam: TypedObject<unknown> | undefined = await this._paramParser(req);
+
+							if (bodyParam !== undefined) {
+								if (
+									param !== undefined
+									&& typeof bodyParam === 'object'
+									&& bodyParam !== null
+									&& !Array.isArray(bodyParam)
+								) {
+									param = Object.assign(param, bodyParam);
+								}
+								else {
+									// array or primitive JSON body can't be merged, passed as it is
+									param = bodyParam;
+								}
 							}
 							break;
 						}
-
-						case METHOD.PUT:
-						case METHOD.POST:
-							if (param) {
-								// TODO: overwrite? uri param & param object
-								param = Object.assign(param, await this._paramParser(req));
-							}
-							else {
-								param = await this._paramParser(req);
-							}
-							break;
 					}
 
 					if (
@@ -1172,7 +1272,18 @@ export class Badak {
 							await this._authFnc(req, res);
 						}
 						catch (e: unknown) {
+							// HttpError keeps its own status code, e.g. 403
+							if (isHttpError(e)) {
+								throw e;
+							}
+
+							// general Error from auth function is logged (e.g. DB failure in auth), responds 401
 							throw new Error('Unauthorized', { cause: e });
+						}
+
+						if (isResponseStarted(res)) {
+							// auth function responded already (e.g. 401), skip route function
+							return;
 						}
 					}
 
@@ -1182,41 +1293,36 @@ export class Badak {
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
 
-					if (responseData) {
-						const contentType: CONTENT_TYPE = getContentType(responseData);
+					if (isResponseStarted(res)) {
+						// route function started (res.writeHead(), res.write()) or ended (res.end()) response by itself,
+						// ignore returned value and leave ending the response to the route function (e.g. streaming)
+					}
+					else if (responseData instanceof Readable) {
+						await this._sendStream(req, res, responseData);
+					}
+					else if (responseData !== undefined) {
+						// string as text, Buffer as binary, others (object, array, number, boolean, null) as JSON
+						// only undefined (no return value) responds an empty body
+						const serialized: SerializedBody | undefined = serializeBody(responseData);
+
+						if (serialized === undefined) {
+							// e.g. circular reference, BigInt
+							throw new Error('returned value of route function can\'t be serialized', { cause: responseData });
+						}
 
 						if (!res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
 						}
 
-						function _convertBufferToBase64<T extends object> (value: T): T {
-							Object.entries(value).forEach(([key, innerValue]) => {
-								if (innerValue === undefined
-									|| innerValue === null) {
-									// do nothing
-								}
-								else if (innerValue instanceof Buffer) {
-									(value as TypedObject<string>)[key] = innerValue.toString('base64');
-								}
-								else if (typeof innerValue === 'object') {
-									// call recursively
-									(value as TypedObject<object>)[key] = _convertBufferToBase64(innerValue);
-								}
-							});
+						responseBody = serialized.body;
 
-							return value;
-						}
-
-						switch (contentType) {
-							case CONTENT_TYPE.APPLICATION_JSON:
-								responseBody = JSON.stringify(
-									_convertBufferToBase64(responseData)
-								);
-								break;
-
-							default:
-								responseBody = responseData;
-
+						// explicit content-length, so that HEAD has the same headers as GET
+						// (Node.js sets it by itself for GET only, because HEAD has no body)
+						if (
+							!res.hasHeader(HEADER_KEY.CONTENT_LENGTH)
+							&& (typeof responseBody === 'string' || responseBody instanceof Uint8Array)
+						) {
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, Buffer.byteLength(responseBody));
 						}
 
 						res.end(responseBody);
@@ -1228,7 +1334,12 @@ export class Badak {
 				catch (e) {
 					const err: Error | TypedObject<unknown> = e as Error | TypedObject<unknown>;
 
-					if (this._config.catchErrorLog) {
+					// HttpError of 4xx is an intended client error response, not logged
+					// 5xx and other errors (including Error('Forbidden')) are logged
+					if (
+						this._config.catchErrorLog
+						&& !(isHttpError(err) && err.status < 500)
+					) {
 						console.error('badak catch error : %o', err);
 					}
 
@@ -1245,45 +1356,83 @@ export class Badak {
 						{ code: 404, message: 'Not Found' },
 						{ code: 404, message: 'no rule' },
 						{ code: 405, message: 'Method Not Allowed' },
-						{ code: 406, message: 'Not Acceptable' }
+						{ code: 406, message: 'Not Acceptable' },
+						{ code: 413, message: 'Payload Too Large' }
 					];
 
 					const foundResult: HttpResStatusCode | undefined = statusCodes.find((def: HttpResStatusCode): boolean => {
 						return def.message == err.message;
 					});
 
-					if (foundResult) {
-						res.statusCode = foundResult.code;
-						res.end();
-					}
-					else {
-						res.statusCode = 500; // Internal Server Error
-
-						if (err) {
-							if (err instanceof Error) {
-								// don't expose internal error message to client, it is logged by catchErrorLog
-								responseBody = 'Internal Server Error';
-								res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.TEXT_PLAIN);
+					// writing the error response must not throw again, it would escape the request handler
+					try {
+						if (isResponseStarted(res)) {
+							// headersSent : status code and headers can't be changed anymore
+							// writableEnded : response is completed already
+							// just close the response if it is not completed
+							if (!res.writableEnded) {
+								res.end();
 							}
-							else {
-								const contentType: CONTENT_TYPE = getContentType(err);
-								res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
+						}
+						else if (isHttpError(err)) {
+							res.statusCode = err.status;
 
-								switch (contentType) {
-									case CONTENT_TYPE.APPLICATION_JSON:
-										responseBody = JSON.stringify(err);
-										break;
-
-									default:
-										responseBody = err;
+							if (err.headers !== undefined) {
+								for (const [key, value] of Object.entries(err.headers)) {
+									if (value !== undefined) {
+										res.setHeader(key, value);
+									}
 								}
 							}
 
+							// status text (e.g. 'Forbidden') if body is not specified or not serializable
+							const serialized: SerializedBody = (
+								err.body !== undefined && err.body !== null
+									? serializeBody(err.body)
+									: undefined
+							) ?? {
+								body: err.message,
+								contentType: CONTENT_TYPE.TEXT_PLAIN
+							};
+
+							if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
+								res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
+							}
+
+							responseBody = serialized.body;
 							res.end(responseBody);
 						}
-						else {
+						else if (foundResult) {
+							res.statusCode = foundResult.code;
 							res.end();
 						}
+						else {
+							res.statusCode = 500; // Internal Server Error
+
+							// don't expose internal error message to client, it is logged by catchErrorLog
+							// thrown non-Error value (e.g. throw { reason }) is sent as the body if serializable
+							const serialized: SerializedBody = (
+								!(err instanceof Error) && err !== undefined && err !== null
+									? serializeBody(err)
+									: undefined
+							) ?? {
+								body: 'Internal Server Error',
+								contentType: CONTENT_TYPE.TEXT_PLAIN
+							};
+
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
+
+							responseBody = serialized.body;
+							res.end(responseBody);
+						}
+					}
+					catch (responseError: unknown) {
+						if (this._config.catchErrorLog) {
+							console.error('badak failed to write error response :', responseError);
+						}
+
+						// can't respond properly, close the connection
+						res.destroy();
 					}
 
 					if (!this._config.preventError) {
@@ -1330,17 +1479,53 @@ export class Badak {
 		return this._http;
 	}
 
-	async stop (): Promise<void> {
+	// stop accepting new connections, and wait for in-flight requests to finish (graceful)
+	// timeout (ms) : close remaining connections forcibly after this time, e.g. long polling or SSE
+	//   integer from 0 to MAX_TIMER_DELAY, or Infinity (wait without limit, same as undefined)
+	// note : upgraded connections (e.g. WebSocket) are not closed by closeAllConnections(),
+	//   badak doesn't handle 'upgrade' now so Node.js destroys them, but they need their own handling if supported
+	async stop (timeout?: number): Promise<void> {
 		if (this._http === undefined) {
 			throw new Error('server is not running, call listen() before stop()');
 		}
 
+		if (
+			timeout !== undefined
+			&& timeout !== Infinity
+			&& (
+				typeof timeout !== 'number'
+				|| !Number.isInteger(timeout)
+				|| timeout < 0
+				// larger delay is set to 1ms by Node.js, closes connections immediately
+				|| timeout > MAX_TIMER_DELAY
+			)
+		) {
+			throw new Error('invalid timeout');
+		}
+
+		const server: Server = this._http;
+
 		return new Promise<void>((resolve): void => {
-			this._http?.close((): void => {
+			let forceCloseTimer: NodeJS.Timeout | undefined;
+
+			server.close((): void => {
+				if (forceCloseTimer !== undefined) {
+					clearTimeout(forceCloseTimer);
+				}
+
 				delete this._http;
 
 				resolve();
 			});
+
+			// idle keep-alive connections, server.close() does it by itself since Node.js 19
+			server.closeIdleConnections();
+
+			if (timeout !== undefined && timeout !== Infinity) {
+				forceCloseTimer = setTimeout((): void => {
+					server.closeAllConnections();
+				}, timeout);
+			}
 		});
 	}
 }
