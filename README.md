@@ -495,7 +495,11 @@ await app.post<{ body: User }>('/users', ({ body }) => body.name);
 await app.get<{ params: IdParams }>('/users/:id', ({ params }) => params.id);
 ```
 
-The generic type is a **TypeScript assertion, not runtime validation**. Validate untrusted HTTP input before using it. Supported keys are `params`, `query`, and `body`; wrong keys are rejected when they do not satisfy the type constraint. Typed handlers can also be registered through `app.route()`.
+The generic type is a **TypeScript assertion, not runtime validation**. Validate untrusted HTTP input before using it. Typed handlers can also be registered through `app.route()`.
+
+- Supported keys are `params`, `query`, and `body`. Other keys (e.g. a typo `bdy`) are compile errors, even together with correct keys.
+- `params` values should be strings, because route captures are always decoded strings (`parseNumber` and `parseDate` don't apply to them). `{ params: { id: number } }` is a compile error. Interfaces and optional keys are supported, e.g. `interface IdParams { id: string }`, `{ id?: string }`.
+- `query` should be an object, `body` can be any type.
 
 ## Routing parameters
 

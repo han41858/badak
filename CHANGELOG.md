@@ -7,6 +7,8 @@ These changes break backward compatibility and are planned for 4.0.0.
 ### TypeScript improvements
 
 - Route handlers support one named generic type argument, e.g. `app.post<{ body: User }>()`, `app.get<{ params: IdParams; query: PageQuery }>()`. Typed callbacks also work inside `route()` objects. These declarations do not validate requests at runtime. ([#60](https://github.com/han41858/badak/pull/60))
+  - `params` values should be strings, same as the runtime values. Interfaces are supported.
+  - keys other than `params`, `query` and `body` are compile errors.
 - Consumer-facing strict TypeScript compile checks run with `yarn test:types` in CI.
 
 ### Breaking changes

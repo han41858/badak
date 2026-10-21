@@ -14,14 +14,34 @@ export interface ParamTypes {
 	body?: unknown;
 }
 
+// declared route params with string values, keys come from the declared type
+// interfaces without an index signature are allowed, e.g. interface IdParams { id: string }
+export type StringValues<P> = { [K in keyof P]: string };
+
+/**
+ * Constraint of the named type argument, checked against the declared type itself
+ * - params : values should be strings, route captures are always decoded strings (parseNumber / parseDate don't apply)
+ * - query : object, body : any type
+ * - other keys (e.g. a typo 'bdy') are rejected, even with correct keys
+ */
+export type CheckedParamTypes<T> = ParamTypes & {
+	[K in keyof T]: K extends 'params'
+		? StringValues<T[K]>
+		: K extends 'query'
+			? object
+			: K extends 'body'
+				? unknown
+				: never;
+};
+
 /** The independent sources of route parameters, query values and parsed request body. */
-export interface ParamContext<T extends ParamTypes = ParamTypes> {
+export interface ParamContext<T extends CheckedParamTypes<T> = ParamTypes> {
 	params: T extends { params: infer P } ? P : Record<string, string>;
 	query: T extends { query: infer Q } ? Q : Record<string, unknown>;
 	body: T extends { body: infer B } ? B : unknown;
 }
 
-export type RouteFunction<T extends ParamTypes = ParamTypes> = (
+export type RouteFunction<T extends CheckedParamTypes<T> = ParamTypes> = (
 	ctx: ParamContext<T>,
 	req: IncomingMessage,
 	res: ServerResponse

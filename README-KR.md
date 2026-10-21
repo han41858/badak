@@ -484,7 +484,11 @@ await app.post<{ body: User }>('/users', ({ body }) => body.name);
 await app.get<{ params: IdParams }>('/users/:id', ({ params }) => params.id);
 ```
 
-**제네릭 타입 선언은 런타임 데이터 검증이 아닙니다.** 외부 HTTP 입력은 사용 전에 검증해야 합니다. 허용 키는 `params`, `query`, `body`이며 타입 제약에 맞지 않는 키는 컴파일 오류가 발생합니다. 타입 지정 핸들러는 `app.route()`에서도 등록할 수 있습니다.
+**제네릭 타입 선언은 런타임 데이터 검증이 아닙니다.** 외부 HTTP 입력은 사용 전에 검증해야 합니다. 타입 지정 핸들러는 `app.route()`에서도 등록할 수 있습니다.
+
+- 허용 키는 `params`, `query`, `body`입니다. 그 밖의 키(예: 오타 `bdy`)는 올바른 키와 함께 써도 컴파일 오류가 발생합니다.
+- 경로 파라미터는 항상 디코딩된 문자열이므로(`parseNumber`, `parseDate`도 적용되지 않음) `params`의 값은 문자열이어야 합니다. `{ params: { id: number } }`는 컴파일 오류입니다. `interface IdParams { id: string }` 같은 인터페이스와 `{ id?: string }` 같은 선택적 키는 사용할 수 있습니다.
+- `query`는 객체여야 하며, `body`는 어떤 타입이든 지정할 수 있습니다.
 
 ## 라우팅 인자
 

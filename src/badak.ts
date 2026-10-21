@@ -4,6 +4,7 @@ import * as querystring from 'node:querystring';
 
 import {
 	BadakOption,
+	CheckedParamTypes,
 	ParamTypes,
 	ParamContext,
 	MiddlewareFunction,
@@ -198,7 +199,7 @@ export class Badak {
 	}
 
 	// route abbreviation
-	async get<T extends ParamTypes = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
+	async get<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -212,7 +213,7 @@ export class Badak {
 		});
 	}
 
-	async post<T extends ParamTypes = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
+	async post<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -226,7 +227,7 @@ export class Badak {
 		});
 	}
 
-	async put<T extends ParamTypes = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
+	async put<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -240,7 +241,7 @@ export class Badak {
 		});
 	}
 
-	async patch<T extends ParamTypes = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
+	async patch<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -254,7 +255,7 @@ export class Badak {
 		});
 	}
 
-	async delete<T extends ParamTypes = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
+	async delete<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
