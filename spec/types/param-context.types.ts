@@ -17,19 +17,19 @@ type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B 
 type Assert<T extends true> = T;
 
 type DefaultContext = ParamContext;
-type _DefaultParams = Assert<Equal<DefaultContext['params'], Record<string, string>>>;
-type _DefaultQuery = Assert<Equal<DefaultContext['query'], Record<string, unknown>>>;
-type _DefaultBody = Assert<Equal<DefaultContext['body'], unknown>>;
-type TypedContext = ParamContext<{ params: IdParams; query: PageQuery; body: User }>;
-type _TypedParams = Assert<Equal<TypedContext['params'], IdParams>>;
-type _TypedQuery = Assert<Equal<TypedContext['query'], PageQuery>>;
-type _TypedBody = Assert<Equal<TypedContext['body'], User>>;
+export type _DefaultParams = Assert<Equal<DefaultContext['params'], Record<string, string>>>;
+export type _DefaultQuery = Assert<Equal<DefaultContext['query'], Record<string, unknown>>>;
+export type _DefaultBody = Assert<Equal<DefaultContext['body'], unknown>>;
+type TypedContext = ParamContext<{ params: IdParams, query: PageQuery, body: User }>;
+export type _TypedParams = Assert<Equal<TypedContext['params'], IdParams>>;
+export type _TypedQuery = Assert<Equal<TypedContext['query'], PageQuery>>;
+export type _TypedBody = Assert<Equal<TypedContext['body'], User>>;
 
 const app = new Badak();
 
 void app.post<{ body: User }>('/users', ({ body }) => body.name);
-void app.patch<{ params: IdParams; body: User }>('/users/:id', ({ params, body }) => params.id + body.name);
-void app.get<{ params: IdParams; query: PageQuery }>('/u/:id', ({ params, query }) => params.id + String(query.page));
+void app.patch<{ params: IdParams, body: User }>('/users/:id', ({ params, body }) => params.id + body.name);
+void app.get<{ params: IdParams, query: PageQuery }>('/u/:id', ({ params, query }) => params.id + String(query.page));
 void app.put<{ body: User }>('/u', ({ body }) => body.age);
 void app.delete<{ params: IdParams }>('/u/:id', ({ params }) => params.id);
 
