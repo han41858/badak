@@ -20,7 +20,7 @@ const enc = (str: string): string => encodeURIComponent(str);
 describe('non-ASCII & percent-encoded routing', () => {
 	// route function for each uri, to know which route is matched
 	const fncOf = (uri: string): RouteFunction => {
-		const fnc: RouteFunction = (param: unknown): unknown => ({ uri, param });
+		const fnc: RouteFunction = (ctx: ParamContext): unknown => ({ uri, param: ctx.params });
 		Object.defineProperty(fnc, 'name', { value: uri });
 
 		return fnc;
