@@ -244,6 +244,8 @@ Specifies how the badak app should behave.
 #### `catchErrorLog: boolean`
 
 If an error occurs, a log is output to the console.
+Client errors thrown as `HttpError` with a 4xx status (including 404, 405, 400, 413 responded by badak) are not logged,
+because they are intended responses. Other errors, including 5xx `HttpError`, are logged.
 
 The default is `true`.
 

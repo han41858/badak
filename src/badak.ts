@@ -1353,7 +1353,11 @@ export class Badak {
 				catch (e) {
 					const err: Error | TypedObject<unknown> = e as Error | TypedObject<unknown>;
 
-					if (this._config.catchErrorLog) {
+					// 4xx HttpError is an intended client error response, don't log it
+					// plain Error (including message mapping like new Error('Forbidden')) and 5xx are logged
+					const isClientHttpError: boolean = isHttpError(err) && err.status < 500;
+
+					if (this._config.catchErrorLog && !isClientHttpError) {
 						console.error('badak catch error : %o', err);
 					}
 
