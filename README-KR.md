@@ -164,8 +164,13 @@ badak 앱의 동작 방식을 지정합니다.
 
 #### `preventError: boolean`
 
-에러가 발생하면 node로 전달합니다.
-`false` 값을 지정하면 에러를 전달하지 않고 무시합니다.
+요청을 처리하다 발생한 에러를 badak 안에서 처리할지 지정합니다.
+
+- `true` : badak이 에러를 잡아 에러 상태 코드로 응답합니다. 서버는 계속 동작합니다.
+- `false` : badak이 에러 상태 코드로 응답한 뒤, 에러를 다시 던집니다.
+  에러는 요청 처리 함수 안에서 던져지므로 처리되지 않은 Promise 거부(unhandled rejection)가 되고,
+  Node.js 기본 설정(`--unhandled-rejections=throw`)에서는 프로세스가 종료됩니다.
+  프로세스 매니저가 재시작해 주는 환경처럼, 에러가 나면 프로세스를 멈추고 싶을 때(fail-fast)만 사용하세요.
 
 기본값은 `true` 입니다.
 
