@@ -1,10 +1,43 @@
 # Changelog
 
+## Unreleased (4.0.0)
+
+These changes break backward compatibility and are planned for 4.0.0.
+
+### Breaking changes
+
+- `?` routing is defined as "`?` makes the character just before it optional", and the duplication check and request matching use the same interpretation. ([#57](https://github.com/han41858/badak/pull/57))
+  - `?` routing paths that can match the same uri fragment throw `duplicated question routing` when they are registered, regardless of the registration order.
+  - other characters are literal. They were interpreted as a regular expression before.
+  - `??`, and `?` with `+` or `*` in the same uri fragment, throw `invalid question route` when they are registered.
+  - the priority with normal, `:`, `+`, `*` and `**` routing is not changed.
+
+Cases that differ from 3.0.0 :
+
+| Routing paths | 3.0.0 | 4.0.0 |
+|---|---|---|
+| `/ab?c` and `/a?bc` | registered, `GET /abc` is handled by the one registered first | registering the second one throws |
+| `/colou?r` and `/colo?ur` | registered, `GET /colour` is handled by the one registered first | registering the second one throws |
+| `/a.c?` | matches `/abc`, `/axc` (`.` is any character) | matches `/a.c`, `/a.` only |
+| `/a.c?` and `/abc` | registering the second one throws | registered, `GET /abc` is handled by `/abc` |
+| `/ab(cd)?e` | matches `/abe`, `/abcde` (group) | matches `/ab(cd)e`, `/ab(cde` only |
+| `/a[bc]?` | matches `/a`, `/ab`, `/ac` (character class) | matches `/a[bc]`, `/a[bc` only |
+| `/a??`, `/ab?c+` | registered | throws when registered |
+| `/a?*` | registered alone, but a request that reaches the pattern responds `500`, and registering a sibling route throws `SyntaxError` (invalid regular expression) | throws `invalid question route` when registered |
+
+### Migration
+
+| If you ... | then |
+|---|---|
+| register `?` routing paths that match the same uri fragment | remove one of them, or merge them into one routing function |
+| use regular expression syntax in `?` routing paths (e.g. `(cd)?`, `[bc]`, `.`) | register each path separately, or use `:` routing and check the value in the routing function |
+| use `??`, or `?` with `+` or `*` in one uri fragment | split the routing path into simple patterns |
+
 ## 3.0.0 (2026-10-21)
 
 This release fixes the routing rules of `**` and `*`.
 `setSPARoot()` serves static files and other routes now, they responded `index.html` before.
-The public API is not changed, but some requests are handled by a different route, see [Breaking changes](#breaking-changes) and [Migration](#migration).
+The public API is not changed, but some requests are handled by a different route, see [Breaking changes](#breaking-changes-1) and [Migration](#migration-1).
 
 ### Breaking changes
 
@@ -70,7 +103,7 @@ and runs `auth()` before receiving the request body.
 
 This release fixes many bugs found in request handling, routing and packaging,
 and adds `HttpError`, `PATCH`, `HEAD`, stream responses and a request body size limit.
-Several fixes change existing behavior, see [Breaking changes](#breaking-changes-1) and [Migration](#migration-1) first.
+Several fixes change existing behavior, see [Breaking changes](#breaking-changes-2) and [Migration](#migration-2) first.
 
 ### Breaking changes
 

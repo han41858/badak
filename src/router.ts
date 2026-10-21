@@ -1,6 +1,7 @@
 import { RouteFunction, RouteFunctionObj, RouteOption, RouteRule, RouteRuleSeed, TypedObject } from './interfaces.js';
 import { METHOD } from './constants.js';
 import { decodeUriFrag, isValidBodyLimit, sift } from './util.js';
+import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from './question-pattern.js';
 
 
 // only bodyLimit is validated, other keys are not checked to keep the behavior of 2.0
@@ -115,6 +116,11 @@ export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: 
 				throw new Error('invalid question route');
 			}
 
+			if (isQuestionPattern(uriFrag)) {
+				// throws for '??', or '?' with '+' or '*'
+				parseQuestionPattern(uriFrag);
+			}
+
 			if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
 				throw new Error('invalid plus route');
 			}
@@ -204,18 +210,27 @@ const checkSiblingUriKeys = (targetKeys: string[]): void => {
 		throw new Error('duplicated colon routing');
 	}
 
-	// question routing
-	const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('?'));
+	// question routing, same pattern interpretation as request matching
+	const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => isQuestionPattern(uri));
 	if (questionRouteArr.length > 0) {
 		const targetUris: string[] = targetKeys.filter((uri: string): boolean => !questionRouteArr.includes(uri));
 
-		const matchingResult: string | undefined = questionRouteArr.find((regSrc: string): boolean => {
-			// anchor to match whole uri fragment
-			return targetUris.some((uri: string): boolean => new RegExp(`^(?:${ regSrc })$`).test(uri));
+		// question pattern and other uri fragments (as literal strings)
+		const matchingResult: string | undefined = questionRouteArr.find((pattern: string): boolean => {
+			return targetUris.some((uri: string): boolean => matchQuestionPattern(pattern, uri));
 		});
 
 		if (matchingResult !== undefined) {
 			throw new Error('duplicated question routing');
+		}
+
+		// question patterns that can match the same uri fragment, e.g. 'ab?c' and 'a?bc' for 'abc'
+		for (let i: number = 0; i < questionRouteArr.length; i++) {
+			for (let j: number = i + 1; j < questionRouteArr.length; j++) {
+				if (questionPatternsIntersect(questionRouteArr[i], questionRouteArr[j])) {
+					throw new Error(`duplicated question routing : ${ questionRouteArr[i] }, ${ questionRouteArr[j] }`);
+				}
+			}
 		}
 	}
 
@@ -384,23 +399,10 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 
 		if (!loopControl) {
 			// question routing
-			const questionKeyArr: string[] = routeRuleKeyArr.filter((routeRuleKey: string): boolean => {
-				return !!routeRuleKey.match(/.+\?/);
-			});
-
-			const targetQuestionKey: string | undefined = questionKeyArr.find((questionKey: string): boolean => {
-				const questionKeyIndex: number = questionKey.indexOf('?');
-
-				const optionalCharacter: string = questionKey.substring(
-					questionKeyIndex - 1,
-					questionKeyIndex
-				);
-
-				const mandatoryKey: string = questionKey.substring(0, questionKeyIndex - 1);
-				const restKey: string = questionKey.substring(questionKeyIndex + 1);
-
-				return new RegExp(`^${ mandatoryKey }${ optionalCharacter }?${ restKey }$`).test(uriFrag);
-			});
+			// question patterns of siblings don't overlap (checked on registration), at most one matches
+			const targetQuestionKey: string | undefined = routeRuleKeyArr
+				.filter((routeRuleKey: string): boolean => isQuestionPattern(routeRuleKey))
+				.find((questionKey: string): boolean => matchQuestionPattern(questionKey, uriFrag));
 
 			if (targetQuestionKey !== undefined) {
 				checkTargetRule = checkTargetRule[targetQuestionKey] as RouteRule;

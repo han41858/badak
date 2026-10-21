@@ -395,7 +395,13 @@ the request is matched and `{ userId: 'user1' }` is passed as an argument to the
 
 ### `?` routing
 
+`?` makes the character just before it optional.
 If you specify the routing path as `/users?`, you can match the `/user` and `/users` paths.
+The matched uri fragment is passed as the param with the routing path as the key, e.g. `{ 'users?': 'user' }`.
+
+- Other characters are literal, including characters with special meaning in regular expressions (e.g. `.`, `(`, `)`, `[`, `]`). `/a.c?` matches `/a.c` and `/a.`, not `/abc`.
+- `??`, and `?` with `+` or `*` in the same uri fragment (e.g. `/ab?c+`), throw an error when they are registered.
+- `?` routing paths that can match the same uri fragment can't be registered together, regardless of the registration order. For example, `/ab?c` and `/a?bc` both match `/abc`, so registering the second one throws `duplicated question routing`. A normal routing path matched by a `?` routing path (e.g. `/abc` and `/ab?c`) throws in the same way.
 
 ### `+` routing
 
