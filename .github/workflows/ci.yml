@@ -35,4 +35,9 @@ jobs:
 
       - run: yarn test
 
+      - run: yarn test:types
+
       - run: yarn build
+
+      # type tests against the packed package (.d.ts), as consumers use it
+      - run: yarn test:types:dist

@@ -4,9 +4,14 @@ import * as querystring from 'node:querystring';
 
 import {
 	BadakOption,
+	CheckedParamTypes,
+	NoBodyParamTypes,
+	NoBodyRouteFunction,
+	ParamTypes,
 	ParamContext,
 	MiddlewareFunction,
 	RouteFunction,
+	RouteHandler,
 	RouteFunctionObj,
 	RouteOption,
 	RouteRule,
@@ -181,7 +186,7 @@ export class Badak {
 		this._setOption(key, value);
 	}
 
-	private _routeAbbrValidator (address: string, fnc: RouteFunction): void {
+	private _routeAbbrValidator (address: string, fnc: RouteHandler): void {
 		if (address === undefined) {
 			throw new Error('no address');
 		}
@@ -196,21 +201,22 @@ export class Badak {
 	}
 
 	// route abbreviation
-	async get (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
-		this._routeAbbrValidator(address, fnc);
+	async get<T extends CheckedParamTypes<T, false> = NoBodyParamTypes> (address: string, fnc: NoBodyRouteFunction<T>, option?: RouteOption): Promise<void> {
+		// request body is not parsed for GET, declaring body is rejected by NoBodyRouteFunction
+		this._routeAbbrValidator(address, fnc as RouteHandler);
 
 		// assign to route rule
 		this._assignRule({
 			[address]: {
 				[METHOD.GET]: {
-					fnc: fnc,
+					fnc: fnc as RouteHandler,
 					option: option
 				}
 			}
 		});
 	}
 
-	async post (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async post<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -224,7 +230,7 @@ export class Badak {
 		});
 	}
 
-	async put (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async put<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -238,7 +244,7 @@ export class Badak {
 		});
 	}
 
-	async patch (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async patch<T extends CheckedParamTypes<T> = ParamTypes> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -252,14 +258,15 @@ export class Badak {
 		});
 	}
 
-	async delete (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
-		this._routeAbbrValidator(address, fnc);
+	async delete<T extends CheckedParamTypes<T, false> = NoBodyParamTypes> (address: string, fnc: NoBodyRouteFunction<T>, option?: RouteOption): Promise<void> {
+		// request body is not parsed for DELETE, declaring body is rejected by NoBodyRouteFunction
+		this._routeAbbrValidator(address, fnc as RouteHandler);
 
 		// assign to route rule
 		this._assignRule({
 			[address]: {
 				[METHOD.DELETE]: {
-					fnc: fnc,
+					fnc: fnc as RouteHandler,
 					option: option
 				}
 			}

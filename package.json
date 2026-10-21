@@ -28,6 +28,8 @@
 		"build:esm": "tsx ./scripts/create-package-json.ts esm",
 		"build": "yarn build:cjs&&yarn build:esm",
 		"test": "mocha",
+		"test:types": "tsc --project tsconfig.types.json",
+		"test:types:dist": "tsx ./scripts/check-dist-types.ts",
 		"lint": "eslint src spec"
 	},
 	"repository": {
