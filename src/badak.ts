@@ -1058,7 +1058,8 @@ export class Badak {
 							// partial asterisk routing
 							const targetAsteriskKey: string | undefined = routeRuleKeyArr
 								.filter((routeRuleKey: string): boolean => {
-									return /.\*./.test(routeRuleKey);
+									// 'ab*cd', 'user1*', not '**'
+									return routeRuleKey !== '**' && /.\*/.test(routeRuleKey);
 								})
 								.find((asteriskKey: string): boolean => {
 									// replace 'b*' to '.*', anchor to match whole uri fragment

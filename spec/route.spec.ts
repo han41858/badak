@@ -1818,6 +1818,38 @@ describe('route()', () => {
 					});
 				});
 			});
+			describe('trailing *', () => {
+				const testFrag: string = 'user1*';
+
+				const testFnc = (param: TypedObject<string>, req: IncomingMessage): void => {
+					expect(param).to.be.a('object');
+					expect(param[testFrag]).to.be.a('string');
+
+					calledUrls.push(req.url as string);
+				};
+
+				it('/user1*', async () => {
+					await app.route({
+						[`/${ testFrag }`]: {
+							GET: testFnc
+						}
+					});
+
+					await app.listen(TestPort);
+
+					// README example
+					validUrls.push(
+						'/user',
+						'/user1',
+						'/user11'
+					);
+
+					invalidUrls.push(
+						'/use',
+						'/xuser1'
+					);
+				});
+			});
 		});
 
 		// TODO: regular expression
