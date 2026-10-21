@@ -155,29 +155,29 @@ describe('** routing', () => {
 		});
 
 		it('route function receives the rest of the path', async () => {
-			await app.get('/files/**', (ctx: ParamContext): unknown => ctx.params);
+			await app.get('/files/**', (ctx: ParamContext): unknown => ctx);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
 				.get('/files/a/b%20c/d.txt')
-				.expect(200, { '**': 'a/b c/d.txt' });
+				.expect(200, { params: { '**': 'a/b c/d.txt' }, query: {} });
 
 			await request(app.getHttpServer())
 				.get('/files')
-				.expect(200, { '**': '' });
+				.expect(200, { params: { '**': '' }, query: {} });
 		});
 
 		it('query string is not included', async () => {
-			await app.get('/files/**', (ctx: ParamContext): unknown => ctx.params);
+			await app.get('/files/**', (ctx: ParamContext): unknown => ctx);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
 				.get('/files/a/b?c=1')
-				.expect(200, { '**': 'a/b', c: '1' });
+				.expect(200, { params: { '**': 'a/b' }, query: { c: '1' } });
 		});
 
 		it('malformed percent-encoding responds 400', async () => {
-			await app.get('/files/**', (ctx: ParamContext): unknown => ctx.params);
+			await app.get('/files/**', (ctx: ParamContext): unknown => ctx);
 			await app.listen(TestPort);
 
 			await request(app.getHttpServer())
