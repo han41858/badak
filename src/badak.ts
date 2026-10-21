@@ -453,6 +453,24 @@ export class Badak {
 		});
 	}
 
+	// convert string by parseDate & parseNumber options
+	// a string can't be both date and number format, so apply one of them
+	private _convertStr (value: string): unknown {
+		if (this._config.parseDate) {
+			const dateConverted: string | Date = convertDateStr(value);
+
+			if (dateConverted instanceof Date) {
+				return dateConverted;
+			}
+		}
+
+		if (this._config.parseNumber) {
+			return convertNumberStr(value);
+		}
+
+		return value;
+	}
+
 	// parameter can be object of string because request has string
 	// only work for string param
 	private _paramConverter (param: TypedObject<unknown>): TypedObject<unknown> {
@@ -469,12 +487,7 @@ export class Badak {
 					arr[i] = this._paramConverter(value as TypedObject<unknown>);
 				}
 				else if (typeof value === 'string') {
-					if (this._config.parseNumber) {
-						arr[i] = convertNumberStr(value);
-					}
-					if (this._config.parseDate) {
-						arr[i] = convertDateStr(value);
-					}
+					arr[i] = this._convertStr(value);
 				}
 			});
 		}
@@ -489,12 +502,7 @@ export class Badak {
 					param[key] = this._paramConverter(value as TypedObject<unknown>);
 				}
 				else if (typeof value === 'string') {
-					if (this._config.parseNumber) {
-						param[key] = convertNumberStr(value);
-					}
-					if (this._config.parseDate) {
-						param[key] = convertDateStr(value);
-					}
+					param[key] = this._convertStr(value);
 				}
 			}
 		}

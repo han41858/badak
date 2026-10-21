@@ -134,4 +134,41 @@ describe('regression', () => {
 				.expect(400);
 		});
 	});
+
+	describe('parseNumber & parseDate together', () => {
+		beforeEach(async () => {
+			app = new Badak({
+				catchErrorLog: false,
+				parseNumber: true,
+				parseDate: true
+			});
+
+			await app.post('/test', (param: TypedObject<unknown>): TypedObject<string> => {
+				return Object.fromEntries(
+					Object.entries(param).map(([key, value]) => {
+						return [key, value instanceof Date ? 'date' : typeof value];
+					})
+				);
+			});
+
+			await app.listen(TestPort);
+		});
+
+		it('number string, date string, normal string', async () => {
+			const res: SuperTestResponse = await request(app.getHttpServer())
+				.post('/test')
+				.send({
+					num: '123',
+					date: '2018-06-20',
+					str: 'abc'
+				})
+				.expect(200);
+
+			expect(res.body).to.be.eql({
+				num: 'number',
+				date: 'date',
+				str: 'string'
+			});
+		});
+	});
 });
