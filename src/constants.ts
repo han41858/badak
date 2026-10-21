@@ -17,8 +17,14 @@ export const DEFAULT_BODY_LIMIT: number = 100 * 1024;
 // case in-sensitive
 export enum HEADER_KEY {
 	CONTENT_TYPE = 'content-type',
-	CONTENT_LENGTH = 'content-length'
+	CONTENT_LENGTH = 'content-length',
+	CACHE_CONTROL = 'cache-control',
+	ETAG = 'etag',
+	LAST_MODIFIED = 'last-modified'
 }
+
+// Cache-Control of static files by default : cached, but revalidated with ETag / Last-Modified every time
+export const DEFAULT_STATIC_CACHE_CONTROL: string = 'no-cache';
 
 
 export enum CONTENT_TYPE {
