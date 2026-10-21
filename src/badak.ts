@@ -198,7 +198,7 @@ export class Badak {
 	}
 
 	// route abbreviation
-	async get (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async get<T extends ParamTypes = {}> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -212,7 +212,7 @@ export class Badak {
 		});
 	}
 
-	async post (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async post<T extends ParamTypes = {}> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -226,7 +226,7 @@ export class Badak {
 		});
 	}
 
-	async put (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async put<T extends ParamTypes = {}> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -240,7 +240,7 @@ export class Badak {
 		});
 	}
 
-	async patch (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async patch<T extends ParamTypes = {}> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
@@ -254,7 +254,7 @@ export class Badak {
 		});
 	}
 
-	async delete (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+	async delete<T extends ParamTypes = {}> (address: string, fnc: RouteFunction<T>, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
 		// assign to route rule
