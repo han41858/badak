@@ -1,22 +1,32 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 (2026-10-21)
+
+This release adds cache headers for static files and a request body size limit for each route,
+and runs `auth()` before receiving the request body.
 
 ### Added
 
-- Static files have `ETag` and `Last-Modified`, and respond `304 Not Modified` for `If-None-Match` and `If-Modified-Since`. `Cache-Control` is `no-cache` by default, and can be changed with the `cacheControl` option of `static()` and `setSPARoot()`.
-- `bodyLimit` of `RouteOption` to set the request body size limit for each routing function, e.g. `app.post('/upload', fnc, { bodyLimit: 10 * 1024 * 1024 })`.
-- `auth` of `RouteOption` is optional in the type, so that `{ bodyLimit }` can be passed alone.
+- Static files have `ETag` and `Last-Modified`, and respond `304 Not Modified` for `If-None-Match` and `If-Modified-Since`. ([#44](https://github.com/han41858/badak/pull/44))
+  - `Cache-Control` is `no-cache` by default (cached, but revalidated every time), and can be changed with the `cacheControl` option of `static()` and `setSPARoot()`, e.g. `{ cacheControl: 'public, max-age=31536000, immutable' }`, or `false` to omit the header.
+  - `StaticOption` type is exported.
+- `bodyLimit` of `RouteOption` to set the request body size limit for each routing function, e.g. `app.post('/upload', fnc, { bodyLimit: 10 * 1024 * 1024 })`. ([#45](https://github.com/han41858/badak/pull/45))
+- `auth` of `RouteOption` is optional in the type, so that `{ bodyLimit }` can be passed alone. ([#45](https://github.com/han41858/badak/pull/45))
 
 ### Changed
 
 - The `auth()` function is executed before the request body is received. It was executed after the request body was received and parsed. ([#46](https://github.com/han41858/badak/pull/46))
   - an unauthenticated request is rejected without receiving its body, so a route with a large `bodyLimit` doesn't receive it.
   - for an unauthenticated request, `auth()` responds first (e.g. `401`) instead of `413` for a large body or `400` for a malformed body.
+  - `auth()` doesn't receive the parsed body as before, so authentication logic is not affected.
 
 ### Fixed
 
 - A request hung if `before()` or `auth()` read the request body. It responds `500` now. ([#46](https://github.com/han41858/badak/pull/46))
+
+### Others
+
+- Update dev dependencies (mocha 12) to fix `yarn audit` vulnerabilities. No runtime dependency is changed, badak has none. ([#43](https://github.com/han41858/badak/pull/43))
 
 ## 2.0.0 (2026-10-21)
 
