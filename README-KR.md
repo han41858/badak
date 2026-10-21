@@ -179,6 +179,21 @@ export type RouteFunction = (param: any, req: IncomingMessage, res: ServerRespon
 HTTP 요청에 반응할 라우팅 함수를 등록합니다.
 라우팅 함수가 반환한 값은 HTTP 응답으로 반환됩니다.
 
+라우팅 함수가 `Readable` 스트림을 반환하면 badak이 응답으로 pipe합니다.
+라우팅 함수가 `Content-Type`을 지정하지 않으면 `application/octet-stream`으로 응답합니다.
+
+```typescript
+import { createReadStream } from 'node:fs';
+
+app.get('/download', (param, req, res) => {
+	res.setHeader('Content-Type', 'application/pdf');
+	return createReadStream('/path/to/file.pdf');
+});
+```
+
+데이터를 보내기 전에 스트림에서 에러가 나면 `500 Internal Server Error`로 응답합니다.
+데이터를 보내는 도중에 에러가 나면 클라이언트가 응답이 불완전하다는 것을 알 수 있도록 연결을 끊습니다.
+
 ### `BadakOption`
 
 badak 앱의 동작 방식을 지정합니다.
