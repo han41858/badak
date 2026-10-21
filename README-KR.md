@@ -235,7 +235,7 @@ export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, res
 ### `RouteFunction`
 
 ```typescript
-export type RouteFunction = (param: any, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
+export type RouteFunction = (ctx: ParamContext, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
 ```
 
 HTTP 요청에 반응할 라우팅 함수를 등록합니다.
@@ -471,6 +471,21 @@ await app.get('/api/users/:id', userFnc);
   예를 들어 `/%2A`는 `/*`(또는 `/%2A`)에만, `/colou%3Fr`는 `/colou%3Fr`에만, `/%3Aid`는 `/:id`에만 매칭됩니다.
 - 라우팅 경로에 잘못된 퍼센트 인코딩(예: `/100%`)이 있으면 등록할 때 에러가 발생합니다. `%`는 `%25`로 씁니다.
 - 정적 파일 이름은 문자 그대로 취급합니다. `한글.txt`, `a+b.txt`, `100%.txt` 같은 파일도 이름 그대로 제공됩니다.
+
+### ParamContext (4.0.0)
+
+라우팅 함수 첫 번째 인자는 기존 병합형 `param` 대신 `ParamContext = { params, query, body }` 입니다.
+`params`는 디코딩된 라우트 파라미터(문자열), `query`는 쿼리 문자열, `body`는 파싱된 요청 본문입니다. `params`와 `query`의 기본값은 `{}`, 본문이 없으면 `body`는 `undefined`입니다. `parseNumber`, `parseDate`는 query와 body에만 적용됩니다.
+
+```typescript
+await app.patch('/users/:id', ({ params, query, body }) => {
+  // PATCH /users/7?id=8, JSON 본문 { "id": 9 }
+  // params.id === '7', query.id === '8', (body as { id: number }).id === 9
+  return { params, query, body };
+});
+```
+
+기존 라우팅 함수의 첫 번째 인자를 새 구조에 맞게 수정해야 합니다. Node.js의 `req`, `res`는 두 번째와 세 번째 인자로 유지됩니다.
 
 ## 라우팅 인자
 
