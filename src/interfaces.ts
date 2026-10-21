@@ -15,13 +15,13 @@ export interface ParamTypes {
 }
 
 /** The independent sources of route parameters, query values and parsed request body. */
-export interface ParamContext<T extends ParamTypes = {}> {
+export interface ParamContext<T extends ParamTypes = ParamTypes> {
 	params: T extends { params: infer P } ? P : Record<string, string>;
 	query: T extends { query: infer Q } ? Q : Record<string, unknown>;
 	body: T extends { body: infer B } ? B : unknown;
 }
 
-export type RouteFunction<T extends ParamTypes = {}> = (
+export type RouteFunction<T extends ParamTypes = ParamTypes> = (
 	ctx: ParamContext<T>,
 	req: IncomingMessage,
 	res: ServerResponse
