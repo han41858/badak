@@ -463,6 +463,20 @@ export class Badak {
 		});
 	}
 
+	async patch (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
+		this._routeAbbrValidator(address, fnc);
+
+		// assign to route rule
+		this._assignRule({
+			[address]: {
+				[METHOD.PATCH]: {
+					fnc: fnc,
+					option: option
+				}
+			}
+		});
+	}
+
 	async delete (address: string, fnc: RouteFunction, option?: RouteOption): Promise<void> {
 		this._routeAbbrValidator(address, fnc);
 
@@ -782,8 +796,9 @@ export class Badak {
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
 							res.setHeader(HEADER_KEY.CONTENT_TYPE, oneCache.mime);
-							res.write(oneCache.fileData);
-							res.end();
+							// explicit content-length for HEAD, same as GET
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, oneCache.fileData.byteLength);
+							res.end(oneCache.fileData);
 						},
 						{
 							auth: false
@@ -819,10 +834,13 @@ export class Badak {
 							};
 
 							res.setHeader(HEADER_KEY.CONTENT_TYPE, resFileObj.mime);
-							res.write(resFileObj.fileData);
+							// explicit content-length for HEAD, same as GET
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, resFileObj.fileData.byteLength);
+							res.end(resFileObj.fileData);
 						}
-
-						res.end();
+						else {
+							res.end();
+						}
 					},
 					{
 						auth: false
@@ -1091,41 +1109,75 @@ export class Badak {
 						// loopControl === LoopControl.Continue : continue
 					}
 
-					if (checkTargetRule && checkTargetRule[method]) {
-						targetFncObj = checkTargetRule[method] as RouteFunctionObj;
+					// HEAD is handled by GET route function, Node.js doesn't send the body for HEAD
+					const ruleMethod: string = method === 'HEAD'
+						? METHOD.GET
+						: method;
+
+					if (checkTargetRule && checkTargetRule[ruleMethod]) {
+						targetFncObj = checkTargetRule[ruleMethod] as RouteFunctionObj;
 					}
 
 					if (targetFncObj === undefined) {
+						// path exists, but not for this method : 405 with allowed methods
+						const allowedMethods: string[] = checkTargetRule !== undefined
+							? Object.values(METHOD).filter((one: METHOD): boolean => {
+								return (checkTargetRule as RouteRule)[one] !== undefined;
+							})
+							: [];
+
+						if (allowedMethods.length > 0) {
+							// HEAD is handled by GET
+							if (allowedMethods.includes(METHOD.GET)) {
+								allowedMethods.splice(allowedMethods.indexOf(METHOD.GET) + 1, 0, 'HEAD');
+							}
+
+							res.setHeader('Allow', allowedMethods.join(', '));
+
+							throw new Error('Method Not Allowed');
+						}
+
 						throw new Error('no rule');
 					}
 
+					// params are merged in this order, the latter wins for the same key :
+					// route param (e.g. colon routing) -> query string -> request body
+
+					// query string, for every method
+					if (
+						queryStr !== undefined
+						&& queryStr !== ''
+					) {
+						// convert by parseNumber & parseDate options, same as request body
+						param = Object.assign(
+							param ?? {},
+							this._paramConverter({ ...querystring.parse(queryStr) })
+						);
+					}
+
+					// request body
 					switch (method) {
-						case METHOD.GET: {
-							// parse query string param
-							if (
-								queryStr !== undefined
-								&& queryStr !== ''
-							) {
-								// merge with route param (e.g. colon routing), same rule as POST/PUT body
-								// convert by parseNumber & parseDate options, same as POST/PUT body
-								param = Object.assign(
-									param ?? {},
-									this._paramConverter({ ...querystring.parse(queryStr) })
-								);
+						case METHOD.PUT:
+						case METHOD.POST:
+						case METHOD.PATCH: {
+							const bodyParam: TypedObject<unknown> | undefined = await this._paramParser(req);
+
+							if (bodyParam !== undefined) {
+								if (
+									param !== undefined
+									&& typeof bodyParam === 'object'
+									&& bodyParam !== null
+									&& !Array.isArray(bodyParam)
+								) {
+									param = Object.assign(param, bodyParam);
+								}
+								else {
+									// array or primitive JSON body can't be merged, passed as it is
+									param = bodyParam;
+								}
 							}
 							break;
 						}
-
-						case METHOD.PUT:
-						case METHOD.POST:
-							if (param) {
-								// TODO: overwrite? uri param & param object
-								param = Object.assign(param, await this._paramParser(req));
-							}
-							else {
-								param = await this._paramParser(req);
-							}
-							break;
 					}
 
 					if (
@@ -1192,6 +1244,15 @@ export class Badak {
 							default:
 								responseBody = responseData;
 
+						}
+
+						// explicit content-length, so that HEAD has the same headers as GET
+						// (Node.js sets it by itself for GET only, because HEAD has no body)
+						if (
+							!res.hasHeader(HEADER_KEY.CONTENT_LENGTH)
+							&& (typeof responseBody === 'string' || responseBody instanceof Uint8Array)
+						) {
+							res.setHeader(HEADER_KEY.CONTENT_LENGTH, Buffer.byteLength(responseBody));
 						}
 
 						res.end(responseBody);

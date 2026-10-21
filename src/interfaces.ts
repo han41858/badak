@@ -30,6 +30,7 @@ export interface RouteRuleSeed {
 	GET?: RouteFunction | RouteFunctionObj;
 	POST?: RouteFunction | RouteFunctionObj;
 	PUT?: RouteFunction | RouteFunctionObj;
+	PATCH?: RouteFunction | RouteFunctionObj;
 	DELETE?: RouteFunction | RouteFunctionObj;
 }
 

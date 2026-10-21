@@ -117,9 +117,14 @@ Stop the HTTP server.
 
 Register a routing function.
 
+If a request matches a registered path but no routing function is registered for its method,
+badak responds `405 Method Not Allowed` with the `Allow` header listing the available methods.
+If no path matches, badak responds `404 Not Found`.
+
 ### `get(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 Registers a routing function that responds to `GET` method requests.
+`HEAD` requests are also handled by this routing function, and only the headers are sent without the body.
 
 ### `post(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
@@ -132,6 +137,11 @@ Registers a routing function that responds to `PUT` method requests.
 ### `delete(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 Registers a routing function that responds to `DELETE` method requests.
+
+### `patch(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
+
+Registers a routing function that responds to `PATCH` method requests.
+The request body is parsed in the same way as `POST` and `PUT`.
 
 ### `static(uri: string, path: string): Promise<void>`
 
@@ -266,7 +276,7 @@ If you specify a routing path as `/user1*`, you can match paths such as `/user`,
 
 ### query string
 
-When requesting the `GET` method, the query string argument is parsed and passed to the routing function.
+The query string is parsed and passed to the routing function, for every method.
 
 The examples below all match the `/path` path, and the arguments passed are as follows.
 
@@ -276,3 +286,19 @@ The examples below all match the `/path` path, and the arguments passed are as f
 /path?key=      # { key: '' }
 /path?key=value # { key: 'value' }
 ```
+
+### merging params
+
+Route params (e.g. `:id`), the query string and the request body (`POST`, `PUT`, `PATCH`) are merged into one object in this order.
+If the same key exists, the latter wins.
+
+```bash
+PATCH /users/7?name=a  with body { "name": "b" }  # { id: '7', name: 'b' }
+```
+
+> **Warning** : the query string and the request body can override route params.
+> For example, `PATCH /users/7?id=8` with body `{ "id": 9 }` passes `{ id: 9 }` to the route function `/users/:id`.
+> Don't trust a key that can come from the client as the route param.
+> Name route params so that they don't collide with query and body keys (e.g. `/users/:userId`).
+
+If the request body is not an object (e.g. a JSON array), it is passed as it is, without route params and the query string.

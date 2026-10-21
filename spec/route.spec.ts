@@ -129,7 +129,7 @@ describe('route()', () => {
 				);
 			});
 
-			it('undefined rule 404', async () => {
+			it('undefined method 405', async () => {
 				await app.route({
 					users: {
 						POST: commonTestFnc
@@ -140,7 +140,8 @@ describe('route()', () => {
 
 				await request(app.getHttpServer())
 					.get('/users')
-					.expect(404)
+					.expect(405)
+					.expect('Allow', 'POST')
 					.then(() => {
 						expect(fncRunFlag).to.be.false;
 					});
@@ -616,7 +617,7 @@ describe('route()', () => {
 	});
 
 	describe('nested', () => {
-		it('undefined nested rule 404', async () => {
+		it('undefined method of nested rule 405', async () => {
 			let fncRunFlag: boolean = false;
 
 			const testFnc = async (): Promise<void> => {
@@ -633,6 +634,11 @@ describe('route()', () => {
 
 			await request(app.getHttpServer())
 				.get('/users/a/b/c')
+				.expect(405);
+
+			// intermediate path without route function
+			await request(app.getHttpServer())
+				.get('/users/a/b')
 				.expect(404);
 
 			expect(fncRunFlag).to.be.false;

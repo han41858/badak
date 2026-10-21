@@ -573,7 +573,7 @@ describe('config()', () => {
 		const testUri: string = '/defaultMethod';
 		const testUriRefined: string = testUri.replace('/', '');
 
-		const methods: METHOD[] = [METHOD.GET, METHOD.POST, METHOD.PUT, METHOD.DELETE];
+		const methods: METHOD[] = [METHOD.GET, METHOD.POST, METHOD.PUT, METHOD.PATCH, METHOD.DELETE];
 
 		const echoFnc = <T> (param: T): T => {
 			return param;
@@ -595,6 +595,10 @@ describe('config()', () => {
 
 				case METHOD.PUT:
 					requestFnc = requestObj.put(testUri);
+					break;
+
+				case METHOD.PATCH:
+					requestFnc = requestObj.patch(testUri);
 					break;
 
 				case METHOD.DELETE:
@@ -676,7 +680,8 @@ describe('config()', () => {
 							expect((routeRule['/'] as RouteRule)[testUriRefined]).to.have.property(setMethod);
 
 							await getReqFnc(testMethod)
-								.expect(setMethod === testMethod ? 200 : 404);
+								// path exists for other method : 405
+								.expect(setMethod === testMethod ? 200 : 405);
 						});
 					});
 				});

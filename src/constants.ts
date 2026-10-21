@@ -3,6 +3,7 @@ export enum METHOD {
 	GET = 'GET',
 	POST = 'POST',
 	PUT = 'PUT',
+	PATCH = 'PATCH',
 	DELETE = 'DELETE'
 }
 
@@ -11,7 +12,8 @@ export const DEFAULT_BODY_LIMIT: number = 100 * 1024;
 
 // case in-sensitive
 export enum HEADER_KEY {
-	CONTENT_TYPE = 'content-type'
+	CONTENT_TYPE = 'content-type',
+	CONTENT_LENGTH = 'content-length'
 }
 
 

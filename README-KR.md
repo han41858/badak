@@ -112,9 +112,14 @@ HTTP 서버를 정지합니다.
 
 라우팅 함수를 등록합니다.
 
+요청 경로와 일치하는 라우팅 규칙은 있지만 요청 메서드에 해당하는 라우팅 함수가 없으면,
+`405 Method Not Allowed`와 함께 사용할 수 있는 메서드 목록을 `Allow` 헤더로 응답합니다.
+일치하는 경로가 없으면 `404 Not Found`로 응답합니다.
+
 ### `get(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 `GET` 메서드 요청에 반응하는 라우팅 함수를 등록합니다.
+`HEAD` 요청도 이 라우팅 함수로 처리하며, 본문 없이 헤더만 응답합니다.
 
 ### `post(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
@@ -127,6 +132,11 @@ HTTP 서버를 정지합니다.
 ### `delete(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
 
 `DELETE` 메서드 요청에 반응하는 라우팅 함수를 등록합니다.
+
+### `patch(address: string, fnc: RouteFunction, option?: RouteOption): Promise<void>`
+
+`PATCH` 메서드 요청에 반응하는 라우팅 함수를 등록합니다.
+요청 본문은 `POST`, `PUT`과 같은 방식으로 파싱합니다.
 
 ### `static(uri: string, path: string): Promise<void>`
 
@@ -260,7 +270,7 @@ app.route({
 
 ### 쿼리 스트링
 
-`GET` 메서드를 요청하는 경우 쿼리 스트링 인자를 파싱해서 라우팅 함수로 전달합니다.
+모든 메서드에서 쿼리 스트링 인자를 파싱해서 라우팅 함수로 전달합니다.
 
 아래 예제는 모두 `/path` 경로와 매칭되며 전달되는 인자는 각각 이렇습니다.
 
@@ -270,3 +280,19 @@ app.route({
 /path?key=      # { key: '' }
 /path?key=value # { key: 'value' }
 ```
+
+### 인자 병합
+
+라우트 파라미터(`:id` 등), 쿼리 스트링, 요청 본문(`POST`, `PUT`, `PATCH`)은 이 순서대로 하나의 객체로 합쳐집니다.
+같은 키가 있으면 뒤의 값이 우선합니다.
+
+```bash
+PATCH /users/7?name=a  본문 { "name": "b" }  # { id: '7', name: 'b' }
+```
+
+> **주의** : 쿼리 스트링과 요청 본문은 라우트 파라미터를 덮어쓸 수 있습니다.
+> 예를 들어 `/users/:id` 라우팅 함수에 `PATCH /users/7?id=8`, 본문 `{ "id": 9 }`로 요청하면 `{ id: 9 }`가 전달됩니다.
+> 클라이언트가 보낼 수 있는 키를 라우트 파라미터로 믿고 사용하면 안 됩니다.
+> 쿼리 스트링이나 요청 본문의 키와 겹치지 않도록 라우트 파라미터 이름을 지정하세요(예: `/users/:userId`).
+
+요청 본문이 객체가 아니면(JSON 배열 등) 라우트 파라미터와 쿼리 스트링 없이 본문을 그대로 전달합니다.

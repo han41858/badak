@@ -644,7 +644,7 @@ describe('core', () => {
 	});
 
 	describe('4-methods', () => {
-		const methodArr: (keyof Badak)[] = ['get', 'post', 'put', 'delete'];
+		const methodArr: (keyof Badak)[] = ['get', 'post', 'put', 'patch', 'delete'];
 
 		methodArr.forEach((method: keyof Badak): void => {
 			const testFnc: RouteFunction = (): void => {
@@ -710,6 +710,10 @@ describe('core', () => {
 							requestFnc = requestObj.put(uri);
 							break;
 
+						case 'patch':
+							requestFnc = requestObj.patch(uri);
+							break;
+
 						case 'delete':
 							requestFnc = requestObj.delete(uri);
 							break;
@@ -763,6 +767,10 @@ describe('core', () => {
 
 						case 'put':
 							requestFnc = requestObj.put(uri);
+							break;
+
+						case 'patch':
+							requestFnc = requestObj.patch(uri);
 							break;
 
 						case 'delete':
@@ -820,6 +828,10 @@ describe('core', () => {
 
 						case 'put':
 							requestFnc = requestObj.put(uri);
+							break;
+
+						case 'patch':
+							requestFnc = requestObj.patch(uri);
 							break;
 
 						case 'delete':
@@ -887,6 +899,10 @@ describe('core', () => {
 							requestFnc1 = requestObj1.put(uri1);
 							break;
 
+						case 'patch':
+							requestFnc1 = requestObj1.patch(uri1);
+							break;
+
 						case 'delete':
 							requestFnc1 = requestObj1.delete(uri1);
 							break;
@@ -911,6 +927,10 @@ describe('core', () => {
 
 						case 'put':
 							requestFnc2 = requestObj2.put(uri2);
+							break;
+
+						case 'patch':
+							requestFnc2 = requestObj2.patch(uri2);
 							break;
 
 						case 'delete':
