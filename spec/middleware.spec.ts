@@ -388,4 +388,148 @@ describe('middleware', () => {
 			});
 		});
 	});
+
+	describe('response already sent', () => {
+		let unhandledCount: number = 0;
+		let routeFncRunFlag: boolean = false;
+		let afterFncRunFlag: boolean = false;
+
+		const onUnhandled = (): void => {
+			++unhandledCount;
+		};
+
+		beforeEach(async () => {
+			unhandledCount = 0;
+			routeFncRunFlag = false;
+			afterFncRunFlag = false;
+
+			process.on('unhandledRejection', onUnhandled);
+
+			await app.after(() => {
+				afterFncRunFlag = true;
+			});
+
+			await app.get('/alive', (): string => 'alive');
+		});
+
+		afterEach(async () => {
+			// server should be still alive
+			await request(app.getHttpServer())
+				.get('/alive')
+				.expect(200, 'alive');
+
+			// let pending rejections be reported
+			await new Promise((resolve) => setImmediate(resolve));
+
+			process.off('unhandledRejection', onUnhandled);
+
+			expect(unhandledCount).to.be.eql(0);
+		});
+
+		it('before() responds by itself, route function is skipped', async () => {
+			await app.before((req: IncomingMessage, res: ServerResponse): void => {
+				if (req.url === '/blocked') {
+					res.statusCode = 429;
+					res.end('blocked');
+				}
+			});
+
+			await app.get('/blocked', (): string => {
+				routeFncRunFlag = true;
+				return 'route';
+			});
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get('/blocked')
+				.expect(429, 'blocked');
+
+			expect(routeFncRunFlag).to.be.false;
+			expect(afterFncRunFlag).to.be.true;
+		});
+
+		it('auth() responds by itself, route function is skipped', async () => {
+			await app.auth((req: IncomingMessage, res: ServerResponse): void => {
+				if (req.url === '/private') {
+					res.statusCode = 401;
+					res.end('need login');
+				}
+			});
+
+			await app.get('/private', (): string => {
+				routeFncRunFlag = true;
+				return 'route';
+			});
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get('/private')
+				.expect(401, 'need login');
+
+			expect(routeFncRunFlag).to.be.false;
+		});
+
+		it('route function ends response and returns value', async () => {
+			await app.get('/manual', (param: unknown, req: IncomingMessage, res: ServerResponse): string => {
+				res.end('manual');
+				return 'ignored';
+			});
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get('/manual')
+				.expect(200, 'manual');
+		});
+
+		it('route function ends response and throws', async () => {
+			await app.get('/manual', (param: unknown, req: IncomingMessage, res: ServerResponse): never => {
+				res.statusCode = 202;
+				res.end('done');
+				throw new Error('after response');
+			});
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get('/manual')
+				.expect(202, 'done');
+		});
+
+		it('route function starts response and returns value, ending is left to route function', async () => {
+			await app.get('/stream', (param: unknown, req: IncomingMessage, res: ServerResponse): string => {
+				res.writeHead(200, { 'Content-Type': 'text/plain' });
+				res.write('partial');
+
+				// streaming, end later
+				setTimeout((): void => {
+					res.end('-end');
+				}, 20);
+
+				return 'ignored';
+			});
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get('/stream')
+				.expect(200, 'partial-end');
+		});
+
+		it('route function sends headers and throws', async () => {
+			await app.get('/partial', (param: unknown, req: IncomingMessage, res: ServerResponse): never => {
+				res.writeHead(200, { 'Content-Type': 'text/plain' });
+				res.write('partial');
+				throw new Error('in the middle of response');
+			});
+
+			await app.listen(port);
+
+			await request(app.getHttpServer())
+				.get('/partial')
+				.expect(200, 'partial');
+		});
+	});
 });

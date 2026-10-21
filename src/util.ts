@@ -2,6 +2,7 @@
 // if not number string, return itself
 import * as fs from 'node:fs';
 import { Stats } from 'node:fs';
+import { ServerResponse } from 'node:http';
 
 import * as node_path from 'node:path';
 
@@ -40,6 +41,12 @@ export const convertDateStr = (param: string): string | Date => {
 	}
 
 	return result;
+};
+
+// response is started (headersSent) or completed (writableEnded) already,
+// status code & headers can't be changed
+export const isResponseStarted = (res: ServerResponse): boolean => {
+	return res.headersSent || res.writableEnded;
 };
 
 // decode percent-encoded uri fragment, malformed encoding is client's fault

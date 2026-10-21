@@ -25,6 +25,7 @@ import {
 	getMultipartBoundary,
 	isExistFile,
 	isFolder,
+	isResponseStarted,
 	loadFolder,
 	MultipartPart,
 	parseMultipart,
@@ -794,6 +795,11 @@ export class Badak {
 						}
 					}
 
+					if (isResponseStarted(res)) {
+						// before() middleware responded already (e.g. 429), skip routing
+						return;
+					}
+
 					if (this._staticRules === null) {
 						// no rule assigned
 						throw new Error('no rule');
@@ -1079,6 +1085,11 @@ export class Badak {
 						catch (e: unknown) {
 							throw new Error('Unauthorized', { cause: e });
 						}
+
+						if (isResponseStarted(res)) {
+							// auth function responded already (e.g. 401), skip route function
+							return;
+						}
 					}
 
 
@@ -1087,7 +1098,11 @@ export class Badak {
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
 
-					if (responseData) {
+					if (isResponseStarted(res)) {
+						// route function started (res.writeHead(), res.write()) or ended (res.end()) response by itself,
+						// ignore returned value and leave ending the response to the route function (e.g. streaming)
+					}
+					else if (responseData) {
 						const contentType: CONTENT_TYPE = getContentType(responseData);
 
 						if (!res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
@@ -1157,7 +1172,15 @@ export class Badak {
 						return def.message == err.message;
 					});
 
-					if (foundResult) {
+					if (isResponseStarted(res)) {
+						// headersSent : status code and headers can't be changed anymore
+						// writableEnded : response is completed already
+						// just close the response if it is not completed
+						if (!res.writableEnded) {
+							res.end();
+						}
+					}
+					else if (foundResult) {
 						res.statusCode = foundResult.code;
 						res.end();
 					}
