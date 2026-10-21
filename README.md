@@ -158,6 +158,9 @@ The request body is parsed in the same way as `POST` and `PUT`.
 
 Concatenate the address and file path to be provided as a static file.
 
+The `Content-Type` is determined by the file extension.
+Text files (`text/*`) and JavaScript files are served with `charset=utf-8`, so save them in UTF-8.
+
 ### `setSPARoot(uri: string, path: string): Promise<void>`
 
 Connect the address and file path to be used with the SPA app.

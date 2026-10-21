@@ -7,6 +7,7 @@ import { expect } from 'chai';
 import { agent as request, Response as SuperTestResponse } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { toContentTypeHeader } from '../src/util';
 import { CONTENT_TYPE, HEADER_KEY } from '../src/constants';
 import { StaticCache, StaticRule, TypedObject } from '../src/interfaces';
 import { promiseFail, TestPort } from './test-util';
@@ -141,7 +142,7 @@ describe('static()', () => {
 								.expect(200)
 								.then((res: SuperTestResponse): void => {
 									const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-									expect(contentType).to.be.eql(CONTENT_TYPE.TEXT_PLAIN);
+									expect(contentType).to.be.eql(toContentTypeHeader(CONTENT_TYPE.TEXT_PLAIN));
 
 									expect(res).to.be.a('object');
 									expect(res.text).to.be.a('string');
@@ -354,7 +355,7 @@ describe('static()', () => {
 				await request(app.getHttpServer())
 					.get(`/static/${ fileName }`)
 					.expect(200)
-					.expect(HEADER_KEY.CONTENT_TYPE, mime);
+					.expect(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(mime));
 			});
 		});
 	});
@@ -404,7 +405,7 @@ describe('static()', () => {
 						expect(res).to.be.a('object');
 
 						const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-						expect(contentType).to.be.eql(mime);
+						expect(contentType).to.be.eql(toContentTypeHeader(mime));
 
 						expect(!!res.body || !!res.text).to.be.ok;
 					});
@@ -420,7 +421,7 @@ describe('static()', () => {
 						expect(res).to.be.a('object');
 
 						const contentType: string = res.headers[HEADER_KEY.CONTENT_TYPE];
-						expect(contentType).to.be.eql(mime);
+						expect(contentType).to.be.eql(toContentTypeHeader(mime));
 
 						expect(!!res.body || !!res.text).to.be.ok;
 					});

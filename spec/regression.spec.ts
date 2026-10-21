@@ -367,7 +367,7 @@ describe('regression', () => {
 			await request(app.getHttpServer())
 				.head('/static/test.html')
 				.expect(200)
-				.expect('content-type', 'text/html');
+				.expect('content-type', 'text/html; charset=utf-8');
 		});
 
 		it('same content-type & content-length as GET', async () => {

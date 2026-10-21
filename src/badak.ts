@@ -29,7 +29,8 @@ import {
 	loadFolder,
 	MultipartPart,
 	parseMultipart,
-	sift
+	sift,
+	toContentTypeHeader
 } from './util.js';
 
 /**
@@ -795,7 +796,7 @@ export class Badak {
 					this.get(
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, oneCache.mime);
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(oneCache.mime));
 							// explicit content-length for HEAD, same as GET
 							res.setHeader(HEADER_KEY.CONTENT_LENGTH, oneCache.fileData.byteLength);
 							res.end(oneCache.fileData);
@@ -833,7 +834,7 @@ export class Badak {
 								fileData: targetCache.fileData
 							};
 
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, resFileObj.mime);
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(resFileObj.mime));
 							// explicit content-length for HEAD, same as GET
 							res.setHeader(HEADER_KEY.CONTENT_LENGTH, resFileObj.fileData.byteLength);
 							res.end(resFileObj.fileData);
@@ -1213,7 +1214,7 @@ export class Badak {
 						const contentType: CONTENT_TYPE = getContentType(responseData);
 
 						if (!res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
+							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(contentType));
 						}
 
 						function _convertBufferToBase64<T extends object> (value: T): T {
@@ -1308,11 +1309,11 @@ export class Badak {
 							if (err instanceof Error) {
 								// don't expose internal error message to client, it is logged by catchErrorLog
 								responseBody = 'Internal Server Error';
-								res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.TEXT_PLAIN);
+								res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(CONTENT_TYPE.TEXT_PLAIN));
 							}
 							else {
 								const contentType: CONTENT_TYPE = getContentType(err);
-								res.setHeader(HEADER_KEY.CONTENT_TYPE, contentType);
+								res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(contentType));
 
 								switch (contentType) {
 									case CONTENT_TYPE.APPLICATION_JSON:
