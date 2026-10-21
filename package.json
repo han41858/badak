@@ -2,19 +2,29 @@
 	"name": "badak",
 	"version": "1.0.11",
 	"description": "node.js Server framework based on Promise and TypeScript",
+	"type": "commonjs",
 	"exports": {
-		"require": "./build/cjs/index.js",
-		"import": "./build/esm/index.js"
+		".": {
+			"import": {
+				"types": "./build/esm/index.d.ts",
+				"default": "./build/esm/index.js"
+			},
+			"require": {
+				"types": "./build/cjs/index.d.ts",
+				"default": "./build/cjs/index.js"
+			}
+		}
 	},
-	"types": "build/index.d.ts",
+	"types": "build/cjs/index.d.ts",
 	"main": "build/cjs/index.js",
+	"files": [
+		"build"
+	],
 	"scripts": {
 		"prebuild": "rimraf ./build",
-		"build:types": "tsc -p tsconfig.types.json",
 		"build:cjs": "tsx ./scripts/create-package-json.ts cjs",
 		"build:esm": "tsx ./scripts/create-package-json.ts esm",
-		"build": "yarn build:types&&yarn build:cjs&&yarn build:esm",
-		"postbuild": "tsc -p tsconfig.scripts.json&&node build/scripts/add-js-extensions",
+		"build": "yarn build:cjs&&yarn build:esm",
 		"test": "mocha",
 		"lint": "eslint src spec"
 	},

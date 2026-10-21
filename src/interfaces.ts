@@ -1,7 +1,7 @@
 // function type definition for IDE
 import { IncomingMessage, ServerResponse } from 'node:http';
 
-import { METHOD } from './constants';
+import { METHOD } from './constants.js';
 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
