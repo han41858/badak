@@ -1017,7 +1017,8 @@ export class Badak {
 							});
 
 							const targetPlusKey: string | undefined = plusKeyArr.find((plusKey: string): boolean => {
-								return new RegExp(plusKey).test(uriFrag);
+								// anchor to match whole uri fragment
+								return new RegExp(`^(?:${ plusKey })$`).test(uriFrag);
 							});
 
 							if (targetPlusKey !== undefined) {
@@ -1057,12 +1058,13 @@ export class Badak {
 							// partial asterisk routing
 							const targetAsteriskKey: string | undefined = routeRuleKeyArr
 								.filter((routeRuleKey: string): boolean => {
-									return /.\*./.test(routeRuleKey);
+									// 'ab*cd', 'user1*', not '**'
+									return routeRuleKey !== '**' && /.\*/.test(routeRuleKey);
 								})
 								.find((asteriskKey: string): boolean => {
-									// replace '*' to '(.)*'
+									// replace 'b*' to '.*', anchor to match whole uri fragment
 									return new RegExp(
-										asteriskKey.replace(/.\*/, '.*')
+										`^(?:${ asteriskKey.replace(/.\*/, '.*') })$`
 									).test(uriFrag);
 								});
 
