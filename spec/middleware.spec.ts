@@ -268,7 +268,7 @@ describe('middleware', () => {
 				};
 
 				const routeFnc: RouteFunction = async (ctx: ParamContext): Promise<unknown> => {
-			const param = ctx.query as TypedObject<unknown>;
+					const param = ctx.query as TypedObject<unknown>;
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('initial');
 					expect(param).to.not.have.property('before'); // param is not modified
@@ -552,7 +552,7 @@ describe('middleware', () => {
 
 		it('route function ends response and returns value', async () => {
 			await app.get('/manual', (ctx: ParamContext): string  => {
-			const param = ctx.query as unknown, req: IncomingMessage, res: ServerResponse;
+				const param = ctx.query as unknown, req: IncomingMessage, res: ServerResponse;
 				res.end('manual');
 				return 'ignored';
 			});
@@ -566,7 +566,7 @@ describe('middleware', () => {
 
 		it('route function ends response and throws', async () => {
 			await app.get('/manual', (ctx: ParamContext): never  => {
-			const param = ctx.query as unknown, req: IncomingMessage, res: ServerResponse;
+				const param = ctx.query as unknown, req: IncomingMessage, res: ServerResponse;
 				res.statusCode = 202;
 				res.end('done');
 				throw new Error('after response');
@@ -581,7 +581,7 @@ describe('middleware', () => {
 
 		it('route function starts response and returns value, ending is left to route function', async () => {
 			await app.get('/stream', (ctx: ParamContext): string  => {
-			const param = ctx.query as unknown, req: IncomingMessage, res: ServerResponse;
+				const param = ctx.query as unknown, req: IncomingMessage, res: ServerResponse;
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
 				res.write('partial');
 
@@ -602,7 +602,7 @@ describe('middleware', () => {
 
 		it('route function sends headers and throws', async () => {
 			await app.get('/partial', (ctx: ParamContext): never  => {
-			const param = ctx.query as unknown, req: IncomingMessage, res: ServerResponse;
+				const param = ctx.query as unknown, req: IncomingMessage, res: ServerResponse;
 				res.writeHead(200, { 'Content-Type': 'text/plain' });
 				res.write('partial');
 				throw new Error('in the middle of response');
