@@ -204,6 +204,15 @@ app.route({
 
 기본값은 `false` 입니다.
 
+#### `bodyLimit: number`
+
+요청 본문의 최대 크기를 바이트 단위로 지정합니다.
+요청 본문이 이 값보다 크면 `413 Payload Too Large` 에러가 발생합니다.
+`multipart/form-data`로 업로드하는 파일에도 이 제한이 적용됩니다.
+제한을 없애려면 `Infinity`를 지정합니다.
+
+기본값은 `102400`(100KB) 입니다.
+
 ### `RouteOption`
 
 라우팅 함수의 동작을 결정합니다.

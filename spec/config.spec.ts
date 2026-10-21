@@ -1,9 +1,11 @@
+import { request as httpRequest } from 'node:http';
+
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
 import { agent as request, Test as SuperTestExpect } from 'supertest';
 
 import { Badak } from '../src/badak';
-import { METHOD } from '../src/constants';
+import { DEFAULT_BODY_LIMIT, METHOD } from '../src/constants';
 import { BadakOption, RouteRule, TypedObject } from '../src/interfaces';
 import { promiseFail, TestPort } from './test-util';
 
@@ -695,6 +697,166 @@ describe('config()', () => {
 					[testUri]: echoFnc
 				})
 			);
+		});
+	});
+
+	describe('bodyLimit', () => {
+		const jsonOfSize = (size: number): string => {
+			// {"a":"xxx..."} : 8 bytes + size
+			return JSON.stringify({ a: 'x'.repeat(size - 8) });
+		};
+
+		// send body with chunked transfer encoding, no content-length
+		const sendChunked = (body: string): Promise<number | undefined> => {
+			return new Promise((resolve, reject): void => {
+				const req = httpRequest({
+					port: TestPort,
+					method: 'POST',
+					path: '/test',
+					headers: {
+						'content-type': 'application/json'
+					}
+				}, (res): void => {
+					res.resume();
+					res.on('end', (): void => resolve(res.statusCode));
+				});
+
+				req.on('error', reject);
+
+				for (let i: number = 0; i < body.length; i += 16 * 1024) {
+					req.write(body.slice(i, i + 16 * 1024));
+				}
+
+				req.end();
+			});
+		};
+
+		let routeFncRunFlag: boolean = false;
+
+		beforeEach(() => {
+			routeFncRunFlag = false;
+		});
+
+		const listen = async (): Promise<void> => {
+			await app.post('/test', (): string => {
+				routeFncRunFlag = true;
+				return 'ok';
+			});
+
+			await app.listen(TestPort);
+		};
+
+		describe('invalid value', () => {
+			[0, -1, NaN, '1000', true, null].forEach((value: unknown): void => {
+				it(String(value), () => {
+					return promiseFail(
+						app.config('bodyLimit', value)
+					);
+				});
+			});
+		});
+
+		it('default is 100KB', async () => {
+			await listen();
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.set('Content-Type', 'application/json')
+				.send(jsonOfSize(DEFAULT_BODY_LIMIT))
+				.expect(200);
+
+			expect(routeFncRunFlag).to.be.true;
+			routeFncRunFlag = false;
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.set('Content-Type', 'application/json')
+				.send(jsonOfSize(DEFAULT_BODY_LIMIT + 1))
+				.expect(413);
+
+			expect(routeFncRunFlag).to.be.false;
+		});
+
+		it('set by config()', async () => {
+			await app.config('bodyLimit', 100);
+			await listen();
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.set('Content-Type', 'application/json')
+				.send(jsonOfSize(100))
+				.expect(200);
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.set('Content-Type', 'application/json')
+				.send(jsonOfSize(101))
+				.expect(413);
+		});
+
+		it('set by constructor', async () => {
+			app = new Badak({
+				catchErrorLog: false,
+				bodyLimit: 100
+			});
+
+			await listen();
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.set('Content-Type', 'application/json')
+				.send(jsonOfSize(101))
+				.expect(413);
+		});
+
+		it('chunked request without content-length', async () => {
+			await app.config('bodyLimit', 1024);
+			await listen();
+
+			expect(await sendChunked(jsonOfSize(1024))).to.be.eql(200);
+			expect(await sendChunked(jsonOfSize(64 * 1024))).to.be.eql(413);
+
+			expect(routeFncRunFlag).to.be.true; // only for the first request
+		});
+
+		it('multipart/form-data file', async () => {
+			await app.config('bodyLimit', 1024);
+			await listen();
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.attach('file', Buffer.alloc(2048), 'big.bin')
+				.expect(413);
+
+			expect(routeFncRunFlag).to.be.false;
+		});
+
+		it('Infinity removes the limit', async () => {
+			await app.config('bodyLimit', Infinity);
+			await listen();
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.set('Content-Type', 'application/json')
+				.send(jsonOfSize(DEFAULT_BODY_LIMIT * 10))
+				.expect(200);
+		});
+
+		it('server works after rejecting large body', async () => {
+			await app.config('bodyLimit', 1024);
+			await listen();
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.set('Content-Type', 'application/json')
+				.send(jsonOfSize(1024 * 1024))
+				.expect(413);
+
+			await request(app.getHttpServer())
+				.post('/test')
+				.set('Content-Type', 'application/json')
+				.send(jsonOfSize(100))
+				.expect(200);
 		});
 	});
 });

@@ -209,6 +209,15 @@ Converts the date in string format passed as an argument to the `Date` type.
 
 The default is `false`.
 
+#### `bodyLimit: number`
+
+The maximum size of the request body in bytes.
+If the request body is larger than this value, a `413 Payload Too Large` error occurs.
+This limit also applies to files uploaded with `multipart/form-data`.
+Specify `Infinity` to remove the limit.
+
+The default is `102400` (100KB).
+
 ### `RouteOption`
 
 Determines the behavior of routing functions.

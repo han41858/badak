@@ -6,6 +6,9 @@ export enum METHOD {
 	DELETE = 'DELETE'
 }
 
+// default max request body size in bytes : 100KB
+export const DEFAULT_BODY_LIMIT: number = 100 * 1024;
+
 // case in-sensitive
 export enum HEADER_KEY {
 	CONTENT_TYPE = 'content-type'

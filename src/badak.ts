@@ -14,7 +14,7 @@ import {
 	StaticRule,
 	TypedObject
 } from './interfaces.js';
-import { CONTENT_TYPE, HEADER_KEY, METHOD } from './constants.js';
+import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, METHOD } from './constants.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -78,7 +78,9 @@ export class Badak {
 		defaultMethod: undefined,
 
 		parseNumber: false,
-		parseDate: false
+		parseDate: false,
+
+		bodyLimit: DEFAULT_BODY_LIMIT
 	};
 
 	constructor (option?: Partial<BadakOption>) {
@@ -356,6 +358,15 @@ export class Badak {
 					this._config[key] = value;
 					break;
 
+				case 'bodyLimit':
+					// Infinity means no limit
+					if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
+						throw new Error('invalid value');
+					}
+
+					this._config.bodyLimit = value;
+					break;
+
 				case 'defaultMethod':
 					if (value !== null) {
 						if (typeof value !== 'string') {
@@ -626,9 +637,37 @@ export class Badak {
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
 	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | undefined> {
 		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
+			const bodyLimit: number = this._config.bodyLimit;
+
+			// reject before receiving body if declared size is over the limit
+			const contentLength: number = Number(req.headers['content-length']);
+
+			if (contentLength > bodyLimit) {
+				reject(new Error('Payload Too Large'));
+				return;
+			}
+
 			const bodyBufferPool: Uint8Array[] = [];
+			let receivedSize: number = 0;
+			let limitExceeded: boolean = false;
 
 			req.on('data', (stream: Uint8Array): void => {
+				if (limitExceeded) {
+					// drop rest of the body
+					return;
+				}
+
+				receivedSize += stream.byteLength;
+
+				// for chunked request without content-length, or wrong content-length
+				if (receivedSize > bodyLimit) {
+					limitExceeded = true;
+					bodyBufferPool.length = 0;
+
+					reject(new Error('Payload Too Large'));
+					return;
+				}
+
 				bodyBufferPool.push(stream);
 			});
 
@@ -637,6 +676,10 @@ export class Badak {
 			});
 
 			req.on('end', (): void => {
+				if (limitExceeded) {
+					return;
+				}
+
 				try {
 					resolve(this._parseBody(req, Buffer.concat(bodyBufferPool)));
 				}
@@ -1165,7 +1208,8 @@ export class Badak {
 						{ code: 404, message: 'Not Found' },
 						{ code: 404, message: 'no rule' },
 						{ code: 405, message: 'Method Not Allowed' },
-						{ code: 406, message: 'Not Acceptable' }
+						{ code: 406, message: 'Not Acceptable' },
+						{ code: 413, message: 'Payload Too Large' }
 					];
 
 					const foundResult: HttpResStatusCode | undefined = statusCodes.find((def: HttpResStatusCode): boolean => {
