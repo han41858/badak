@@ -14,7 +14,7 @@ import {
 	StaticRule,
 	TypedObject
 } from './interfaces.js';
-import { CONTENT_TYPE, HEADER_KEY, METHOD } from './constants.js';
+import { CONTENT_TYPE, DEFAULT_BODY_LIMIT, HEADER_KEY, METHOD } from './constants.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -78,13 +78,18 @@ export class Badak {
 		defaultMethod: undefined,
 
 		parseNumber: false,
-		parseDate: false
+		parseDate: false,
+
+		bodyLimit: DEFAULT_BODY_LIMIT
 	};
 
 	constructor (option?: Partial<BadakOption>) {
 		if (option) {
 			for (const [key, value] of Object.entries(option)) {
-				this._config[key] = value;
+				// undefined means not set (Partial<BadakOption>)
+				if (value !== undefined) {
+					this._setOption(key, value);
+				}
 			}
 		}
 	}
@@ -343,43 +348,62 @@ export class Badak {
 		this._middlewaresAfter.push(middleware);
 	}
 
+	// validate & set an option, shared by constructor and config()
+	private _setOption (key: string, value: unknown): void {
+		switch (key) {
+			// boolean keys
+			case 'catchErrorLog':
+			case 'preventError':
+			case 'parseNumber':
+			case 'parseDate':
+				if (typeof value !== 'boolean') {
+					throw new Error('invalid value');
+				}
+
+				this._config[key] = value;
+				break;
+
+			case 'bodyLimit':
+				// bytes, positive integer or Infinity (no limit)
+				// NaN or decimal is rejected, NaN disables every size comparison
+				if (
+					typeof value !== 'number'
+					|| value <= 0
+					|| (!Number.isInteger(value) && value !== Infinity)
+				) {
+					throw new Error('invalid value');
+				}
+
+				this._config.bodyLimit = value;
+				break;
+
+			case 'defaultMethod':
+				if (value !== null) {
+					if (typeof value !== 'string') {
+						throw new Error('invalid method parameter');
+					}
+
+					if (!Object.values(METHOD).some((method: string): boolean => {
+						return value.toUpperCase() === method;
+					})) {
+						throw new Error('not defined method');
+					}
+
+					this._config.defaultMethod = value.toUpperCase() as METHOD;
+				}
+				else {
+					// null is clearing
+					delete this._config[key];
+				}
+				break;
+
+			default:
+				throw new Error('not defined option');
+		}
+	}
+
 	async config (key: string, value: unknown): Promise<void> {
-		if (Object.keys(this._config).includes(key)) {
-			switch (key) {
-				// boolean keys
-				case 'parseNumber':
-				case 'parseDate':
-					if (typeof value !== 'boolean') {
-						throw new Error('invalid value');
-					}
-
-					this._config[key] = value;
-					break;
-
-				case 'defaultMethod':
-					if (value !== null) {
-						if (typeof value !== 'string') {
-							throw new Error('invalid method parameter');
-						}
-
-						if (!Object.values(METHOD).some((method: string): boolean => {
-							return value.toUpperCase() === method;
-						})) {
-							throw new Error('not defined method');
-						}
-
-						this._config.defaultMethod = value.toUpperCase() as METHOD;
-					}
-					else {
-						// null is clearing
-						delete this._config[key];
-					}
-					break;
-			}
-		}
-		else {
-			throw new Error('not defined option');
-		}
+		this._setOption(key, value);
 	}
 
 	private _routeAbbrValidator (address: string, fnc: RouteFunction): void {
@@ -626,9 +650,40 @@ export class Badak {
 	// not support array of objects : 'multipart/form-data', 'application/x-www-form-urlencoded'
 	private async _paramParser (req: IncomingMessage): Promise<TypedObject<unknown> | undefined> {
 		return new Promise<TypedObject<unknown> | undefined>((resolve, reject): undefined => {
+			const bodyLimit: number = this._config.bodyLimit;
+
+			// reject before receiving body if declared size is over the limit
+			const contentLength: number = Number(req.headers['content-length']);
+
+			if (contentLength > bodyLimit) {
+				// discard the body to keep the connection (keep-alive) usable
+				req.resume();
+
+				reject(new Error('Payload Too Large'));
+				return;
+			}
+
 			const bodyBufferPool: Uint8Array[] = [];
+			let receivedSize: number = 0;
+			let limitExceeded: boolean = false;
 
 			req.on('data', (stream: Uint8Array): void => {
+				if (limitExceeded) {
+					// discard rest of the body to keep the connection (keep-alive) usable
+					return;
+				}
+
+				receivedSize += stream.byteLength;
+
+				// for chunked request without content-length, or wrong content-length
+				if (receivedSize > bodyLimit) {
+					limitExceeded = true;
+					bodyBufferPool.length = 0;
+
+					reject(new Error('Payload Too Large'));
+					return;
+				}
+
 				bodyBufferPool.push(stream);
 			});
 
@@ -637,6 +692,10 @@ export class Badak {
 			});
 
 			req.on('end', (): void => {
+				if (limitExceeded) {
+					return;
+				}
+
 				try {
 					resolve(this._parseBody(req, Buffer.concat(bodyBufferPool)));
 				}
@@ -1165,7 +1224,8 @@ export class Badak {
 						{ code: 404, message: 'Not Found' },
 						{ code: 404, message: 'no rule' },
 						{ code: 405, message: 'Method Not Allowed' },
-						{ code: 406, message: 'Not Acceptable' }
+						{ code: 406, message: 'Not Acceptable' },
+						{ code: 413, message: 'Payload Too Large' }
 					];
 
 					const foundResult: HttpResStatusCode | undefined = statusCodes.find((def: HttpResStatusCode): boolean => {
