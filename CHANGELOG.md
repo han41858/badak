@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Files of `multipart/form-data` (`Buffer`) are not traversed when the request body is converted. Every byte of a file was visited before, even if `parseNumber` and `parseDate` are disabled, and the server was blocked for about 0.5 seconds per 1MB of uploaded files (seconds for a 10MB upload). ([#65](https://github.com/han41858/badak/pull/65))
+  - only plain objects and arrays from the request (JSON, form, multipart fields) are traversed. The converted values are not changed.
+
 ## 4.0.0 (2026-10-22)
 
 This release changes the first argument of routing functions to `ParamContext` (`{ params, query, body }`), and redefines `?` routing and non-ASCII / percent-encoded path matching.

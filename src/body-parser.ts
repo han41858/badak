@@ -75,18 +75,35 @@ const convertStr = (value: string, option: ParamConvertOption): unknown => {
 	return value;
 };
 
+// objects made by JSON.parse(), querystring and the form parsers, converted recursively
+// other objects (e.g. Buffer of a multipart file) are kept as they are
+const isPlainContainer = (value: object): boolean => {
+	if (Array.isArray(value)) {
+		return true;
+	}
+
+	const prototype: unknown = Object.getPrototypeOf(value);
+
+	return prototype === Object.prototype || prototype === null;
+};
+
 // parameter can be object of string because request has string
 // only work for string param
 export const convertParam = (param: TypedObject<unknown>, option: ParamConvertOption): TypedObject<unknown> => {
+	if (!option.parseNumber && !option.parseDate) {
+		// nothing to convert
+		return param;
+	}
+
+	if (!isPlainContainer(param)) {
+		return param;
+	}
+
 	if (Array.isArray(param)) {
 		const paramAsArray: unknown[] = param as unknown[];
 
 		paramAsArray.forEach((value: unknown, i: number, arr: unknown[]): void => {
-			if (!value) {
-				// null, undefined
-				arr[i] = value;
-			}
-			else if (typeof value === 'object') {
+			if (value !== null && typeof value === 'object') {
 				// call recursively
 				arr[i] = convertParam(value as TypedObject<unknown>, option);
 			}
@@ -97,11 +114,7 @@ export const convertParam = (param: TypedObject<unknown>, option: ParamConvertOp
 	}
 	else {
 		for (const [key, value] of Object.entries(param)) {
-			if (!value) {
-				// null, undefined
-				param[key] = value;
-			}
-			else if (typeof value === 'object') {
+			if (value !== null && typeof value === 'object') {
 				// call recursively
 				param[key] = convertParam(value as TypedObject<unknown>, option);
 			}
