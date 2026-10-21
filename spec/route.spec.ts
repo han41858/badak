@@ -1817,8 +1817,9 @@ describe('route()', () => {
 			});
 
 			describe('**', () => {
-				const testFnc = (ctx: ParamContext): void  => {
-					const param = ctx.params as unknown, req: IncomingMessage;
+				const testFnc = (ctx: ParamContext, req: IncomingMessage): void => {
+					const param = ctx.params as unknown;
+
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('**');
 
@@ -1851,8 +1852,9 @@ describe('route()', () => {
 			});
 
 			describe('*', () => {
-				const testFnc = (ctx: ParamContext): void  => {
-					const param = ctx.params as unknown, req: IncomingMessage;
+				const testFnc = (ctx: ParamContext, req: IncomingMessage): void => {
+					const param = ctx.params as unknown;
+
 					expect(param).to.be.a('object');
 					expect(param).to.have.property('*');
 
@@ -1928,8 +1930,9 @@ describe('route()', () => {
 			describe('partial *', () => {
 				const testFrag: string = 'ab*cd';
 
-				const testFnc = (ctx: ParamContext): void  => {
-					const param = ctx.params as TypedObject<string>, req: IncomingMessage;
+				const testFnc = (ctx: ParamContext, req: IncomingMessage): void => {
+					const param = ctx.params as TypedObject<string>;
+
 					expect(param).to.be.a('object');
 
 					const regExpKey: string = param[testFrag].replace('*', '(\\w)*');
@@ -1975,8 +1978,9 @@ describe('route()', () => {
 			describe('trailing *', () => {
 				const testFrag: string = 'user1*';
 
-				const testFnc = (ctx: ParamContext): void  => {
-					const param = ctx.params as TypedObject<string>, req: IncomingMessage;
+				const testFnc = (ctx: ParamContext, req: IncomingMessage): void => {
+					const param = ctx.params as TypedObject<string>;
+
 					expect(param).to.be.a('object');
 					expect(param[testFrag]).to.be.a('string');
 
