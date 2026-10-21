@@ -1,0 +1,70 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Verify and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag, version, and main ancestry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node - <<'NODE'
+          const { version } = require('./package.json');
+          const tag = process.env.RELEASE_TAG;
+          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag)) {
+            console.error('Only stable semver tags (X.Y.Z) may be published.');
+            process.exit(1);
+          }
+          if (tag !== version) {
+            console.error(`Tag ${tag} does not match package.json version ${version}.`);
+            process.exit(1);
+          }
+          NODE
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "The release tag must point to a commit contained in main."
+            exit 1
+          }
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Test
+        run: yarn test
+
+      - name: Build
+        run: yarn build
+
+      - name: Verify npm CLI supports trusted publishing
+        run: |
+          npm install --global 'npm@^11'
+          npm --version
+
+      - name: Publish to npm (trusted publishing)
+        run: npm publish --access public
