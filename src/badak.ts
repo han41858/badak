@@ -1017,7 +1017,8 @@ export class Badak {
 							});
 
 							const targetPlusKey: string | undefined = plusKeyArr.find((plusKey: string): boolean => {
-								return new RegExp(plusKey).test(uriFrag);
+								// anchor to match whole uri fragment
+								return new RegExp(`^(?:${ plusKey })$`).test(uriFrag);
 							});
 
 							if (targetPlusKey !== undefined) {
@@ -1060,9 +1061,9 @@ export class Badak {
 									return /.\*./.test(routeRuleKey);
 								})
 								.find((asteriskKey: string): boolean => {
-									// replace '*' to '(.)*'
+									// replace 'b*' to '.*', anchor to match whole uri fragment
 									return new RegExp(
-										asteriskKey.replace(/.\*/, '.*')
+										`^(?:${ asteriskKey.replace(/.\*/, '.*') })$`
 									).test(uriFrag);
 								});
 

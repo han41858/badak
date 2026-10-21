@@ -1588,9 +1588,37 @@ describe('route()', () => {
 
 					expect(testFncRunCount).to.be.eql(3);
 
+					// 'c' has no '+', so 'cc' is not a target
 					await request(app.getHttpServer())
 						.get('/abcc')
-						.expect(200);
+						.expect(404);
+
+					expect(testFncRunCount).to.be.eql(3);
+				});
+
+				it('should match whole uri fragment', async () => {
+					let testFncRunCount: number = 0;
+					const testFnc = (): void => {
+						testFncRunCount++;
+					};
+
+					await app.route({
+						'ab+c': {
+							GET: testFnc
+						}
+					});
+
+					await app.listen(TestPort);
+
+					await Promise.all(
+						['/xabc', '/abcx', '/xxabbbcyy'].map((url: string): SuperTestExpect => {
+							return request(app.getHttpServer())
+								.get(url)
+								.expect(404);
+						})
+					);
+
+					expect(testFncRunCount).to.be.eql(0);
 				});
 			});
 		});
@@ -1782,7 +1810,10 @@ describe('route()', () => {
 
 						invalidUrls.push(
 							prefix + '/a',
-							prefix + '/bd'
+							prefix + '/bd',
+							// should match whole uri fragment
+							prefix + '/xabcd',
+							prefix + '/abcdx'
 						);
 					});
 				});
