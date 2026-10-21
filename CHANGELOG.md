@@ -2,11 +2,21 @@
 
 ## Unreleased
 
+### Changed
+
+- `**` is a fallback. It is used only if the request path doesn't match other routes fully, and the deepest `**` along the matched path is used. `**` took precedence over sibling routes before. ([#53](https://github.com/han41858/badak/pull/53))
+  - with `setSPARoot()`, static files (e.g. `/style.css`) and other routes (e.g. `/api/users`) are handled by their own routes. They responded `index.html` before.
+  - e.g. with `/files/**` and `/files/x`, `GET /files/x` is handled by `/files/x`, and `GET /files/x/y` by `/files/**` with `{ '**': 'x/y' }`.
+  - if the path matches a route fully but the method is not registered, it responds `405` without using `**`.
+  - the result doesn't depend on the registration order.
+- `*` matches exactly one uri fragment. `/img/*` doesn't match `/img` and `/img/` (`{ '*': 'img' }` before). ([#53](https://github.com/han41858/badak/pull/53))
+  - with `/img` and `/img/*`, `GET /img` is handled by `/img`. It was handled by `/img/*` before.
+- The priority of normal, `:`, `?` and `+` routing, and `**` matching 0 or more uri fragments, are not changed.
+
 ### Fixed
 
 - The `**` param of `**` routing is the rest of the path, e.g. `{ '**': 'a/b/c' }` for `/files/a/b/c` of `/files/**`. It was the uri fragment before `**` (`'files'`). ([#52](https://github.com/han41858/badak/pull/52))
   - each uri fragment is decoded and joined with `/`, so a malformed percent-encoding in the rest of the path responds `400`.
-  - matching range and priority are not changed.
 - A routing path with `**` not at the end (e.g. `/files/**/edit`) throws an error when it is registered. It was registered, but never matched. ([#52](https://github.com/han41858/badak/pull/52))
 
 ### Others

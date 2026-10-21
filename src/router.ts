@@ -40,7 +40,6 @@ export const checkRouteFunctionObj = (value: unknown): void => {
  */
 
 enum LOOP_CONTROL {
-	BREAK = 'B',
 	CONTINUE = 'C'
 }
 
@@ -294,10 +293,40 @@ export const splitUrl = (url: string): { path: string, queryStr: string | undefi
 	};
 };
 
+// has a route function for any method
+const hasRouteFunction = (rule: RouteRule): boolean => {
+	return Object.values(METHOD).some((method: METHOD): boolean => rule[method] !== undefined);
+};
+
 // find the rule object matching the request path
+// '**' is a fallback : it is used only if the path doesn't match other routes fully,
+// and the deepest '**' along the matched path is used
 // throws HttpError(400) for malformed percent-encoding in a matched uri fragment
 export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatch => {
 	let param: TypedObject<unknown> | undefined;
+
+	// '**' fallback candidate, the rest of the path is decoded only when it is used
+	let fallback: {
+		rule: RouteRule;
+		param: TypedObject<unknown> | undefined;
+		restStartIndex: number;
+	} | undefined;
+
+	// record '**' child of the node, restStartIndex : index of the uri fragment after the node
+	const recordFallback = (node: RouteRule, restStartIndex: number): void => {
+		const doubleAsteriskRule: unknown = node['**'];
+
+		if (typeof doubleAsteriskRule === 'object' && doubleAsteriskRule !== null) {
+			fallback = {
+				rule: doubleAsteriskRule as RouteRule,
+				// params matched before '**', e.g. ':id' of '/users/:id/**'
+				param: param !== undefined
+					? { ...param }
+					: undefined,
+				restStartIndex
+			};
+		}
+	};
 
 	let checkTargetRule: RouteRule | undefined = routeRule;
 
@@ -315,13 +344,15 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 	for (let depthIter: number = 0; depthIter < uriArr.length; depthIter++) {
 		let loopControl: LOOP_CONTROL | undefined;
 
+		recordFallback(checkTargetRule, depthIter);
+
 		const routeRuleKeyArr: string[] = Object.keys(checkTargetRule);
 
 		const uriFrag: string = uriArr[depthIter];
 
 
-		// normal routing
-		if (checkTargetRule[uriFrag] !== undefined) {
+		// normal routing, '**' is not a normal uri fragment
+		if (uriFrag !== '**' && checkTargetRule[uriFrag] !== undefined) {
 			checkTargetRule = checkTargetRule[uriFrag] as RouteRule;
 
 			loopControl = LOOP_CONTROL.CONTINUE;
@@ -466,58 +497,40 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 			}
 		}
 
-
-		// * / ** asterisk child routing
-		const childRouteRuleKeyArr: string[] = Object.keys(checkTargetRule);
-
-		if (depthIter === uriArr.length - 1 // for urls like '/something/'
-			&& childRouteRuleKeyArr.includes('*')) {
-			checkTargetRule = checkTargetRule['*'] as RouteRule;
-
-			if (param === undefined) {
-				param = {};
-			}
-
-			param['*'] = decodeUriFrag(uriFrag);
-
-			loopControl = LOOP_CONTROL.BREAK;
-		}
-		else if (routeRuleKeyArr.includes('**') || childRouteRuleKeyArr.includes('**')) {
-			checkTargetRule = checkTargetRule['**'] as RouteRule;
-
-			if (param === undefined) {
-				param = {};
-			}
-
-			// rest of the path after '**', each uri fragment is decoded and joined with '/'
-			// e.g. '/files/**' : '/files/a/b%20c' -> 'a/b c', '/files' -> ''
-			// uriFrag is consumed already if it matched above (e.g. 'files' of '/files/**')
-			const restStartIndex: number = loopControl === LOOP_CONTROL.CONTINUE
-				? depthIter + 1
-				: depthIter;
-
-			param['**'] = uriArr
-				.slice(restStartIndex)
-				.map((restUriFrag: string): string => decodeUriFrag(restUriFrag))
-				.join('/');
-
-			// rest of the path is captured by '**'
-			loopControl = LOOP_CONTROL.BREAK;
-		}
-
-		// use if/else instead of switch to break for loop
-		if (
-			loopControl === LOOP_CONTROL.BREAK
-			|| uriFrag === '' // last frag with query string param
-		) {
-			break;
-		}
-		else if (loopControl === undefined) {
+		if (loopControl === undefined) {
 			// not found
 			checkTargetRule = undefined;
 			break;
 		}
 		// loopControl === LoopControl.Continue : continue
+	}
+
+	if (checkTargetRule !== undefined) {
+		// '**' of the last node matches no more uri fragment, e.g. '/files' of '/files/**'
+		recordFallback(checkTargetRule, uriArr.length);
+
+		if (hasRouteFunction(checkTargetRule)) {
+			// matched fully, '**' is not used
+			return {
+				rule: checkTargetRule,
+				param
+			};
+		}
+	}
+
+	if (fallback !== undefined) {
+		return {
+			rule: fallback.rule,
+			param: {
+				...fallback.param,
+				// rest of the path after '**', each uri fragment is decoded and joined with '/'
+				// e.g. '/files/**' : '/files/a/b%20c' -> 'a/b c', '/files' -> ''
+				'**': uriArr
+					.slice(fallback.restStartIndex)
+					.map((restUriFrag: string): string => decodeUriFrag(restUriFrag))
+					.join('/')
+			}
+		};
 	}
 
 	return {
