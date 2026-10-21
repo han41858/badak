@@ -472,6 +472,20 @@ await app.get('/api/users/:id', userFnc);
 - 라우팅 경로에 잘못된 퍼센트 인코딩(예: `/100%`)이 있으면 등록할 때 에러가 발생합니다. `%`는 `%25`로 씁니다.
 - 정적 파일 이름은 문자 그대로 취급합니다. `한글.txt`, `a+b.txt`, `100%.txt` 같은 파일도 이름 그대로 제공됩니다.
 
+## 요청 데이터 제네릭 타입
+
+하나의 이름 있는 타입 인자로 필요한 항목만 지정할 수 있습니다. 지정하지 않은 항목은 기본 타입을 유지합니다.
+
+```typescript
+interface User { name: string }
+interface IdParams { id: string }
+
+await app.post<{ body: User }>('/users', ({ body }) => body.name);
+await app.get<{ params: IdParams }>('/users/:id', ({ params }) => params.id);
+```
+
+**제네릭 타입 선언은 런타임 데이터 검증이 아닙니다.** 외부 HTTP 입력은 사용 전에 검증해야 합니다. 허용 키는 `params`, `query`, `body`이며 타입 제약에 맞지 않는 키는 컴파일 오류가 발생합니다. 타입 지정 핸들러는 `app.route()`에서도 등록할 수 있습니다.
+
 ## 라우팅 인자
 
 라우팅 함수의 첫 번째 인자인 `ParamContext`는 요청 데이터를 출처별로 구분합니다. 동일한 키가 있어도 서로 덮어쓰지 않습니다.
