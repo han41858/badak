@@ -1,7 +1,6 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import * as node_path from 'node:path';
 import * as querystring from 'node:querystring';
-import { Readable } from 'node:stream';
 
 import {
 	BadakOption,
@@ -16,55 +15,23 @@ import {
 	TypedObject
 } from './interfaces.js';
 import {
-	CONTENT_TYPE,
 	DEFAULT_BODY_LIMIT,
-	DEFAULT_STATIC_CACHE_CONTROL,
-	HEADER_KEY,
 	MAX_TIMER_DELAY,
 	METHOD
 } from './constants.js';
 import { HttpError, isHttpError } from './http-error.js';
 import { convertParam, parseRequestBody } from './body-parser.js';
+import { sendErrorResponse, sendRouteResult } from './response.js';
+import { checkStaticOption, loadStaticRule, sendStaticFile } from './static.js';
 import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl } from './router.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
 	isExistFile,
 	isFolder,
-	isNotModified,
 	isResponseStarted,
-	isValidBodyLimit,
-	loadFolder,
-	SerializedBody,
-	serializeBody,
-	toContentTypeHeader
+	isValidBodyLimit
 } from './util.js';
-
-const checkStaticOption = (option: unknown): void => {
-	if (option === undefined) {
-		return;
-	}
-
-	if (typeof option !== 'object' || option === null || Array.isArray(option)) {
-		throw new Error('static option should be an object');
-	}
-
-	const unknownKeys: string[] = Object.keys(option).filter((key: string): boolean => key !== 'cacheControl');
-
-	if (unknownKeys.length > 0) {
-		throw new Error(`unknown static option : ${ unknownKeys.join(', ') }`);
-	}
-
-	const { cacheControl } = option as StaticOption;
-
-	if (
-		cacheControl !== undefined
-		&& cacheControl !== false
-		&& (typeof cacheControl !== 'string' || cacheControl.trim() === '' || /[\r\n]/.test(cacheControl))
-	) {
-		throw new Error(`invalid cacheControl : ${ String(cacheControl) }`);
-	}
-};
 
 export class Badak {
 	private _http: Server | undefined;
@@ -347,106 +314,6 @@ export class Badak {
 		this._spaRoot = uri;
 	}
 
-	// send cached static file, 304 Not Modified if the client has the same file
-	private _sendStaticFile (req: IncomingMessage, res: ServerResponse, cache: StaticCache): void {
-		// validators and Cache-Control are sent with 304 too (RFC 9110 15.4.5)
-		res.setHeader(HEADER_KEY.ETAG, cache.etag);
-		res.setHeader(HEADER_KEY.LAST_MODIFIED, cache.lastModified);
-
-		if (cache.cacheControl !== undefined) {
-			res.setHeader(HEADER_KEY.CACHE_CONTROL, cache.cacheControl);
-		}
-
-		if (isNotModified(req, cache.etag, cache.lastModified)) {
-			res.statusCode = 304;
-			res.end();
-			return;
-		}
-
-		res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(cache.mime));
-		// explicit content-length for HEAD, same as GET
-		res.setHeader(HEADER_KEY.CONTENT_LENGTH, cache.fileData.byteLength);
-		res.end(cache.fileData);
-	}
-
-	// send Readable stream returned by route function
-	// resolves when the response is finished or closed
-	// rejects only if the stream fails before sending the response headers, to respond with an error status code
-	private async _sendStream (req: IncomingMessage, res: ServerResponse, stream: Readable): Promise<void> {
-		if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
-			res.setHeader(HEADER_KEY.CONTENT_TYPE, CONTENT_TYPE.APPLICATION_OCTET_STREAM);
-		}
-
-		// HEAD has no body, don't read the stream
-		if (req.method === 'HEAD') {
-			stream.destroy();
-			res.end();
-			return;
-		}
-
-		return new Promise<void>((resolve, reject): void => {
-			let settled: boolean = false;
-
-			const settle = (err?: unknown): void => {
-				if (settled) {
-					return;
-				}
-
-				settled = true;
-
-				if (err === undefined) {
-					resolve();
-				}
-				else {
-					reject(err);
-				}
-			};
-
-			stream.on('error', (err: Error): void => {
-				stream.unpipe(res);
-
-				// release resources, a stream with autoDestroy: false is not destroyed by itself
-				stream.destroy();
-
-				if (settled) {
-					// the response is finished or closed already, don't touch it
-					if (this._config.catchErrorLog) {
-						console.error('badak stream failed after response :', err);
-					}
-
-					return;
-				}
-
-				if (res.headersSent) {
-					// some data is sent already, close the connection so that the client can know the response is incomplete
-					if (this._config.catchErrorLog) {
-						console.error('badak stream failed while sending response :', err);
-					}
-
-					res.destroy(err);
-					settle();
-				}
-				else {
-					// respond with an error status code
-					settle(err);
-				}
-			});
-
-			res.on('finish', (): void => settle());
-
-			res.on('close', (): void => {
-				// client aborted, stop reading the stream
-				if (!res.writableFinished) {
-					stream.destroy();
-				}
-
-				settle();
-			});
-
-			stream.pipe(res);
-		});
-	}
-
 	async listen (port: number): Promise<void> {
 		if (port === undefined) {
 			throw new Error('port should be passed');
@@ -462,19 +329,8 @@ export class Badak {
 			&& this._staticRules.length > 0
 		) {
 			const allCache: StaticCache[][] = await Promise.all<StaticCache[]>(
-				this._staticRules.map(async (staticRule: StaticRule): Promise<StaticCache[]> => {
-					const cacheSet: StaticCache[] = await loadFolder(staticRule.uri, staticRule.path);
-
-					const cacheControlOption: string | false | undefined = staticRule.option?.cacheControl;
-					const cacheControl: string | undefined = cacheControlOption === undefined
-						? DEFAULT_STATIC_CACHE_CONTROL
-						: (cacheControlOption || undefined);
-
-					cacheSet.forEach((oneCache: StaticCache): void => {
-						oneCache.cacheControl = cacheControl;
-					});
-
-					return cacheSet;
+				this._staticRules.map((staticRule: StaticRule): Promise<StaticCache[]> => {
+					return loadStaticRule(staticRule);
 				})
 			);
 
@@ -485,7 +341,7 @@ export class Badak {
 					this.get(
 						oneCache.uri,
 						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-							this._sendStaticFile(req, res, oneCache);
+							sendStaticFile(req, res, oneCache);
 						},
 						{
 							auth: false
@@ -512,7 +368,7 @@ export class Badak {
 						});
 
 						if (targetCache) {
-							this._sendStaticFile(req, res, targetCache);
+							sendStaticFile(req, res, targetCache);
 						}
 						else {
 							res.end();
@@ -529,6 +385,10 @@ export class Badak {
 		await new Promise<void>((resolve, reject): void => {
 			this._http = createServer(async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
 				let responseBody: unknown;
+
+				const setResponseBody = (body: unknown): void => {
+					responseBody = body;
+				};
 
 				try {
 					// run before middleware functions in parallel
@@ -650,43 +510,7 @@ export class Badak {
 						: await (targetFncObj as RouteFunctionObj).fnc(param, req, res);
 
 
-					if (isResponseStarted(res)) {
-						// route function started (res.writeHead(), res.write()) or ended (res.end()) response by itself,
-						// ignore returned value and leave ending the response to the route function (e.g. streaming)
-					}
-					else if (responseData instanceof Readable) {
-						await this._sendStream(req, res, responseData);
-					}
-					else if (responseData !== undefined) {
-						// string as text, Buffer as binary, others (object, array, number, boolean, null) as JSON
-						// only undefined (no return value) responds an empty body
-						const serialized: SerializedBody | undefined = serializeBody(responseData);
-
-						if (serialized === undefined) {
-							// e.g. circular reference, BigInt
-							throw new Error('returned value of route function can\'t be serialized', { cause: responseData });
-						}
-
-						if (!res.getHeader(HEADER_KEY.CONTENT_TYPE)) {
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
-						}
-
-						responseBody = serialized.body;
-
-						// explicit content-length, so that HEAD has the same headers as GET
-						// (Node.js sets it by itself for GET only, because HEAD has no body)
-						if (
-							!res.hasHeader(HEADER_KEY.CONTENT_LENGTH)
-							&& (typeof responseBody === 'string' || responseBody instanceof Uint8Array)
-						) {
-							res.setHeader(HEADER_KEY.CONTENT_LENGTH, Buffer.byteLength(responseBody));
-						}
-
-						res.end(responseBody);
-					}
-					else {
-						res.end();
-					}
+					await sendRouteResult(req, res, responseData, this._config.catchErrorLog, setResponseBody);
 				}
 				catch (e) {
 					const err: Error | TypedObject<unknown> = e as Error | TypedObject<unknown>;
@@ -700,97 +524,7 @@ export class Badak {
 						console.error('badak catch error : %o', err);
 					}
 
-					interface HttpResStatusCode {
-						code: number;
-						message: string;
-					}
-
-					const statusCodes: HttpResStatusCode[] = [
-						{ code: 400, message: 'Bad Request' },
-						{ code: 401, message: 'Unauthorized' },
-						{ code: 401, message: 'Unauthenticated' },
-						{ code: 403, message: 'Forbidden' },
-						{ code: 404, message: 'Not Found' },
-						{ code: 404, message: 'no rule' },
-						{ code: 405, message: 'Method Not Allowed' },
-						{ code: 406, message: 'Not Acceptable' },
-						{ code: 413, message: 'Payload Too Large' }
-					];
-
-					const foundResult: HttpResStatusCode | undefined = statusCodes.find((def: HttpResStatusCode): boolean => {
-						return def.message == err.message;
-					});
-
-					// writing the error response must not throw again, it would escape the request handler
-					try {
-						if (isResponseStarted(res)) {
-							// headersSent : status code and headers can't be changed anymore
-							// writableEnded : response is completed already
-							// just close the response if it is not completed
-							if (!res.writableEnded) {
-								res.end();
-							}
-						}
-						else if (isHttpError(err)) {
-							res.statusCode = err.status;
-
-							if (err.headers !== undefined) {
-								for (const [key, value] of Object.entries(err.headers)) {
-									if (value !== undefined) {
-										res.setHeader(key, value);
-									}
-								}
-							}
-
-							// status text (e.g. 'Forbidden') if body is not specified or not serializable
-							const serialized: SerializedBody = (
-								err.body !== undefined && err.body !== null
-									? serializeBody(err.body)
-									: undefined
-							) ?? {
-								body: err.message,
-								contentType: CONTENT_TYPE.TEXT_PLAIN
-							};
-
-							if (!res.hasHeader(HEADER_KEY.CONTENT_TYPE)) {
-								res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
-							}
-
-							responseBody = serialized.body;
-							res.end(responseBody);
-						}
-						else if (foundResult) {
-							res.statusCode = foundResult.code;
-							res.end();
-						}
-						else {
-							res.statusCode = 500; // Internal Server Error
-
-							// don't expose internal error message to client, it is logged by catchErrorLog
-							// thrown non-Error value (e.g. throw { reason }) is sent as the body if serializable
-							const serialized: SerializedBody = (
-								!(err instanceof Error) && err !== undefined && err !== null
-									? serializeBody(err)
-									: undefined
-							) ?? {
-								body: 'Internal Server Error',
-								contentType: CONTENT_TYPE.TEXT_PLAIN
-							};
-
-							res.setHeader(HEADER_KEY.CONTENT_TYPE, toContentTypeHeader(serialized.contentType));
-
-							responseBody = serialized.body;
-							res.end(responseBody);
-						}
-					}
-					catch (responseError: unknown) {
-						if (this._config.catchErrorLog) {
-							console.error('badak failed to write error response :', responseError);
-						}
-
-						// can't respond properly, close the connection
-						res.destroy();
-					}
+					sendErrorResponse(res, err, this._config.catchErrorLog, setResponseBody);
 
 					if (!this._config.preventError) {
 						throw err;
