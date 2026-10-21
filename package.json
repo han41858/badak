@@ -14,7 +14,6 @@
 		"build:cjs": "tsx ./scripts/create-package-json.ts cjs",
 		"build:esm": "tsx ./scripts/create-package-json.ts esm",
 		"build": "yarn build:types&&yarn build:cjs&&yarn build:esm",
-		"postbuild": "tsc -p tsconfig.scripts.json&&node build/scripts/add-js-extensions",
 		"test": "mocha",
 		"lint": "eslint src spec"
 	},

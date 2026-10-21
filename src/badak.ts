@@ -13,8 +13,8 @@ import {
 	StaticCache,
 	StaticRule,
 	TypedObject
-} from './interfaces';
-import { CONTENT_TYPE, HEADER_KEY, METHOD } from './constants';
+} from './interfaces.js';
+import { CONTENT_TYPE, HEADER_KEY, METHOD } from './constants.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -26,7 +26,7 @@ import {
 	isFolder,
 	loadFolder,
 	sift
-} from './util';
+} from './util.js';
 
 /**
  * rule format, reserved keyword is 4-methods in upper cases

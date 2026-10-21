@@ -5,8 +5,8 @@ import { Stats } from 'node:fs';
 
 import * as node_path from 'node:path';
 
-import { StaticCache } from './interfaces';
-import { CONTENT_TYPE } from './constants';
+import { StaticCache } from './interfaces.js';
+import { CONTENT_TYPE } from './constants.js';
 
 
 export const convertNumberStr = (param: string): string | number => {
