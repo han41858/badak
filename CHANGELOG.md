@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Files of `multipart/form-data` (`Buffer`) are not traversed when the request body is converted. Every byte of a file was visited before, even if `parseNumber` and `parseDate` are disabled, and the server was blocked for about 0.5 seconds per 1MB of uploaded files (seconds for a 10MB upload). ([#65](https://github.com/han41858/badak/pull/65))
+  - only plain objects and arrays from the request (JSON, form, multipart fields) are traversed. The converted values are not changed.
+
 - `Content-Type` of the request body is compared case-insensitively, e.g. `Application/JSON` is parsed as JSON. The request body was not parsed before, and `ctx.body` was `undefined`. ([#64](https://github.com/han41858/badak/pull/64))
 - absolute-form request targets with `http` or `https` (e.g. `GET http://example.com/users/7 HTTP/1.1`) are routed by their path and query, without normalizing the path. They responded `404` before. ([#64](https://github.com/han41858/badak/pull/64))
   - other schemes (e.g. `ftp://`), an empty host (e.g. `http:///users/7`), userinfo (e.g. `http://user@host/`), and an invalid host or port respond `400`.
