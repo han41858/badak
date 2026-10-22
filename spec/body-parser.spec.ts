@@ -41,6 +41,38 @@ describe('body-parser', () => {
 		});
 	});
 
+	describe('convertParam() : Buffer of a multipart file is not converted', () => {
+		[noConvert, convertAll].forEach((option: ParamConvertOption): void => {
+			it(`kept as it is, ${ JSON.stringify(option) }`, () => {
+				const file: Buffer = Buffer.from('12');
+				const converted: Record<string, unknown> = convertParam({ file, list: [file], n: '1' }, option);
+
+				expect(converted.file).to.be.equal(file);
+				expect(converted.file).to.be.instanceof(Buffer);
+				expect((converted.list as unknown[])[0]).to.be.equal(file);
+				expect(converted.n).to.be.eql(option.parseNumber ? 1 : '1');
+			});
+
+			it(`8MB file in multipart body is parsed in linear time, ${ JSON.stringify(option) }`, () => {
+				const boundary: string = 'XyZ';
+				const size: number = 8 * 1024 * 1024;
+				const body: Buffer = Buffer.concat([
+					Buffer.from(`--${ boundary }\r\nContent-Disposition: form-data; name="file"; filename="a.png"\r\nContent-Type: image/png\r\n\r\n`),
+					Buffer.alloc(size, 1),
+					Buffer.from(`\r\n--${ boundary }\r\nContent-Disposition: form-data; name="n"\r\n\r\n1\r\n--${ boundary }--\r\n`)
+				]);
+
+				const start: number = Date.now();
+				const param: Record<string, unknown> = parseBody(fakeReq({ 'content-type': `multipart/form-data; boundary=${ boundary }` }), body, option) as Record<string, unknown>;
+
+				// every byte of the Buffer was visited before, it took seconds for 8MB
+				expect(Date.now() - start).to.be.below(300);
+				expect((param.file as Buffer).byteLength).to.be.eql(size);
+				expect(param.n).to.be.eql(option.parseNumber ? 1 : '1');
+			});
+		});
+	});
+
 	describe('parseBody()', () => {
 		it('application/json', () => {
 			expect(parseBody(fakeReq({ 'content-type': 'application/json' }), Buffer.from('{"a":"1"}'), convertAll))

@@ -1,6 +1,8 @@
 import { RouteFunction, RouteFunctionObj, RouteOption, RouteRule, RouteRuleSeed, TypedObject } from './interfaces.js';
 import { METHOD } from './constants.js';
+import { HttpError } from './http-error.js';
 import { isValidBodyLimit, sift } from './util.js';
+import { matchPatternTokens, PatternToken, patternTokensIntersect } from './fragment-pattern.js';
 import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from './question-pattern.js';
 import {
 	canonicalRouteKey,
@@ -276,36 +278,37 @@ const checkSiblingUriKeys = (targetKeys: string[]): void => {
 		}
 	}
 
-	// plus routing, compare with normal uri fragments and the shortest uri fragments of other plus routes
+	// plus routing, same pattern interpretation as request matching
 	const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => segments.get(uri)?.kind === 'plus');
 	if (plusRouteArr.length > 0) {
-		plusRouteArr.forEach((plusUri: string): void => {
-			const { regExp } = segments.get(plusUri) as { kind: 'plus', regExp: RegExp };
+		const tokensOf = (uri: string): PatternToken[] => (segments.get(uri) as { kind: 'plus', tokens: PatternToken[] }).tokens;
 
-			const isDuplicated: boolean = targetKeys
-				.filter((uri: string): boolean => uri !== plusUri)
-				.map((uri: string): string | undefined => {
-					const segment: RouteSegment = segments.get(uri) as RouteSegment;
-
-					// other special routings are checked by themselves
-					switch (segment.kind) {
-						case 'normal':
-							return segment.literal;
-
-						case 'plus':
-							// shortest matching uri fragment : 'abc+' -> 'abc'
-							return segment.shortest;
-
-						default:
-							return undefined;
-					}
-				})
-				.some((literal: string | undefined): boolean => literal !== undefined && regExp.test(literal));
-
-			if (isDuplicated) {
-				throw new Error('duplicated plus routing');
+		// plus pattern and normal uri fragments (literal)
+		for (const plusUri of plusRouteArr) {
+			for (const [literal, normalUri] of normalLiterals) {
+				if (matchPatternTokens(tokensOf(plusUri), literal)) {
+					throw new Error(`duplicated plus routing : ${ plusUri }, ${ normalUri }`);
+				}
 			}
-		});
+		}
+
+		// plus patterns that can match the same uri fragment, e.g. 'aab+' and 'a+bb' for 'aabb'
+		for (let i: number = 0; i < plusRouteArr.length; i++) {
+			for (let j: number = i + 1; j < plusRouteArr.length; j++) {
+				if (patternTokensIntersect(tokensOf(plusRouteArr[i]), tokensOf(plusRouteArr[j]))) {
+					throw new Error(`duplicated plus routing : ${ plusRouteArr[i] }, ${ plusRouteArr[j] }`);
+				}
+			}
+		}
+
+		// question and plus patterns that can match the same uri fragment, e.g. 'colou?r' and 'colou+r' for 'colour'
+		for (const questionUri of questionRouteArr) {
+			for (const plusUri of plusRouteArr) {
+				if (patternTokensIntersect(parseQuestionPattern(questionUri), tokensOf(plusUri))) {
+					throw new Error(`duplicated question and plus routing : ${ questionUri }, ${ plusUri }`);
+				}
+			}
+		}
 	}
 
 	// asterisk routing, encoded '*' (%2A) is literal
@@ -342,6 +345,47 @@ export interface RouteMatch {
 	// params from special routing (e.g. colon routing)
 	param: TypedObject<unknown> | undefined;
 }
+
+// split request url into path and query string (without '?')
+// request target (RFC 9112 3.2) to origin-form ('/path?query')
+// - origin-form : as it is
+// - absolute-form (e.g. 'http://host/path?query', sent to proxies) : path and query, the authority is ignored
+//   only 'http' and 'https' (case-insensitive), the host should not be empty (RFC 9110 4.2.1)
+//   userinfo (e.g. 'http://user@host/') is an error (RFC 9110 4.2.4)
+//   the path is not normalized (e.g. dot segments), same as origin-form
+// - asterisk-form ('*', OPTIONS for the server) : no resource, 404
+// - authority-form ('host:port', CONNECT), other schemes, and others : 400
+// - a fragment ('#') is not a part of the request target in any form : 400
+export const toOriginForm = (target: string): string => {
+	if (target.includes('#')) {
+		throw new HttpError(400);
+	}
+
+	if (target.startsWith('/')) {
+		return target;
+	}
+
+	if (target === '*') {
+		throw new HttpError(404);
+	}
+
+	const absolute: RegExpMatchArray | null = target.match(/^https?:\/\/([^/?]*)(.*)$/i);
+
+	if (absolute === null) {
+		throw new HttpError(400);
+	}
+
+	const [, authority, rest] = absolute;
+
+	// host : reg-name or IPv4 (without ':'), or IP literal in brackets, then an optional port
+	if (!/^(?:\[[0-9A-Fa-f:.]+\]|[^:@[\]]+)(?::\d*)?$/.test(authority)) {
+		throw new HttpError(400);
+	}
+
+	return rest.startsWith('/')
+		? rest
+		: '/' + rest; // 'http://host' -> '/', 'http://host?a=1' -> '/?a=1'
+};
 
 // split request url into path and query string (without '?')
 export const splitUrl = (url: string): { path: string, queryStr: string | undefined } => {
@@ -479,7 +523,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatc
 					? undefined
 					: compileRouteSegment(routeRuleKey);
 
-				return segment?.kind === 'plus' && segment.regExp.test(uriFrag);
+				return segment?.kind === 'plus' && matchPatternTokens(segment.tokens, uriFrag);
 			});
 
 			if (targetPlusKey !== undefined) {

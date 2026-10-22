@@ -303,12 +303,15 @@ describe('? routing', () => {
 				]
 			},
 			{
-				name: 'question pattern and plus routing for the same uri fragment : ? first',
-				uris: ['/ab?c', '/ab+c'],
+				// patterns matching the same uri fragment throw, see plus-route.spec.ts
+				name: 'question pattern and plus routing without overlap',
+				uris: ['/ab?c', '/ab+d'],
 				requests: [
 					['/abc', '/ab?c'],
 					['/ac', '/ab?c'],
-					['/abbc', '/ab+c']
+					['/abd', '/ab+d'],
+					['/abbd', '/ab+d'],
+					['/abbc', undefined]
 				]
 			},
 			{
