@@ -249,15 +249,67 @@ const checkRoutePair = (a: RegisteredRoute, b: RegisteredRoute): void => {
 	throw new Error(`${ header }\n  ${ routePath(b.keys) }\n  ${ routePath(a.keys) }`);
 };
 
+// registered routes that can conflict with the route, found along the route tree
+// only the children whose route keys intersect with the route key of the same depth are followed
+// '**' children are compared only with '**' routes, at the same depth
+const findConflictCandidates = (node: RouteRule, route: RegisteredRoute, depth: number, keys: string[], found: RegisteredRoute[]): void => {
+	if (depth === route.keys.length) {
+		if (node[route.method] !== undefined) {
+			found.push({ keys, method: route.method });
+		}
+
+		return;
+	}
+
+	const routeKey: string = route.keys[depth];
+
+	if (routeKey === '**') {
+		// the last key
+		const doubleAsteriskRule: unknown = node['**'];
+
+		if (typeof doubleAsteriskRule === 'object' && doubleAsteriskRule !== null && (doubleAsteriskRule as RouteRule)[route.method] !== undefined) {
+			found.push({ keys: [...keys, '**'], method: route.method });
+		}
+
+		return;
+	}
+
+	const segment: RouteSegment = compileRouteSegment(routeKey);
+
+	// a literal route key : only the normal child of the same literal, and pattern children
+	const childKeys: string[] = segment.kind === 'normal'
+		? [
+			...(findNormalRouteKey(node, segment.literal) !== undefined ? [findNormalRouteKey(node, segment.literal) as string] : []),
+			...patternRouteKeys(node)
+		]
+		: Object.keys(node).filter((key: string): boolean => !isMethodKey(key) && key !== '**');
+
+	for (const childKey of childKeys) {
+		const child: unknown = node[childKey];
+
+		if (typeof child === 'object' && child !== null && keysIntersect(childKey, routeKey)) {
+			findConflictCandidates(child as RouteRule, route, depth + 1, [...keys, childKey], found);
+		}
+	}
+};
+
 // check that each request path matches only one route per method, with the routes of currentRouteRule and newRouteRule
 // throws before anything is changed, the caller merges newRouteRule only if this passes
 export const checkUriDuplication = (currentRouteRule: RouteRule, newRouteRule: RouteRule): void => {
-	const currentRoutes: RegisteredRoute[] = collectRoutes(currentRouteRule);
 	const newRoutes: RegisteredRoute[] = collectRoutes(newRouteRule);
 
 	newRoutes.forEach((newRoute: RegisteredRoute, i: number): void => {
-		// registered routes, and new routes before this one (keys of one rule object)
-		for (const other of [...currentRoutes, ...newRoutes.slice(0, i)]) {
+		// registered routes, found along the route tree
+		const candidates: RegisteredRoute[] = [];
+
+		findConflictCandidates(currentRouteRule, newRoute, 0, [], candidates);
+
+		for (const candidate of candidates) {
+			checkRoutePair(newRoute, candidate);
+		}
+
+		// new routes before this one (keys of one rule object)
+		for (const other of newRoutes.slice(0, i)) {
 			checkRoutePair(newRoute, other);
 		}
 	});

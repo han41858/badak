@@ -28,10 +28,10 @@ const accepts = (token: PatternToken, char: string): boolean => token.char === n
 // and repeating a skipped wildcard is the same as consuming it
 
 // states reachable without consuming a character (skip optional tokens)
-const closeOverOptional = (reachable: boolean[], tokens: PatternToken[]): void => {
+const closeOverOptional = (reachable: Uint8Array, tokens: PatternToken[]): void => {
 	for (let p: number = 0; p < tokens.length; p++) {
-		if (reachable[p] && tokens[p].optional) {
-			reachable[p + 1] = true;
+		if (reachable[p] === 1 && tokens[p].optional) {
+			reachable[p + 1] = 1;
 		}
 	}
 };
@@ -53,25 +53,34 @@ const moves = (tokens: PatternToken[], p: number): [token: PatternToken, next: n
 };
 
 // whole uri fragment should match
+// two state arrays are reused for every character, no allocation per character
 export const matchPatternTokens = (tokens: PatternToken[], uriFrag: string): boolean => {
-	let reachable: boolean[] = new Array<boolean>(tokens.length + 1).fill(false);
-	reachable[0] = true;
+	let reachable: Uint8Array = new Uint8Array(tokens.length + 1);
+	let next: Uint8Array = new Uint8Array(tokens.length + 1);
+
+	reachable[0] = 1;
 	closeOverOptional(reachable, tokens);
 
 	for (const char of uriFrag) {
-		const next: boolean[] = new Array<boolean>(tokens.length + 1).fill(false);
+		next.fill(0);
+
 		let anyReachable: boolean = false;
 
 		for (let p: number = 0; p <= tokens.length; p++) {
-			if (!reachable[p]) {
+			if (reachable[p] !== 1) {
 				continue;
 			}
 
-			for (const [token, state] of moves(tokens, p)) {
-				if (accepts(token, char)) {
-					next[state] = true;
-					anyReachable = true;
-				}
+			// consume tokens[p]
+			if (p < tokens.length && accepts(tokens[p], char)) {
+				next[p + 1] = 1;
+				anyReachable = true;
+			}
+
+			// repeat the token consumed just before
+			if (p > 0 && tokens[p - 1].repeat && accepts(tokens[p - 1], char)) {
+				next[p] = 1;
+				anyReachable = true;
 			}
 		}
 
@@ -80,10 +89,10 @@ export const matchPatternTokens = (tokens: PatternToken[], uriFrag: string): boo
 		}
 
 		closeOverOptional(next, tokens);
-		reachable = next;
+		[reachable, next] = [next, reachable];
 	}
 
-	return reachable[tokens.length];
+	return reachable[tokens.length] === 1;
 };
 
 // true if there is a non-empty string matched by both token sequences
