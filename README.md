@@ -102,6 +102,7 @@ Don't read the request body (`req`) in this function or in `before()`, badak res
 Registers a middleware function to run **before** the routing function is executed.
 Multiple middleware functions can be specified,
 and they are executed in parallel regardless of the order in which they are specified.
+It should be called before `listen()`.
 
 If a middleware function throws an error (or returns a rejected Promise), the routing function is not executed
 and badak responds with an error status code, in the same way as an error thrown in the routing function.
@@ -113,6 +114,7 @@ If a middleware function responds by itself (e.g. `res.end()`), the routing func
 Registers a middleware function to run **after** the routing function is executed.
 Multiple middleware functions can be specified,
 and they are executed in parallel regardless of the order in which they are specified.
+It should be called before `listen()`.
 
 `after()` functions run for every request, also if the client closed the connection before the response.
 If the client closed the connection while sending the request body, the routing function is not executed,
@@ -120,11 +122,19 @@ no response is sent, and `res.writableEnded` is `false` in `after()` functions.
 
 ### `config(key: string, value: unknown): Promise<void>`
 
-Controls how badak apps run.
+Controls how badak apps run. The keys are the same as [`BadakOption`](#badakoption) : `catchErrorLog`, `preventError`, `defaultMethod`, `parseNumber`, `parseDate` and `bodyLimit`.
+An unknown key or an invalid value throws an error.
+
+```typescript
+await app.config('parseNumber', true);
+await app.config('bodyLimit', 1024 * 1024);
+```
 
 ### `listen(port: number): Promise<void>`
 
 The server starts responding.
+Files of `static()` and `setSPARoot()` are loaded and registered as routes here, and checked for conflicts with other routes (see [One route per request](#one-route-per-request)).
+If a static file route conflicts, `listen()` rejects and the server doesn't start.
 
 ### `isRunning(): boolean`
 
@@ -151,6 +161,8 @@ because `stop()` doesn't resolve until they finish.
 ### `route(rule: RouteRule): Promise<void>`
 
 Register a routing function.
+All routes of the rule object are checked first, and registered only if none of them conflicts with other routes (see [One route per request](#one-route-per-request)).
+Routes can be registered after `listen()` too.
 
 If a request matches a registered path but no routing function is registered for its method,
 badak responds `405 Method Not Allowed` with the `Allow` header listing the available methods.
@@ -187,7 +199,7 @@ For an unknown extension or a file without extension, it is determined by the fi
 and `application/octet-stream` is used if it is not known either.
 Text files (`text/*`) and JavaScript files are served with `charset=utf-8`, so save them in UTF-8.
 
-Files are loaded into memory when `listen()` is called, so restart the server to serve changed files.
+Files are loaded into memory when `listen()` is called, so call `stop()` and `listen()` again to serve changed files. Files deleted before that are not served anymore.
 
 Static files are served with `ETag` (from the file content) and `Last-Modified` (from the file modification time),
 and respond `304 Not Modified` without the body if `If-None-Match` or `If-Modified-Since` of the request matches.
@@ -565,7 +577,10 @@ GET /path?             → query: {}
 GET /path?key          → query: { key: '' }
 GET /path?key=         → query: { key: '' }
 GET /path?key=value    → query: { key: 'value' }
+GET /path?a=1&a=2      → query: { a: ['1', '2'] }
 ```
+
+- Values are decoded by `node:querystring`. A malformed percent-encoding in the query string is kept as it is (e.g. `?a=%ZZ` → `{ a: '%ZZ' }`), it doesn't respond `400` like the request path.
 
 ### Route captures and body
 
@@ -583,6 +598,17 @@ await app.patch('/users/:id', (ctx) => ctx);
 ```
 
 `parseNumber` and `parseDate` apply to query and body strings, but never to path captures. The original Node.js `req` and `res` are still available as the second and third callback parameters.
+
+The request body is parsed by `Content-Type` (compared case-insensitively, parameters like `charset` are ignored) :
+
+| `Content-Type` | `ctx.body` | `400 Bad Request` |
+|---|---|---|
+| `application/json` | the parsed JSON value | malformed JSON, including JSON starting with a UTF-8 BOM |
+| `application/x-www-form-urlencoded` | an object of strings, `key[]` for arrays | |
+| `multipart/form-data` | an object : fields are strings, files are `Buffer` (or strings for `text/plain` files), `key[]` for arrays | no `boundary` |
+| other types (e.g. `text/plain`, `application/octet-stream`), or no `Content-Type` | `undefined` : the body is received up to `bodyLimit` and discarded, it can't be read from `req` | |
+
+An empty body is `undefined` for every type. A body over `bodyLimit` responds `413 Payload Too Large`.
 
 ## Examples
 

@@ -14,6 +14,14 @@ These changes break backward compatibility and are planned for 5.0.0. See [`docs
 - Static file routes of `static()` and `setSPARoot()` are checked in `listen()` with the other routes, at once. A conflict rejects `listen()` and nothing is registered partially. `listen()` after `stop()` doesn't duplicate the static cache.
 - Error messages of route registration are changed : `duplicated colon/question/plus/asterisk routing` and `duplicated question and plus routing` are `Conflicting routes for <METHOD>:` with both paths, and syntax errors are `invalid route '<uri fragment>' : <reason>`.
 
+### Others
+
+- Registering a value that is not a function as a routing function throws `route function should be Function`. It threw `middleware should be Function` before. ([#72](https://github.com/han41858/badak/pull/72))
+
+### Documentation
+
+- README : `config()` keys, `before()` and `after()` should be called before `listen()`, routes can be registered after `listen()`, static files after `stop()` and `listen()`, how the request body is parsed by `Content-Type` (including `400` for JSON with a UTF-8 BOM, and `undefined` for other types), and the query string with a malformed percent-encoding. ([#72](https://github.com/han41858/badak/pull/72))
+
 ### Migration
 
 | If you ... | 4.x | 5.0.0 | then |

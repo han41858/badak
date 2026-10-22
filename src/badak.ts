@@ -208,7 +208,7 @@ export class Badak {
 		}
 
 		if (typeof fnc !== 'function') {
-			throw new Error('middleware should be Function');
+			throw new Error('route function should be Function');
 		}
 	}
 

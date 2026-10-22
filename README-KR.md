@@ -99,6 +99,7 @@ const appWithLog: Badak = new Badak({
 
 라우팅 함수가 실행되기 전에 실행할 미들웨어 함수를 등록합니다.
 미들웨어 함수는 여러개를 지정할 수 있으며, 지정한 순서와 관계없이 병렬로 실행됩니다.
+`listen()` 전에 호출해야 합니다.
 
 미들웨어 함수에서 에러가 발생하면(거부된 Promise를 반환하는 경우 포함) 라우팅 함수는 실행되지 않으며,
 라우팅 함수에서 에러가 발생했을 때와 같은 방식으로 에러 상태 코드로 응답합니다.
@@ -109,17 +110,26 @@ const appWithLog: Badak = new Badak({
 
 라우팅 함수가 실행된 후에 실행할 미들웨어 함수를 등록합니다.
 미들웨어 함수는 여러개를 지정할 수 있으며, 지정한 순서와 관계없이 병렬로 실행됩니다.
+`listen()` 전에 호출해야 합니다.
 
 `after()` 함수는 클라이언트가 응답 전에 연결을 끊은 경우에도 모든 요청에 대해 실행됩니다.
 요청 본문을 보내는 중 클라이언트가 연결을 끊으면 라우팅 함수는 실행되지 않고 응답도 보내지 않으며, `after()` 함수에서 `res.writableEnded`는 `false`입니다.
 
 ### `config(key: string, value: unknown): Promise<void>`
 
-badak 앱이 실행되는 동작을 조정합니다.
+badak 앱이 실행되는 동작을 조정합니다. 키는 [`BadakOption`](#badakoption)과 같습니다 : `catchErrorLog`, `preventError`, `defaultMethod`, `parseNumber`, `parseDate`, `bodyLimit`.
+알 수 없는 키나 잘못된 값은 에러가 발생합니다.
+
+```typescript
+await app.config('parseNumber', true);
+await app.config('bodyLimit', 1024 * 1024);
+```
 
 ### `listen(port: number): Promise<void>`
 
 서버 응답을 시작합니다.
+`static()`과 `setSPARoot()`의 파일을 이때 불러와 라우트로 등록하며, 다른 라우트와 충돌하는지 검사합니다([요청 하나에 라우트 하나](#요청-하나에-라우트-하나) 참고).
+정적 파일 라우트가 충돌하면 `listen()`이 실패하고 서버는 시작하지 않습니다.
 
 ### `isRunning(): boolean`
 
@@ -143,6 +153,8 @@ HTTP 서버를 정지합니다.
 ### `route(rule: RouteRule): Promise<void>`
 
 라우팅 함수를 등록합니다.
+규칙 객체의 라우트를 모두 먼저 검사하고, 다른 라우트와 충돌하는 것이 없을 때만 등록합니다([요청 하나에 라우트 하나](#요청-하나에-라우트-하나) 참고).
+`listen()` 후에도 라우트를 등록할 수 있습니다.
 
 요청 경로와 일치하는 라우팅 규칙은 있지만 요청 메서드에 해당하는 라우팅 함수가 없으면,
 `405 Method Not Allowed`와 함께 사용할 수 있는 메서드 목록을 `Allow` 헤더로 응답합니다.
@@ -178,7 +190,7 @@ HTTP 서버를 정지합니다.
 알 수 없는 확장자이거나 확장자가 없는 파일은 파일 시그니처(예: PNG)로 판별하고, 그래도 알 수 없으면 `application/octet-stream`으로 응답합니다.
 텍스트 파일(`text/*`)과 JavaScript 파일은 `charset=utf-8`로 응답하므로 UTF-8로 저장해야 합니다.
 
-파일은 `listen()`을 실행할 때 메모리에 올라가므로, 파일을 바꾸면 서버를 다시 시작해야 반영됩니다.
+파일은 `listen()`을 실행할 때 메모리에 올라가므로, 파일을 바꾸면 `stop()` 후 `listen()`을 다시 호출해야 반영됩니다. 그 사이 삭제된 파일은 더 이상 제공하지 않습니다.
 
 정적 파일은 `ETag`(파일 내용 기준)와 `Last-Modified`(파일 수정 시각 기준)를 함께 응답하며,
 요청의 `If-None-Match`나 `If-Modified-Since`가 일치하면 본문 없이 `304 Not Modified`로 응답합니다.
@@ -553,7 +565,10 @@ GET /path?             → query: {}
 GET /path?key          → query: { key: '' }
 GET /path?key=         → query: { key: '' }
 GET /path?key=value    → query: { key: 'value' }
+GET /path?a=1&a=2      → query: { a: ['1', '2'] }
 ```
+
+- 값은 `node:querystring`으로 디코딩합니다. 쿼리 문자열의 잘못된 퍼센트 인코딩은 원문 그대로 둡니다(예: `?a=%ZZ` → `{ a: '%ZZ' }`). 요청 경로처럼 `400`으로 응답하지 않습니다.
 
 ### 경로 파라미터와 본문
 
@@ -571,6 +586,17 @@ await app.patch('/users/:id', (ctx) => ctx);
 ```
 
 `parseNumber`와 `parseDate`는 query와 body의 문자열에만 적용하며 경로 캡처에는 적용하지 않습니다. Node.js의 `req`, `res`는 두 번째와 세 번째 인자로 그대로 전달됩니다.
+
+요청 본문은 `Content-Type`에 따라 파싱합니다(대소문자 구분 없음, `charset` 같은 파라미터는 무시).
+
+| `Content-Type` | `ctx.body` | `400 Bad Request` |
+|---|---|---|
+| `application/json` | 파싱한 JSON 값 | 잘못된 JSON, UTF-8 BOM으로 시작하는 JSON 포함 |
+| `application/x-www-form-urlencoded` | 문자열 값의 객체, 배열은 `key[]` | |
+| `multipart/form-data` | 객체 : 필드는 문자열, 파일은 `Buffer`(`text/plain` 파일은 문자열), 배열은 `key[]` | `boundary` 없음 |
+| 그 밖의 타입(예: `text/plain`, `application/octet-stream`), 또는 `Content-Type` 없음 | `undefined` : 본문은 `bodyLimit`까지 받은 뒤 버리며, `req`에서 읽을 수 없음 | |
+
+본문이 비어 있으면 모든 타입에서 `undefined`입니다. `bodyLimit`을 넘는 본문은 `413 Payload Too Large`로 응답합니다.
 
 ## 예제
 
