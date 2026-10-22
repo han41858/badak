@@ -30,6 +30,7 @@
 		"test": "mocha",
 		"test:types": "tsc --project tsconfig.types.json",
 		"test:types:dist": "tsx ./scripts/check-dist-types.ts",
+		"bench:routing": "tsx ./scripts/bench-routing.ts",
 		"lint": "eslint src spec sample"
 	},
 	"repository": {

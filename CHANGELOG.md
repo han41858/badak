@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased (5.0.0)
+
+These changes break backward compatibility and are planned for 5.0.0. See [`docs/routing-spec-5.0.0.md`](https://github.com/han41858/badak/blob/main/docs/routing-spec-5.0.0.md) (Korean) for the full specification.
+
+### Breaking changes
+
+- **A request matches only one route per method.** Routes of the same method conflict if they have the same number of uri fragments and every uri fragment can match the same characters, regardless of the kind of routing (normal, `:`, `?`, `+`, `*`). A conflict throws `Conflicting routes for <METHOD>` when it is registered, regardless of the registration order. There is no priority between routes, normal routing doesn't win over `:` routing anymore.
+- `**` routes are fallbacks, not compared with other routes. `**` routes of the same method and depth conflict if the parts before `**` can match the same path, and throw `Conflicting fallback routes for <METHOD> at depth <n>`.
+- Every route matching the request path is found, not only the first one by priority, and the routing function is selected by the method. `405 Method Not Allowed` has the methods of all matched routes in the `Allow` header.
+- `*` in a uri fragment is a wildcard : any characters, 0 or more. The character before it is literal. `ab*cd` matches `abcd` and `abXYZcd`, not `acd` and `aXcd`.
+- `?`, `+` and `*` can be combined in a uri fragment, e.g. `ab?c+d`, `a*b*c`, `*abc`. Adjacent syntax characters (`ab??`, `ab?*`, `a**b`), `?` or `+` without a character before it, and `:` not at the beginning throw `invalid route '...'`.
+- Static file routes of `static()` and `setSPARoot()` are checked in `listen()` with the other routes, at once. A conflict rejects `listen()` and nothing is registered partially. `listen()` after `stop()` doesn't duplicate the static cache.
+- Error messages of route registration are changed : `duplicated colon/question/plus/asterisk routing` and `duplicated question and plus routing` are `Conflicting routes for <METHOD>:` with both paths, and syntax errors are `invalid route '<uri fragment>' : <reason>`.
+
+### Migration
+
+| If you ... | 4.x | 5.0.0 | then |
+|---|---|---|---|
+| register `/users/me` and `/users/:id` | `me` wins | throws | move one of them (e.g. `/me`), or branch on `me` in the `:id` routing function |
+| register `/files/readme` and `/files/*` | `readme` wins | throws | same as above |
+| use `static('/', dir)` with a route like `/:slug` | the file wins | `listen()` rejects if a file name matches | move the static files under a path, or use `setSPARoot()` |
+| register `/img/*` and `/img/:id` | `:id` wins | throws | keep one of them |
+| register `/a/:id` and `/a/b+` (or `?`, `*`) | `b+` is never used | throws | remove the unused route |
+| use `ab*cd` for `acd` or `aXcd` | matched | not matched | change the pattern, the character before `*` is literal |
+| use `user1*` (4.x README example) for `user` | matched | not matched | use `user*` |
+| use `*abc`, `a*b*c`, `ab?c+`, `ab?c*` | throws | registered | - |
+| register `/a/:id/x` and `/a/b+/y` | `/a/bb/y` responds `404` | `/a/bb/y` -> `/a/b+/y` | check the routes |
+| register `GET /a/:id` and `POST /a/b+` | `POST /a/bb` responds `405` | `POST /a/bb` -> `POST /a/b+` | check the routes |
+| register `/users/:id/a` and `/users/:name/b` | throws | registered | - |
+| register `/files/*` and `/files/**` | throws | registered | - |
+| register `/ab*` and `/xy*` | throws | registered | - |
+| check the error messages of route registration | `duplicated … routing` | `Conflicting routes for …` | change the expected messages |
+
 ## 4.1.0 (2026-10-22)
 
 This release fixes request handling (multipart uploads blocking the server, `Content-Type` case, absolute-form request targets, client aborts) and the duplication check of `+` routing.
@@ -59,7 +92,7 @@ To migrate, remove one of the routing paths, merge them into one routing functio
 ## 4.0.0 (2026-10-22)
 
 This release changes the first argument of routing functions to `ParamContext` (`{ params, query, body }`), and redefines `?` routing and non-ASCII / percent-encoded path matching.
-Every route callback that reads the merged `param` object must be migrated, see [Breaking changes](#breaking-changes) and [Migration](#migration).
+Every route callback that reads the merged `param` object must be migrated, see [Breaking changes](#breaking-changes-1) and [Migration](#migration-1).
 
 ### Breaking changes
 
@@ -137,7 +170,7 @@ Cases that differ from 3.0.0 :
 
 This release fixes the routing rules of `**` and `*`.
 `setSPARoot()` serves static files and other routes now, they responded `index.html` before.
-The public API is not changed, but some requests are handled by a different route, see [Breaking changes](#breaking-changes-1) and [Migration](#migration-1).
+The public API is not changed, but some requests are handled by a different route, see [Breaking changes](#breaking-changes-2) and [Migration](#migration-2).
 
 ### Breaking changes
 
@@ -203,7 +236,7 @@ and runs `auth()` before receiving the request body.
 
 This release fixes many bugs found in request handling, routing and packaging,
 and adds `HttpError`, `PATCH`, `HEAD`, stream responses and a request body size limit.
-Several fixes change existing behavior, see [Breaking changes](#breaking-changes-2) and [Migration](#migration-2) first.
+Several fixes change existing behavior, see [Breaking changes](#breaking-changes-3) and [Migration](#migration-3) first.
 
 ### Breaking changes
 

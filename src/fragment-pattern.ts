@@ -1,76 +1,86 @@
-// character patterns of '?' and '+' routing, compared by Unicode code point with decoded uri fragments
-//   - '?' makes the character just before it optional (0 or 1), e.g. 'colou?r' : 'color', 'colour'
-//   - '+' makes the character just before it repeat (1 or more), e.g. 'ab+c' : 'abc', 'abbc'
-//   - other characters are literal
+// token automaton of a uri fragment pattern, compared by Unicode code point with decoded uri fragments
+//   - literal character : 1 time
+//   - 'c?' : the character just before '?' 0 or 1 time
+//   - 'c+' : the character just before '+' 1 or more times
+//   - '*' : wildcard, any characters 0 or more times
+//   - ':id' and '*' as a whole uri fragment : one wildcard, a uri fragment is not empty so 1 or more characters
+// see docs/routing-spec-5.0.0.md 3.
 //
-// matching and duplication check use the same token sequence,
+// matching and intersection use the same tokens,
 // and both run in O(pattern length x string length) without backtracking or expanding strings
 
 export interface PatternToken {
-	char: string; // one Unicode code point
-	optional: boolean; // '?' : 0 or 1
-	repeat?: boolean; // '+' : 1 or more
+	char: string | null; // one Unicode code point, null : any character (wildcard)
+	optional: boolean; // can be skipped : '?' or wildcard
+	repeat: boolean; // can be repeated : '+' or wildcard
 }
 
+export const WILDCARD: Readonly<PatternToken> = Object.freeze({ char: null, optional: true, repeat: true });
+
+export const literalTokens = (literal: string): PatternToken[] => {
+	return [...literal].map((char: string): PatternToken => ({ char, optional: false, repeat: false }));
+};
+
+const accepts = (token: PatternToken, char: string): boolean => token.char === null || token.char === char;
+
 // state p : tokens[0..p) matched the consumed characters
-// a token is either optional or repeat, an optional token is not repeated and a repeat token is not skipped
+// a skipped optional token is never repeated : only a wildcard is both optional and repeat,
+// and repeating a skipped wildcard is the same as consuming it
 
 // states reachable without consuming a character (skip optional tokens)
-const closeOverOptional = (reachable: boolean[], tokens: PatternToken[]): void => {
+const closeOverOptional = (reachable: Uint8Array, tokens: PatternToken[]): void => {
 	for (let p: number = 0; p < tokens.length; p++) {
-		if (reachable[p] && tokens[p].optional) {
-			reachable[p + 1] = true;
+		if (reachable[p] === 1 && tokens[p].optional) {
+			reachable[p + 1] = 1;
 		}
 	}
 };
 
-// next states consuming one character from state p
-const nextStates = (tokens: PatternToken[], p: number, char: string): number[] => {
-	const states: number[] = [];
+// moves consuming one character from state p : [token that consumes it, next state]
+const moves = (tokens: PatternToken[], p: number): [token: PatternToken, next: number][] => {
+	const result: [PatternToken, number][] = [];
 
-	if (p < tokens.length && tokens[p].char === char) {
-		states.push(p + 1);
+	if (p < tokens.length) {
+		result.push([tokens[p], p + 1]);
 	}
 
 	// repeat the token consumed just before
-	if (p > 0 && tokens[p - 1].repeat === true && tokens[p - 1].char === char) {
-		states.push(p);
-	}
-
-	return states;
-};
-
-// characters that can be consumed from state p, with the next state
-const moves = (tokens: PatternToken[], p: number): [char: string, next: number][] => {
-	const result: [string, number][] = [];
-
-	if (p < tokens.length) {
-		result.push([tokens[p].char, p + 1]);
-	}
-
-	if (p > 0 && tokens[p - 1].repeat === true) {
-		result.push([tokens[p - 1].char, p]);
+	if (p > 0 && tokens[p - 1].repeat) {
+		result.push([tokens[p - 1], p]);
 	}
 
 	return result;
 };
 
 // whole uri fragment should match
+// two state arrays are reused for every character, no allocation per character
 export const matchPatternTokens = (tokens: PatternToken[], uriFrag: string): boolean => {
-	let reachable: boolean[] = new Array<boolean>(tokens.length + 1).fill(false);
-	reachable[0] = true;
+	let reachable: Uint8Array = new Uint8Array(tokens.length + 1);
+	let next: Uint8Array = new Uint8Array(tokens.length + 1);
+
+	reachable[0] = 1;
 	closeOverOptional(reachable, tokens);
 
 	for (const char of uriFrag) {
-		const next: boolean[] = new Array<boolean>(tokens.length + 1).fill(false);
+		next.fill(0);
+
 		let anyReachable: boolean = false;
 
 		for (let p: number = 0; p <= tokens.length; p++) {
-			if (reachable[p]) {
-				for (const state of nextStates(tokens, p, char)) {
-					next[state] = true;
-					anyReachable = true;
-				}
+			if (reachable[p] !== 1) {
+				continue;
+			}
+
+			// consume tokens[p]
+			if (p < tokens.length && accepts(tokens[p], char)) {
+				next[p + 1] = 1;
+				anyReachable = true;
+			}
+
+			// repeat the token consumed just before
+			if (p > 0 && tokens[p - 1].repeat && accepts(tokens[p - 1], char)) {
+				next[p] = 1;
+				anyReachable = true;
 			}
 		}
 
@@ -79,10 +89,10 @@ export const matchPatternTokens = (tokens: PatternToken[], uriFrag: string): boo
 		}
 
 		closeOverOptional(next, tokens);
-		reachable = next;
+		[reachable, next] = [next, reachable];
 	}
 
-	return reachable[tokens.length];
+	return reachable[tokens.length] === 1;
 };
 
 // true if there is a non-empty string matched by both token sequences
@@ -116,10 +126,10 @@ export const patternTokensIntersect = (a: PatternToken[], b: PatternToken[]): bo
 			stack.push([i, j + 1, consumed]);
 		}
 
-		// consume the same character in both
-		for (const [charA, nextI] of moves(a, i)) {
-			for (const [charB, nextJ] of moves(b, j)) {
-				if (charA === charB) {
+		// consume the same character in both : equal characters, or a wildcard on either side
+		for (const [tokenA, nextI] of moves(a, i)) {
+			for (const [tokenB, nextJ] of moves(b, j)) {
+				if (tokenA.char === null || tokenB.char === null || tokenA.char === tokenB.char) {
 					stack.push([nextI, nextJ, 1]);
 				}
 			}

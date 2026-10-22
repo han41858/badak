@@ -104,11 +104,14 @@ describe('route priority', () => {
 			]
 		},
 		{
-			name: 'normal routing before colon routing (not changed)',
-			uris: ['/users/:id', '/users/me'],
+			// 5.0.0 : '/users/me' & '/users/:id' conflict, see 'routes matching the same path conflict'
+			name: 'normal and colon routing with different following uri fragments',
+			uris: ['/users/:id', '/users/me/settings'],
 			requests: [
-				['/users/me', '/users/me'],
-				['/users/7', '/users/:id', { id: '7' }]
+				['/users/me/settings', '/users/me/settings'],
+				['/users/7', '/users/:id', { id: '7' }],
+				['/users/me', '/users/:id', { id: 'me' }],
+				['/users/7/settings', undefined]
 			]
 		}
 	];
@@ -162,6 +165,31 @@ describe('route priority', () => {
 							}
 						});
 					});
+				});
+			});
+		});
+	});
+
+	describe('routes matching the same path conflict, regardless of the registration order (5.0.0)', () => {
+		[
+			['/users/me', '/users/:id'],
+			['/img/a.png', '/img/*'],
+			['/img/*', '/img/:id'],
+			['/abc', '/ab*'],
+			['/a/:id', '/a/b+']
+		].forEach(([a, b]: string[]): void => {
+			it(`${ a } & ${ b }`, () => {
+				[[a, b], [b, a]].forEach((order: string[]): void => {
+					const routeRule: RouteRule = {};
+
+					expect((): void => {
+						order.forEach((uri: string): void => {
+							const refined: RouteRule = refineRouteRule({ [uri]: { GET: fncOf(uri) } }, undefined);
+
+							checkUriDuplication(routeRule, refined);
+							mergeRouteRule(routeRule, refined);
+						});
+					}, `order : ${ order.join(', ') }`).to.throw('Conflicting routes for GET');
 				});
 			});
 		});
