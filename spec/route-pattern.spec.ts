@@ -115,6 +115,50 @@ describe('uri fragment pattern (5.0.0)', () => {
 			expect(intersect('ab%2Acd', 'ab*cd')).to.be.true;
 		});
 
+		it('canonical keys keep the parts : random patterns with encoded and syntax characters (round trip)', () => {
+			// deterministic pseudo random
+			let seed: number = 9;
+
+			const random = (n: number): number => {
+				seed = (seed * 1103515245 + 12345) % 2147483648;
+				return seed % n;
+			};
+
+			// literal characters in raw or encoded spellings, syntax characters after a literal
+			const literals: string[][] = [['a', '%61'], ['한', '%ED%95%9C'], ['?', '%3F'], ['*', '%2A'], ['+', '%2B'], [':', '%3A'], ['%', '%25'], [' ', '%20']];
+
+			for (let n: number = 0; n < 500; n++) {
+				const length: number = 1 + random(5);
+				let spellingA: string = '';
+				let spellingB: string = '';
+
+				for (let i: number = 0; i < length; i++) {
+					const [raw, encoded] = literals[random(literals.length)];
+					// raw '?', '*', '+', ':', '%', ' ' are syntax or invalid, use the encoded spelling for them
+					const safeRaw: string = /^[a한]$/.test(raw) ? raw : encoded;
+
+					spellingA += random(2) === 0 ? safeRaw : encoded;
+					spellingB += random(2) === 0 ? safeRaw : encoded;
+
+					if (random(3) === 0) {
+						const syntax: string = '?+*'[random(3)];
+
+						spellingA += syntax;
+						spellingB += syntax;
+					}
+				}
+
+				const canonical: string = canonicalRouteKey(spellingA);
+
+				// the same parts in different spellings : the same key
+				expect(canonicalRouteKey(spellingB), `${ spellingA } & ${ spellingB }`).to.be.eql(canonical);
+
+				// round trip : the canonical key has the same parts and the same canonical key
+				expect(splitRouteKey(canonical, '?+*'), spellingA).to.be.eql(splitRouteKey(spellingA, '?+*'));
+				expect(canonicalRouteKey(canonical)).to.be.eql(canonical);
+			}
+		});
+
 		it('malformed percent-encoding throws', () => {
 			['%ZZ', 'a%E0%A4', 'ab*%2'].forEach((routeKey: string): void => {
 				expect(() => compileRouteSegment(routeKey), routeKey).to.throw('invalid percent-encoding');
