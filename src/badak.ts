@@ -1,4 +1,5 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
+import { Socket } from 'node:net';
 import * as node_path from 'node:path';
 import * as querystring from 'node:querystring';
 
@@ -50,8 +51,54 @@ import {
 	isValidBodyLimit
 } from './util.js';
 
+// responses of a running server not closed yet, see Badak.stop()
+interface HttpState {
+	// with the connection, IncomingMessage has it even for a pipelined request
+	responses: Map<ServerResponse, Socket>;
+	// the number of responses not closed yet by the connection, more than 1 : pipelined requests
+	connections: Map<Socket, number>;
+	// responses 'Connection: close' is set to by stop()
+	closing: Set<ServerResponse>;
+	stopping: boolean;
+}
+
+const closeWhenIdle = (server: Server, res: ServerResponse): void => {
+	res.once('finish', (): void => {
+		server.closeIdleConnections();
+	});
+};
+
+// close the keep-alive connection after the response, for stop()
+const closeAfterResponse = (server: Server, state: HttpState, res: ServerResponse, socket: Socket): void => {
+	if (!res.headersSent && state.connections.get(socket) === 1) {
+		// Node.js closes the connection after this response
+		res.setHeader('Connection', 'close');
+		state.closing.add(res);
+
+		return;
+	}
+
+	// 'Connection: keep-alive' is sent already, or pipelined requests are on the connection
+	// 'Connection: close' drops the responses of the requests after it, Node.js closes the connection
+	// close the connection when it becomes idle, after the last response
+	closeWhenIdle(server, res);
+
+	// a pipelined request is received after 'Connection: close' is set to the response before it, not sent yet
+	state.responses.forEach((other: Socket, otherRes: ServerResponse): void => {
+		if (other === socket && otherRes !== res && state.closing.has(otherRes) && !otherRes.headersSent) {
+			otherRes.removeHeader('Connection');
+			state.closing.delete(otherRes);
+
+			closeWhenIdle(server, otherRes);
+		}
+	});
+};
+
 export class Badak {
 	private _http: Server | undefined;
+
+	// responses of the running server not closed yet, and stop() is called or not, see stop()
+	private _httpState: HttpState | undefined;
 
 	// auth hook
 	private _authFnc: MiddlewareFunction | undefined;
@@ -446,7 +493,35 @@ export class Badak {
 
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject): void => {
-			this._http = createServer(async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+			const httpState: HttpState = { responses: new Map(), connections: new Map(), closing: new Set(), stopping: false };
+
+			this._httpState = httpState;
+
+			const server: Server = createServer(async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+				const socket: Socket = req.socket;
+
+				httpState.responses.set(res, socket);
+				httpState.connections.set(socket, (httpState.connections.get(socket) ?? 0) + 1);
+
+				res.once('close', (): void => {
+					httpState.responses.delete(res);
+					httpState.closing.delete(res);
+
+					const count: number = (httpState.connections.get(socket) ?? 1) - 1;
+
+					if (count > 0) {
+						httpState.connections.set(socket, count);
+					}
+					else {
+						httpState.connections.delete(socket);
+					}
+				});
+
+				// a request on a keep-alive connection after stop()
+				if (httpState.stopping) {
+					closeAfterResponse(server, httpState, res, socket);
+				}
+
 				let responseBody: unknown;
 
 				const setResponseBody = (body: unknown): void => {
@@ -602,11 +677,13 @@ export class Badak {
 				}
 			});
 
-			this._http.on('error', (err: Error): void => {
+			this._http = server;
+
+			server.on('error', (err: Error): void => {
 				reject(err);
 			});
 
-			this._http.listen(port, (): void => {
+			server.listen(port, (): void => {
 				resolve();
 			});
 		});
@@ -649,6 +726,7 @@ export class Badak {
 		}
 
 		const server: Server = this._http;
+		const httpState: HttpState | undefined = this._httpState;
 
 		return new Promise<void>((resolve): void => {
 			let forceCloseTimer: NodeJS.Timeout | undefined;
@@ -659,9 +737,20 @@ export class Badak {
 				}
 
 				delete this._http;
+				delete this._httpState;
 
 				resolve();
 			});
+
+			// in-flight requests : their keep-alive connections become idle after the response,
+			// and server.close() waits for them until keepAliveTimeout or the client closes them
+			if (httpState !== undefined) {
+				httpState.stopping = true;
+
+				httpState.responses.forEach((socket: Socket, res: ServerResponse): void => {
+					closeAfterResponse(server, httpState, res, socket);
+				});
+			}
 
 			// idle keep-alive connections, server.close() does it by itself since Node.js 19
 			server.closeIdleConnections();
