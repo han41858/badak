@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased (5.0.0)
+## 5.0.0 (2026-10-22)
 
-These changes break backward compatibility and are planned for 5.0.0. See [`docs/routing-spec-5.0.0.md`](https://github.com/han41858/badak/blob/main/docs/routing-spec-5.0.0.md) (Korean) for the full specification.
+This release makes a request match only one route per method : routes that can match the same request path throw when they are registered, without priority between them.
+`*` in a uri fragment is a wildcard, request bodies of other `Content-Type`s are available in `ctx.body`, and `Error` messages are not mapped to status codes.
+Check the route registration of your app first, see [Breaking changes](#breaking-changes) and [Migration](#migration). The full routing specification is in [`docs/routing-spec-5.0.0.md`](https://github.com/han41858/badak/blob/main/docs/routing-spec-5.0.0.md) (Korean).
 
 ### Breaking changes
 
