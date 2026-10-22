@@ -30,7 +30,17 @@ import { ClientAbortError, convertParam, parseRequestBody } from './body-parser.
 import { sendErrorResponse, sendRouteResult } from './response.js';
 import { checkStaticOption, loadStaticRule, sendStaticFile } from './static.js';
 import { encodeLiteralPath } from './route-segment.js';
-import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl, toOriginForm } from './router.js';
+import {
+	checkUriDuplication,
+	cloneRouteRule,
+	findRoute,
+	findRouteFunction,
+	mergeRouteRule,
+	refineRouteRule,
+	removeRouteRule,
+	splitUrl,
+	toOriginForm
+} from './router.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -54,6 +64,8 @@ export class Badak {
 
 	private _staticRules: StaticRule[] = [];
 	private _staticCache: StaticCache[] = [];
+	// static routes merged by the last listen(), removed in the next listen()
+	private _staticRouteRule: RouteRule | undefined;
 
 	private _spaRoot: string | undefined;
 
@@ -401,8 +413,21 @@ export class Badak {
 				};
 			}
 
+			// the route tree with the static routes of this listen() call, replaced only if there is no conflict
+			// static routes of the previous listen() call are removed : files deleted after stop() are not served
+			const nextRouteRule: RouteRule = cloneRouteRule(this._routeRule);
+
+			if (this._staticRouteRule !== undefined) {
+				removeRouteRule(nextRouteRule, this._staticRouteRule);
+			}
+
+			let refinedStaticRule: RouteRule;
+
 			try {
-				this._assignRule(staticRouteRule);
+				refinedStaticRule = refineRouteRule(staticRouteRule, this._config.defaultMethod);
+
+				checkUriDuplication(nextRouteRule, refinedStaticRule);
+				mergeRouteRule(nextRouteRule, refinedStaticRule);
 			}
 			catch (e: unknown) {
 				const folders: string = this._staticRules
@@ -411,6 +436,9 @@ export class Badak {
 
 				throw new Error(`${ (e as Error).message }\nstatic files :\n${ folders }`, { cause: e });
 			}
+
+			this._routeRule = nextRouteRule;
+			this._staticRouteRule = refinedStaticRule;
 
 			// replaced, not appended : listen() after stop() loads the files again
 			this._staticCache = staticCache;

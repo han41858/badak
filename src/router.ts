@@ -315,6 +315,71 @@ export const checkUriDuplication = (currentRouteRule: RouteRule, newRouteRule: R
 	});
 };
 
+// copy of the route tree : nodes and option objects are copied, route functions are shared
+export const cloneRouteRule = (rule: RouteRule): RouteRule => {
+	const copied: RouteRule = {};
+
+	for (const [key, value] of Object.entries(rule)) {
+		copied[key] = typeof value === 'object' && value !== null
+			? cloneRouteRule(value as RouteRule) as RouteRule[string]
+			: value;
+	}
+
+	return copied;
+};
+
+const routeFunctionOf = (value: unknown): unknown => {
+	return typeof value === 'object' && value !== null
+		? (value as RouteFunctionObj).fnc
+		: value;
+};
+
+// remove the routes of rule from tree, only if the route function is the same (not replaced after rule was merged)
+// nodes without routes are removed too
+export const removeRouteRule = (tree: RouteRule, rule: RouteRule): void => {
+	for (const route of collectRoutes(rule)) {
+		const path: RouteRule[] = [tree];
+
+		for (const key of route.keys) {
+			const child: unknown = path[path.length - 1][key];
+
+			if (typeof child !== 'object' || child === null) {
+				break;
+			}
+
+			path.push(child as RouteRule);
+		}
+
+		if (path.length !== route.keys.length + 1) {
+			continue;
+		}
+
+		const node: RouteRule = path[path.length - 1];
+		// the route function in rule, the keys exist (collected from rule)
+		const registered: unknown = route.keys
+			.reduce((one: RouteRule, key: string): RouteRule => one[key] as RouteRule, rule)[route.method];
+
+		if (routeFunctionOf(node[route.method]) !== routeFunctionOf(registered)) {
+			continue;
+		}
+
+		delete node[route.method];
+
+		// remove empty nodes from the deepest
+		for (let depth: number = route.keys.length; depth > 0; depth--) {
+			const parent: RouteRule = path[depth - 1];
+
+			invalidateNormalRouteIndex(parent);
+
+			if (Object.keys(path[depth]).length > 0) {
+				break;
+			}
+
+			delete parent[route.keys[depth - 1]];
+		}
+	}
+};
+
 export const mergeRouteRule = (a: RouteRule, b: RouteRule): RouteRule => {
 	// keys of a can be changed
 	invalidateNormalRouteIndex(a);
