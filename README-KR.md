@@ -608,7 +608,8 @@ import { Readable } from 'node:stream';
 await app.get('/api/users.csv', (ctx, req, res) => {
 	res.setHeader('Content-Type', 'text/csv; charset=utf-8');
 
-	return Readable.from(['id,name\n', ...rows]);
+	// rows : CSV 행, 필드는 이스케이프해야 합니다 (sample/app.ts의 toCsvField() 참고)
+	return Readable.from(['id,name\r\n', ...rows]);
 });
 ```
 

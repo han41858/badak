@@ -30,6 +30,21 @@ const isNewUser = (body: unknown): body is Pick<User, 'name'> => {
 		&& (body as { name: string }).name.trim() !== '';
 };
 
+// CSV field (RFC 4180) : quote if it has a comma, a quote or a line break, and double the quotes
+// a value starting with '=', '+', '-', '@', tab or CR is a formula in spreadsheet programs,
+// so it is prefixed with ' to be shown as text (CSV injection)
+export const toCsvField = (value: string): string => {
+	const text: string = /^[=+\-@\t\r]/.test(value)
+		? `'${ value }`
+		: value;
+
+	return /[",\r\n]/.test(text)
+		? `"${ text.replace(/"/g, '""') }"`
+		: text;
+};
+
+const toCsvLine = (fields: string[]): string => fields.map(toCsvField).join(',') + '\r\n';
+
 export interface SampleAppOption {
 	token: string; // Bearer token for the API
 	log?: (line: string) => void;
@@ -127,8 +142,8 @@ export const createApp = async ({ token, log }: SampleAppOption): Promise<Badak>
 		res.setHeader('Content-Disposition', 'attachment; filename="users.csv"');
 
 		return Readable.from([
-			'id,name\n',
-			...[...users.values()].map((user: User): string => `${ user.id },${ user.name }\n`)
+			toCsvLine(['id', 'name']),
+			...[...users.values()].map((user: User): string => toCsvLine([user.id, user.name]))
 		]);
 	});
 

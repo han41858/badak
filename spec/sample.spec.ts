@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
-import { createApp } from '../sample/app';
+import { createApp, toCsvField } from '../sample/app';
 import { TestPort } from './test-util';
 
 
@@ -129,8 +129,53 @@ describe('sample app', () => {
 		await request(app.getHttpServer())
 			.get('/api/users.csv')
 			.set('Authorization', auth)
-			.expect(200, 'id,name\n1,han\n')
+			.expect(200, 'id,name\r\n1,han\r\n')
 			.expect('content-type', 'text/csv; charset=utf-8');
+	});
+
+	it('CSV download : names with a comma, quotes, a line break and a formula', async () => {
+		const names: string[] = ['kim, lee', 'say "hi"', 'line\nbreak', '=1+1', '@SUM(A1)', '-2'];
+
+		for (const name of names) {
+			await request(app.getHttpServer())
+				.post('/api/users')
+				.set('Authorization', auth)
+				.send({ name })
+				.expect(201);
+		}
+
+		await request(app.getHttpServer())
+			.get('/api/users.csv')
+			.set('Authorization', auth)
+			.expect(200, [
+				'id,name',
+				'1,"kim, lee"',
+				'2,"say ""hi"""',
+				'3,"line\nbreak"',
+				'4,\'=1+1',
+				'5,\'@SUM(A1)',
+				'6,\'-2',
+				''
+			].join('\r\n'));
+	});
+
+	describe('toCsvField()', () => {
+		[
+			['han', 'han'],
+			['', ''],
+			['a,b', '"a,b"'],
+			['a"b', '"a""b"'],
+			['a\r\nb', '"a\r\nb"'],
+			['=HYPERLINK("x")', '"\'=HYPERLINK(""x"")"'],
+			['+1', '\'+1'],
+			['\tx', '\'\tx'],
+			['\rx', '"\'\rx"'],
+			['a=1', 'a=1']
+		].forEach(([value, expected]: string[]): void => {
+			it(`${ JSON.stringify(value) } -> ${ JSON.stringify(expected) }`, () => {
+				expect(toCsvField(value)).to.be.eql(expected);
+			});
+		});
 	});
 
 	it('SPA : static files, and index.html for client routes', async () => {

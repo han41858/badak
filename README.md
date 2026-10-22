@@ -624,7 +624,8 @@ import { Readable } from 'node:stream';
 await app.get('/api/users.csv', (ctx, req, res) => {
 	res.setHeader('Content-Type', 'text/csv; charset=utf-8');
 
-	return Readable.from(['id,name\n', ...rows]);
+	// rows : CSV lines, escape the fields (see toCsvField() in sample/app.ts)
+	return Readable.from(['id,name\r\n', ...rows]);
 });
 ```
 
