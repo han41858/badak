@@ -14,7 +14,8 @@ These changes break backward compatibility and are planned for 5.0.0. See [`docs
 - Static file routes of `static()` and `setSPARoot()` are checked in `listen()` with the other routes, at once. A conflict rejects `listen()` and nothing is registered partially. `listen()` after `stop()` doesn't duplicate the static cache.
 - Request bodies of `Content-Type`s that are not parsed are available in `ctx.body`, they were received and discarded (`ctx.body` was `undefined`, and the body couldn't be read from `req`). ([#73](https://github.com/han41858/badak/pull/73))
   - `text/*` without `charset` or with `charset=utf-8` : a UTF-8 string, decoded strictly. Malformed UTF-8 responds `400`.
-  - `text/*` with another `charset` : the original `Buffer`, not decoded.
+  - `text/*` with another `charset`, an empty `charset`, or `charset` more than once : the original `Buffer`, not decoded.
+  - a UTF-8 BOM at the beginning is removed from the string.
   - other types and no `Content-Type` : the original `Buffer`.
   - `text/plain` files of `multipart/form-data` follow the same rule : malformed UTF-8 responds `400`, and another `charset` is a `Buffer`. They were decoded leniently as UTF-8 for any `charset` before.
   - an empty body is `undefined`, `bodyLimit` and `auth()` before receiving the body are not changed. The original bytes of JSON, form and multipart bodies are not available yet.

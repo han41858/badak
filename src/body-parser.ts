@@ -128,11 +128,15 @@ export const convertParam = (param: TypedObject<unknown>, option: ParamConvertOp
 };
 
 // charset of 'text/*' : UTF-8 if not specified, a badak policy (docs : README, request body)
-// 'utf-8' and 'utf8' (case-insensitive, quoted or not), other charsets are not decoded
+// - no charset parameter : UTF-8
+// - one charset parameter of 'utf-8' or 'utf8' (case-insensitive, quoted or not) : UTF-8
+// - other charsets, an empty charset, or charset more than once (an error by RFC 6838 4.3) : not UTF-8, not decoded
 const isUtf8Charset = (contentTypeHeader: string): boolean => {
-	const charset: string | undefined = getHeaderParam(contentTypeHeader, 'charset');
+	const charsets: string[] = [...contentTypeHeader.matchAll(/;\s*charset\s*=\s*(?:"([^"]*)"|([^;\s]*))/gi)]
+		.map((matching: RegExpMatchArray): string => (matching[1] ?? matching[2]).trim().toLowerCase());
 
-	return charset === undefined || ['utf-8', 'utf8'].includes(charset.trim().toLowerCase());
+	return charsets.length === 0
+		|| (charsets.length === 1 && ['utf-8', 'utf8'].includes(charsets[0]));
 };
 
 // strict UTF-8 decoding, malformed UTF-8 is client's fault (400), not replaced with U+FFFD

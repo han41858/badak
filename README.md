@@ -612,7 +612,10 @@ The request body is parsed by `Content-Type` (compared case-insensitively, param
 - An empty body is `undefined` for every type. A body over `bodyLimit` responds `413 Payload Too Large`.
 - `text/*` is UTF-8 if `charset` is not specified (a badak policy). `charset` is case-insensitive and can be quoted, `utf-8` and `utf8` are UTF-8.
   UTF-8 is decoded strictly : malformed bytes respond `400`, they are not replaced with `U+FFFD`. Other charsets are not decoded, decode the `Buffer` if needed.
+- `charset` more than once (e.g. `charset=utf-8; charset=euc-kr`) or an empty `charset` is ambiguous, the body is the original `Buffer`.
+- A UTF-8 BOM at the beginning of a text body is removed from the string. Use another `Content-Type` (e.g. `application/octet-stream`) to receive the bytes as they are.
 - A `text/plain` file of `multipart/form-data` (or a file without `Content-Type`, `text/plain` by RFC 7578) follows the same rule, a string or a `Buffer`.
+  Send binary files with their `Content-Type` (e.g. `image/png`, `application/octet-stream`) : a binary file without `Content-Type` is decoded as UTF-8, and the request responds `400`. Browsers and `curl -F` send it for files.
 - `parseNumber` and `parseDate` are not applied to string and `Buffer` bodies.
 - The original bytes of JSON, form and multipart bodies are not available (e.g. for HMAC signatures of webhooks).
 

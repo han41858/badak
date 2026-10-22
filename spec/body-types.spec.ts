@@ -31,6 +31,9 @@ describe('request body of other Content-Types (5.0.0)', () => {
 			['text/plain; charset=UTF-8', '한글 text'],
 			['text/plain; charset="utf-8"', '한글 text'],
 			['text/plain; charset=utf8', '한글 text'],
+			['text/plain;charset=utf-8', '한글 text'],
+			['text/plain; CHARSET = "Utf-8"', '한글 text'],
+			['text/plain; format=flowed; charset=utf-8', '한글 text'],
 			['Text/CSV', 'a,b\n1,2'],
 			['text/html; charset=UTF-8', '<p>한</p>'],
 			['text/markdown; foo=bar', '# title']
@@ -56,7 +59,18 @@ describe('request body of other Content-Types (5.0.0)', () => {
 			});
 		});
 
-		['text/plain; charset=euc-kr', 'text/plain; charset="EUC-KR"', 'text/plain; charset=iso-8859-1', 'text/csv; charset=utf-16'].forEach((contentType: string): void => {
+		[
+			'text/plain; charset=euc-kr',
+			'text/plain; charset="EUC-KR"',
+			'text/plain; charset=iso-8859-1',
+			'text/csv; charset=utf-16',
+			// ambiguous : not decoded, in any order
+			'text/plain; charset=utf-8; charset=euc-kr',
+			'text/plain; charset=euc-kr; charset=utf-8',
+			'text/plain; charset=utf-8; charset=utf-8',
+			'text/plain; charset=',
+			'text/plain; charset=""'
+		].forEach((contentType: string): void => {
 			it(`${ contentType } : the original Buffer, not decoded`, () => {
 				const body: unknown = parseBody(reqOf(contentType), eucKr, convertAll);
 
@@ -129,6 +143,10 @@ describe('request body of other Content-Types (5.0.0)', () => {
 
 			it('text/plain with malformed UTF-8 : HttpError(400)', () => {
 				expect(() => parse(file('text/plain'), invalidUtf8)).to.throw(HttpError).with.property('status', 400);
+			});
+
+			it('a binary file without Content-Type is decoded as text/plain : HttpError(400)', () => {
+				expect(() => parse(file(), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff]))).to.throw(HttpError).with.property('status', 400);
 			});
 
 			it('text/plain; charset=euc-kr : Buffer', () => {
