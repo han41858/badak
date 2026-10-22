@@ -33,6 +33,8 @@ const isNewUser = (body: unknown): body is Pick<User, 'name'> => {
 // CSV field (RFC 4180) : quote if it has a comma, a quote or a line break, and double the quotes
 // a value starting with '=', '+', '-', '@', tab or CR is a formula in spreadsheet programs,
 // so it is prefixed with ' to be shown as text (CSV injection)
+// this is a mitigation, not a guarantee : spreadsheet programs and their import settings interpret CSV differently,
+// and the prefixed value is not the original value (e.g. '-2' for -2)
 export const toCsvField = (value: string): string => {
 	const text: string = /^[=+\-@\t\r]/.test(value)
 		? `'${ value }`
