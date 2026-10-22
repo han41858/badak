@@ -105,7 +105,7 @@ and they are executed in parallel regardless of the order in which they are spec
 
 If a middleware function throws an error (or returns a rejected Promise), the routing function is not executed
 and badak responds with an error status code, in the same way as an error thrown in the routing function.
-For example, `throw new Error('Forbidden')` responds `403 Forbidden`, and other errors respond `500 Internal Server Error`.
+For example, `throw new HttpError(403)` responds `403 Forbidden`, and other errors respond `500 Internal Server Error`.
 If a middleware function responds by itself (e.g. `res.end()`), the routing function is not executed either.
 
 ### `after(fnc: MiddlewareFunction): Promise<void>`
@@ -244,8 +244,7 @@ app.get('/limited', () => {
 - `option.cause` : the original error, for logging.
 
 Other errors respond `500 Internal Server Error`, without the error message.
-For compatibility, an `Error` whose message is a status text such as `new Error('Forbidden')` responds with the matching status code
-(`Bad Request`, `Unauthorized`, `Forbidden`, `Not Found`, `Method Not Allowed`, `Not Acceptable`, `Payload Too Large`).
+The message is not mapped to a status code : `new Error('Forbidden')` responds `500`, use `new HttpError(403)` (changed in 5.0.0).
 
 Use `isHttpError(value)` to check if a value is an `HttpError`.
 

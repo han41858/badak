@@ -12,6 +12,8 @@ These changes break backward compatibility and are planned for 5.0.0. See [`docs
 - `*` in a uri fragment is a wildcard : any characters, 0 or more. The character before it is literal. `ab*cd` matches `abcd` and `abXYZcd`, not `acd` and `aXcd`.
 - `?`, `+` and `*` can be combined in a uri fragment, e.g. `ab?c+d`, `a*b*c`, `*abc`. Adjacent syntax characters (`ab??`, `ab?*`, `a**b`), `?` or `+` without a character before it, and `:` not at the beginning throw `invalid route '...'`.
 - Static file routes of `static()` and `setSPARoot()` are checked in `listen()` with the other routes, at once. A conflict rejects `listen()` and nothing is registered partially. `listen()` after `stop()` doesn't duplicate the static cache.
+- An `Error` whose message is a status text is not mapped to the status code : `new Error('Forbidden')` responds `500`, it responded `403` before. Errors of other libraries with such messages (e.g. `Error('Not Found')`) responded `4xx` without being logged as server errors. Use `HttpError`, e.g. `new HttpError(403)`. The removed messages are `Bad Request`, `Unauthorized`, `Unauthenticated`, `Forbidden`, `Not Found`, `no rule`, `Method Not Allowed`, `Not Acceptable` and `Payload Too Large`. ([#71](https://github.com/han41858/badak/pull/71))
+  - a general `Error` thrown in `auth()` still responds `401` and is logged.
 - Error messages of route registration are changed : `duplicated colon/question/plus/asterisk routing` and `duplicated question and plus routing` are `Conflicting routes for <METHOD>:` with both paths, and syntax errors are `invalid route '<uri fragment>' : <reason>`.
 
 ### Migration
@@ -32,6 +34,7 @@ These changes break backward compatibility and are planned for 5.0.0. See [`docs
 | register `/files/*` and `/files/**` | throws | registered | - |
 | register `/ab*` and `/xy*` | throws | registered | - |
 | check the error messages of route registration | `duplicated … routing` | `Conflicting routes for …` | change the expected messages |
+| throw `new Error('Forbidden')` (or another status text) for a status code | `403` | `500` | throw `new HttpError(403)` |
 
 ## 4.1.0 (2026-10-22)
 
