@@ -152,6 +152,8 @@ Used to access badak internal members.
 Stop the HTTP server.
 It stops accepting new connections, closes idle keep-alive connections,
 and waits for in-flight requests to finish.
+The keep-alive connections of in-flight requests are closed after their responses (`Connection: close` if the response headers are not sent yet),
+so `stop()` doesn't wait for clients to close them.
 
 If `timeout` (ms) is specified, the remaining connections are closed forcibly after this time.
 `timeout` should be an integer from `0` to `2147483647` (about 24.8 days, the limit of Node.js timers), or `Infinity` to wait without limit.

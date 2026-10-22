@@ -53,6 +53,10 @@ import {
 export class Badak {
 	private _http: Server | undefined;
 
+	// responses of the running server not closed yet, and stop() is called or not
+	// in-flight responses respond 'Connection: close' while stopping, see stop()
+	private _httpState: { responses: Set<ServerResponse>, stopping: boolean } | undefined;
+
 	// auth hook
 	private _authFnc: MiddlewareFunction | undefined;
 
@@ -446,7 +450,22 @@ export class Badak {
 
 		// use new Promise for http.listen() callback
 		await new Promise<void>((resolve, reject): void => {
+			const httpState: { responses: Set<ServerResponse>, stopping: boolean } = { responses: new Set(), stopping: false };
+
+			this._httpState = httpState;
+
 			this._http = createServer(async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+				httpState.responses.add(res);
+
+				res.once('close', (): void => {
+					httpState.responses.delete(res);
+				});
+
+				// a request on a keep-alive connection after stop() : close the connection after the response
+				if (httpState.stopping) {
+					res.setHeader('Connection', 'close');
+				}
+
 				let responseBody: unknown;
 
 				const setResponseBody = (body: unknown): void => {
@@ -649,6 +668,7 @@ export class Badak {
 		}
 
 		const server: Server = this._http;
+		const httpState: { responses: Set<ServerResponse>, stopping: boolean } | undefined = this._httpState;
 
 		return new Promise<void>((resolve): void => {
 			let forceCloseTimer: NodeJS.Timeout | undefined;
@@ -659,9 +679,29 @@ export class Badak {
 				}
 
 				delete this._http;
+				delete this._httpState;
 
 				resolve();
 			});
+
+			// in-flight requests : their keep-alive connections become idle after the response,
+			// and server.close() waits for them until keepAliveTimeout or the client closes them
+			if (httpState !== undefined) {
+				httpState.stopping = true;
+
+				httpState.responses.forEach((res: ServerResponse): void => {
+					if (!res.headersSent) {
+						// Node.js closes the connection after this response
+						res.setHeader('Connection', 'close');
+					}
+					else {
+						// 'Connection: keep-alive' is sent already, close the connection when it becomes idle
+						res.once('finish', (): void => {
+							server.closeIdleConnections();
+						});
+					}
+				});
+			}
 
 			// idle keep-alive connections, server.close() does it by itself since Node.js 19
 			server.closeIdleConnections();

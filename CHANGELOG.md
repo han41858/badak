@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `stop()` waited about 5 seconds (`keepAliveTimeout` of Node.js) or until the clients closed the connections, if there were in-flight requests on keep-alive connections (e.g. `fetch()`, `http.Agent` with `keepAlive`, browsers), because their connections became idle after the responses and were not closed (4.x too). The responses of in-flight requests have `Connection: close` if their headers are not sent yet, requests received while stopping too, and the connections of streaming responses are closed after the responses.
+
 ## 5.0.0 (2026-10-22)
 
 This release makes a request match only one route per method : routes that can match the same request path throw when they are registered, without priority between them.
