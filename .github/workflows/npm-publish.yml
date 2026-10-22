@@ -58,8 +58,15 @@ jobs:
       - name: Test
         run: yarn test
 
+      - name: Type tests
+        run: yarn test:types
+
       - name: Build
         run: yarn build
+
+      # type tests against the packed package (.d.ts), as consumers install it
+      - name: Type tests of the packed package
+        run: yarn test:types:dist
 
       - name: Verify npm CLI supports trusted publishing
         run: |

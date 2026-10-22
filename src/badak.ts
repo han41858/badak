@@ -26,11 +26,11 @@ import {
 	METHOD
 } from './constants.js';
 import { HttpError, isHttpError } from './http-error.js';
-import { convertParam, parseRequestBody } from './body-parser.js';
+import { ClientAbortError, convertParam, parseRequestBody } from './body-parser.js';
 import { sendErrorResponse, sendRouteResult } from './response.js';
 import { checkStaticOption, loadStaticRule, sendStaticFile } from './static.js';
 import { encodeLiteralPath } from './route-segment.js';
-import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl } from './router.js';
+import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl, toOriginForm } from './router.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -433,7 +433,7 @@ export class Badak {
 					}
 
 					const method: string = req.method.toUpperCase();
-					const { path: uriSanitized, queryStr } = splitUrl(req.url as string);
+					const { path: uriSanitized, queryStr } = splitUrl(toOriginForm(req.url as string));
 
 					const { rule: matchedRule, param: routeParam } = findRoute(this._routeRule, uriSanitized);
 					const params: Record<string, string> = (routeParam ?? {}) as Record<string, string>;
@@ -509,6 +509,13 @@ export class Badak {
 				catch (e) {
 					const err: Error | TypedObject<unknown> = e as Error | TypedObject<unknown>;
 
+					// the client closed the connection while sending the request body (classified in receiveBody())
+					// nothing can be responded, not a server error : not logged, not passed to Node.js
+					// after() functions still run, the response is not completed (res.writableEnded is false)
+					if (err instanceof ClientAbortError) {
+						return;
+					}
+
 					// HttpError of 4xx is an intended client error response, not logged
 					// 5xx and other errors (including Error('Forbidden')) are logged
 					if (
@@ -518,7 +525,10 @@ export class Badak {
 						console.error('badak catch error : %o', err);
 					}
 
-					sendErrorResponse(res, err, this._config.catchErrorLog, setResponseBody);
+					// the connection is closed already, don't respond
+					if (!res.destroyed) {
+						sendErrorResponse(res, err, this._config.catchErrorLog, setResponseBody);
+					}
 
 					if (!this._config.preventError) {
 						throw err;

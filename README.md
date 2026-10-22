@@ -28,34 +28,50 @@ yarn add badak
 ## Usage
 
 ```typescript
-import { Badak, RouteRule } from 'badak';
+import { Badak, HttpError } from 'badak';
 
 interface User {
+	id: string;
 	name: string;
 }
 
-const rule: RouteRule = {
-	users: {
-		GET: () => {
-			// returns a list of users.
-			return {
-				list: ['han', 'kim', 'lee']
-			};
-		},
-		POST: (user: User) => {
-			// add a user.
-			return {
-				result: 'ok'
-			};
-		}
-	}
-};
-
-
+const users: Map<string, User> = new Map();
 const app: Badak = new Badak();
-await app.route(rule);
+
+// returned values are the response : object -> JSON, string -> text
+await app.get('/users', () => [...users.values()]);
+
+// typed route captures, e.g. GET /users/7 -> params.id === '7'
+await app.get<{ params: { id: string } }>('/users/:id', ({ params }) => {
+	const user: User | undefined = users.get(params.id);
+
+	if (user === undefined) {
+		throw new HttpError(404);
+	}
+
+	return user;
+});
+
+// the request body is parsed for POST, PUT and PATCH (JSON, form, multipart)
+// it is not validated, check it before use
+await app.post('/users', ({ body }) => {
+	const name: unknown = (body as { name?: unknown } | undefined)?.name;
+
+	if (typeof name !== 'string') {
+		throw new HttpError(400, { body: { message: 'name is required' } });
+	}
+
+	const user: User = { id: String(users.size + 1), name };
+	users.set(user.id, user);
+
+	return user;
+});
+
 await app.listen(3000);
 ```
+
+Routing functions receive `ctx` (`{ params, query, body }`), and the Node.js `req` and `res`, see [Routing parameters](#routing-parameters).
+See [Examples](#examples) for authentication, file upload, streaming and SPA.
 
 ## Methods
 
@@ -97,6 +113,10 @@ If a middleware function responds by itself (e.g. `res.end()`), the routing func
 Registers a middleware function to run **after** the routing function is executed.
 Multiple middleware functions can be specified,
 and they are executed in parallel regardless of the order in which they are specified.
+
+`after()` functions run for every request, also if the client closed the connection before the response.
+If the client closed the connection while sending the request body, the routing function is not executed,
+no response is sent, and `res.writableEnded` is `false` in `after()` functions.
 
 ### `config(key: string, value: unknown): Promise<void>`
 
@@ -284,6 +304,7 @@ If an error occurs, a log is output to the console.
 - Logged : `5xx` `HttpError`, and other errors such as `Error`, including an error thrown in the `auth()` function.
 - Not logged : `4xx` `HttpError`, and `4xx` responses made by badak such as `404 Not Found`, `405 Method Not Allowed`,
   `400 Bad Request` (malformed body) and `413 Payload Too Large`, because they are intended client error responses.
+- Not logged : the client closing the connection, e.g. while sending the request body (`ECONNRESET`). It is not a server error, and nothing can be responded.
 
 The default is `true`.
 
@@ -407,7 +428,12 @@ The matched fragment is available in `ctx.params`, keyed by the routing pattern,
 
 `+` makes the character just before it repeat 1 or more times, other characters are literal.
 If you specify the routing path as `/user1+`, you can match paths such as `/user1` and `/user11`.
-`++`, and `+` with `*` in the same uri fragment, throw an error when they are registered.
+The matched fragment is available in `ctx.params`, keyed by the routing pattern, e.g. `{ 'user1+': 'user11' }`.
+
+- Other characters are literal, including characters with special meaning in regular expressions.
+- `++`, and `+` with `*` in the same uri fragment, throw an error when they are registered.
+- `+` routing paths that can match the same uri fragment can't be registered together, regardless of the registration order. For example, `/aab+` and `/a+bb` both match `/aabb`, so registering the second one throws `duplicated plus routing`. A normal routing path matched by a `+` routing path (e.g. `/abbc` and `/ab+c`) throws in the same way.
+- A `?` routing path and a `+` routing path that can match the same uri fragment throw `duplicated question and plus routing`, e.g. `/colou?r` and `/colou+r` both match `/colour`.
 
 ### `*` routing
 
@@ -539,3 +565,95 @@ await app.patch('/users/:id', (ctx) => ctx);
 ```
 
 `parseNumber` and `parseDate` apply to query and body strings, but never to path captures. The original Node.js `req` and `res` are still available as the second and third callback parameters.
+
+## Examples
+
+[`sample/app.ts`](https://github.com/han41858/badak/blob/main/sample/app.ts) is a small app with the examples below, and it is tested with the current version. Run it with `npx tsx sample/index.ts`.
+
+### Authentication and public routes
+
+`auth()` runs before the request body is received. Routes with `{ auth: false }`, static files and the SPA skip it.
+
+```typescript
+await app.auth((req) => {
+	if (req.headers.authorization !== `Bearer ${ token }`) {
+		throw new HttpError(401, { headers: { 'WWW-Authenticate': 'Bearer' } });
+	}
+});
+
+await app.get('/api/health', () => ({ status: 'ok' }), { auth: false });
+```
+
+### Status code and headers
+
+Set them with `res`, and return the body.
+
+```typescript
+await app.post('/api/users', ({ body }, req, res) => {
+	const user: User = createUser(body); // validate body, throw HttpError(400) if invalid
+
+	res.statusCode = 201;
+	res.setHeader('Location', `/api/users/${ user.id }`);
+
+	return user;
+});
+
+await app.delete<{ params: { id: string } }>('/api/users/:id', ({ params }, req, res) => {
+	deleteUser(params.id);
+	res.statusCode = 204; // no return value : empty body
+});
+```
+
+### File upload
+
+For `multipart/form-data`, fields are strings, and files are `Buffer` (or strings for `text/plain` files).
+`bodyLimit` of a route allows larger bodies for this route only.
+
+```typescript
+await app.post('/api/files', ({ body }) => {
+	const { name, file } = body as { name?: string, file?: Buffer | string };
+
+	if (file === undefined) {
+		throw new HttpError(400);
+	}
+
+	return { name, size: Buffer.byteLength(file) };
+}, { bodyLimit: 10 * 1024 * 1024 });
+```
+
+### Streaming response
+
+```typescript
+import { Readable } from 'node:stream';
+
+await app.get('/api/users.csv', (ctx, req, res) => {
+	res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+
+	// rows : CSV lines, escape the fields (see toCsvField() in sample/app.ts)
+	return Readable.from(['id,name\r\n', ...rows]);
+});
+```
+
+### API with a SPA
+
+API routes and static files are matched first, and `index.html` is served for other paths.
+
+```typescript
+await app.get('/api/users', listUsers);
+await app.setSPARoot('/', path.join(__dirname, 'public'));
+
+// GET /api/users  -> listUsers
+// GET /app.css    -> public/app.css
+// GET /users/1    -> public/index.html
+```
+
+### Access log
+
+```typescript
+await app.after((req, res) => {
+	// false if the client closed the connection while sending the request body
+	const status = res.writableEnded ? res.statusCode : 'closed';
+
+	console.log(`${ req.method } ${ req.url } ${ status }`);
+});
+```

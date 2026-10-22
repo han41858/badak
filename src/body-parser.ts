@@ -75,18 +75,35 @@ const convertStr = (value: string, option: ParamConvertOption): unknown => {
 	return value;
 };
 
+// objects made by JSON.parse(), querystring and the form parsers, converted recursively
+// other objects (e.g. Buffer of a multipart file) are kept as they are
+const isPlainContainer = (value: object): boolean => {
+	if (Array.isArray(value)) {
+		return true;
+	}
+
+	const prototype: unknown = Object.getPrototypeOf(value);
+
+	return prototype === Object.prototype || prototype === null;
+};
+
 // parameter can be object of string because request has string
 // only work for string param
 export const convertParam = (param: TypedObject<unknown>, option: ParamConvertOption): TypedObject<unknown> => {
+	if (!option.parseNumber && !option.parseDate) {
+		// nothing to convert
+		return param;
+	}
+
+	if (!isPlainContainer(param)) {
+		return param;
+	}
+
 	if (Array.isArray(param)) {
 		const paramAsArray: unknown[] = param as unknown[];
 
 		paramAsArray.forEach((value: unknown, i: number, arr: unknown[]): void => {
-			if (!value) {
-				// null, undefined
-				arr[i] = value;
-			}
-			else if (typeof value === 'object') {
+			if (value !== null && typeof value === 'object') {
 				// call recursively
 				arr[i] = convertParam(value as TypedObject<unknown>, option);
 			}
@@ -97,11 +114,7 @@ export const convertParam = (param: TypedObject<unknown>, option: ParamConvertOp
 	}
 	else {
 		for (const [key, value] of Object.entries(param)) {
-			if (!value) {
-				// null, undefined
-				param[key] = value;
-			}
-			else if (typeof value === 'object') {
+			if (value !== null && typeof value === 'object') {
 				// call recursively
 				param[key] = convertParam(value as TypedObject<unknown>, option);
 			}
@@ -122,9 +135,10 @@ export const parseBody = (req: IncomingMessage, bodyBuffer: Buffer, option: Para
 	const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
 
 	if (contentTypeInHeader) {
+		// media type is case-insensitive (RFC 9110), e.g. 'Application/JSON'
 		const [contentType] = contentTypeInHeader
 			.split(';')
-			.map((s: string): string => s.trim());
+			.map((s: string): string => s.trim().toLowerCase());
 
 		if (bodyBuffer.byteLength > 0) {
 			switch (contentType) {
@@ -226,12 +240,28 @@ export const parseBody = (req: IncomingMessage, bodyBuffer: Buffer, option: Para
 	return param;
 };
 
+// the client closed the connection before the whole request body was received
+// not a server error : badak doesn't log it, respond, or pass it to Node.js (not exported)
+export class ClientAbortError extends Error {
+	constructor (cause?: unknown) {
+		super('the client closed the connection while sending the request body', { cause });
+
+		this.name = 'ClientAbortError';
+	}
+}
+
 // receive request body up to bodyLimit, rejects with HttpError(413) if exceeded
 export const receiveBody = (req: IncomingMessage, bodyLimit: number): Promise<Buffer> => {
 	return new Promise<Buffer>((resolve, reject): undefined => {
 		// the body is read by a middleware function already, 'end' event is not emitted again
 		if (req.readableEnded) {
 			reject(new Error('request body is read before badak parses it, don\'t read it in before() or auth()'));
+			return;
+		}
+
+		// the connection is closed already (e.g. while async auth() runs), 'error' and 'end' are not emitted again
+		if (req.destroyed) {
+			reject(new ClientAbortError());
 			return;
 		}
 
@@ -271,7 +301,19 @@ export const receiveBody = (req: IncomingMessage, bodyLimit: number): Promise<Bu
 		});
 
 		req.on('error', (err: Error): void => {
-			reject(err);
+			// Node.js destroys the request with ECONNRESET ('aborted') when the client closes the connection
+			reject(
+				req.destroyed && (err as { code?: unknown }).code === 'ECONNRESET'
+					? new ClientAbortError(err)
+					: err
+			);
+		});
+
+		// closed without 'end' and without 'error', not to wait forever
+		req.on('close', (): void => {
+			if (!req.readableEnded) {
+				reject(new ClientAbortError());
+			}
 		});
 
 		req.on('end', (): void => {
