@@ -5,7 +5,10 @@
 ### Fixed
 
 - `Content-Type` of the request body is compared case-insensitively, e.g. `Application/JSON` is parsed as JSON. The request body was not parsed before, and `ctx.body` was `undefined`. ([#64](https://github.com/han41858/badak/pull/64))
-- absolute-form request targets (e.g. `GET http://example.com/users/7 HTTP/1.1`) are routed by their path and query. They responded `404` before. `OPTIONS *` responds `404`, and other request targets not starting with `/` respond `400`. ([#64](https://github.com/han41858/badak/pull/64))
+- absolute-form request targets with `http` or `https` (e.g. `GET http://example.com/users/7 HTTP/1.1`) are routed by their path and query, without normalizing the path. They responded `404` before. ([#64](https://github.com/han41858/badak/pull/64))
+  - other schemes (e.g. `ftp://`), an empty host (e.g. `http:///users/7`), userinfo (e.g. `http://user@host/`), and an invalid host or port respond `400`.
+  - a request target with a fragment (`#`) responds `400`, in origin-form too. `/a#b` was routed to the literal `a#b` (usually `404`), and `/a?b=1#c` passed `{ b: '1#c' }` before.
+  - `OPTIONS *` responds `404`, and other request targets not starting with `/` respond `400`.
 
 ## 4.0.0 (2026-10-22)
 
