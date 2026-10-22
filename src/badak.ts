@@ -333,6 +333,8 @@ export class Badak {
 		}
 
 		// load static files
+		// all static file routes and the SPA fallback are one rule object, checked and merged at once (docs/routing-spec-5.0.0.md 7.)
+		// if a route conflicts, listen() rejects and nothing is changed : route tree, static cache
 		if (
 			!!this._staticRules
 			&& this._staticRules.length > 0
@@ -343,27 +345,30 @@ export class Badak {
 				})
 			);
 
+			const staticCache: StaticCache[] = allCache.flat();
+			const staticRouteRule: RouteRule = {};
+
 			allCache.forEach((oneCacheSet: StaticCache[], ruleIndex: number): void => {
 				// uri of the static rule is a routing path given by the user, kept as it is
 				const ruleUri: string = this._staticRules[ruleIndex].uri;
 
 				oneCacheSet.forEach((oneCache: StaticCache): void => {
-					this._staticCache.push(oneCache);
-
 					// file names are literal, not routing syntax, e.g. 'a+b.txt', '한글.txt', '100%.txt'
 					const routeUri: string = oneCache.uri.startsWith(ruleUri)
 						? ruleUri + encodeLiteralPath(oneCache.uri.slice(ruleUri.length))
 						: encodeLiteralPath(oneCache.uri);
 
-					this.get(
-						routeUri,
-						async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-							sendStaticFile(req, res, oneCache);
-						},
-						{
-							auth: false
+					// the same file path in different static folders : the latter wins, same as registering again
+					staticRouteRule[routeUri] = {
+						[METHOD.GET]: {
+							fnc: async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
+								sendStaticFile(req, res, oneCache);
+							},
+							option: {
+								auth: false
+							}
 						}
-					);
+					};
 				});
 			});
 
@@ -372,30 +377,43 @@ export class Badak {
 					? this._spaRoot
 					: this._spaRoot + '/';
 
-				const spaRoutingUrl: string = spaPathPrefix + '**';
+				const indexHtmlUrl: string = spaPathPrefix + 'index.html';
 
-				await this.get(
-					spaRoutingUrl,
-					async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
-						// find index.html in static cache & return
-						const indexHtmlUrl: string = spaPathPrefix + 'index.html';
+				staticRouteRule[spaPathPrefix + '**'] = {
+					[METHOD.GET]: {
+						fnc: async (param: unknown, req: IncomingMessage, res: ServerResponse): Promise<void> => {
+							// find index.html in static cache & return
+							const targetCache: StaticCache | undefined = this._staticCache.find((cache: StaticCache): boolean => {
+								return cache.uri === indexHtmlUrl;
+							});
 
-						const targetCache: StaticCache | undefined = this._staticCache.find((cache: StaticCache): boolean => {
-							return cache.uri === indexHtmlUrl;
-						});
-
-						if (targetCache) {
-							sendStaticFile(req, res, targetCache);
+							if (targetCache) {
+								sendStaticFile(req, res, targetCache);
+							}
+							else {
+								res.end();
+							}
+						},
+						option: {
+							auth: false
 						}
-						else {
-							res.end();
-						}
-					},
-					{
-						auth: false
 					}
-				);
+				};
 			}
+
+			try {
+				this._assignRule(staticRouteRule);
+			}
+			catch (e: unknown) {
+				const folders: string = this._staticRules
+					.map((staticRule: StaticRule): string => `  ${ staticRule.uri } : ${ staticRule.path }`)
+					.join('\n');
+
+				throw new Error(`${ (e as Error).message }\nstatic files :\n${ folders }`, { cause: e });
+			}
+
+			// replaced, not appended : listen() after stop() loads the files again
+			this._staticCache = staticCache;
 		}
 
 		// use new Promise for http.listen() callback
