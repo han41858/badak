@@ -265,8 +265,10 @@ export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, res
 ### `RouteFunction`
 
 ```typescript
-export type RouteFunction = (ctx: ParamContext, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
+export type RouteFunction<T extends CheckedParamTypes<T> = ParamTypes> = (ctx: ParamContext<T>, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
 ```
+
+`T`는 요청 데이터의 이름 있는 제네릭입니다. [요청 데이터 제네릭 타입](#요청-데이터-제네릭-타입)을 참고하세요. 지정하지 않으면 `ctx`는 기본 타입의 `ParamContext`입니다.
 
 HTTP 요청에 반응할 라우팅 함수를 등록합니다.
 라우팅 함수가 반환한 값은 HTTP 응답으로 반환됩니다.

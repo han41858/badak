@@ -23,6 +23,10 @@ These changes break backward compatibility and are planned for 5.0.0. See [`docs
   - a general `Error` thrown in `auth()` still responds `401` and is logged.
 - Error messages of route registration are changed : `duplicated colon/question/plus/asterisk routing` and `duplicated question and plus routing` are `Conflicting routes for <METHOD>:` with both paths, and syntax errors are `invalid route '<uri fragment>' : <reason>`.
 
+### Fixed
+
+- Static files deleted between `stop()` and `listen()` were still served from the previous cache, with their old contents (4.x too). `listen()` replaces the static routes of the previous `listen()` call, and keeps routes registered by the user. ([#70](https://github.com/han41858/badak/pull/70))
+
 ### Others
 
 - Registering a value that is not a function as a routing function throws `route function should be Function`. It threw `middleware should be Function` before. ([#72](https://github.com/han41858/badak/pull/72))
