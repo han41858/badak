@@ -1,20 +1,11 @@
 # Changelog
 
-## Unreleased
+## 4.1.0 (2026-10-22)
 
-### Fixed
+This release fixes request handling (multipart uploads blocking the server, `Content-Type` case, absolute-form request targets, client aborts) and the duplication check of `+` routing.
+Some routing paths registered together in 4.0.0 throw when they are registered now, see [Routing duplication check](#routing-duplication-check).
 
-- Files of `multipart/form-data` (`Buffer`) are not traversed when the request body is converted. Every byte of a file was visited before, even if `parseNumber` and `parseDate` are disabled, and the server was blocked for about 0.5 seconds per 1MB of uploaded files (seconds for a 10MB upload). ([#65](https://github.com/han41858/badak/pull/65))
-  - only plain objects and arrays from the request (JSON, form, multipart fields) are traversed. The converted values are not changed.
-
-- `Content-Type` of the request body is compared case-insensitively, e.g. `Application/JSON` is parsed as JSON. The request body was not parsed before, and `ctx.body` was `undefined`. ([#64](https://github.com/han41858/badak/pull/64))
-- absolute-form request targets with `http` or `https` (e.g. `GET http://example.com/users/7 HTTP/1.1`) are routed by their path and query, without normalizing the path. They responded `404` before. ([#64](https://github.com/han41858/badak/pull/64))
-  - other schemes (e.g. `ftp://`), an empty host (e.g. `http:///users/7`), userinfo (e.g. `http://user@host/`), and an invalid host or port respond `400`.
-  - a request target with a fragment (`#`) responds `400`, in origin-form too. `/a#b` was routed to the literal `a#b` (usually `404`), and `/a?b=1#c` passed `{ b: '1#c' }` before.
-  - `OPTIONS *` responds `404`, and other request targets not starting with `/` respond `400`.
-- The client closing the connection while sending the request body (`ECONNRESET`) is not logged by `catchErrorLog`, and not passed to Node.js with `preventError: false`. It was logged as `badak catch error : Error: aborted`, and badak tried to respond `500` to the closed connection. `after()` functions still run, and `res.writableEnded` is `false` in them. ([#68](https://github.com/han41858/badak/pull/68))
-  - only the abort while badak receives the request body is classified. Errors thrown by routing functions or middleware functions are logged and passed as before, even if the connection is closed and the error has a connection error code (e.g. `EPIPE`).
-  - a request whose client closed the connection while an async `auth()` function ran waited forever, and `after()` functions didn't run. It is handled the same way now.
+### Routing duplication check
 
 Routing paths that can match the same uri fragment throw when they are registered, regardless of the registration order. ([#62](https://github.com/han41858/badak/pull/62))
 
@@ -24,7 +15,7 @@ Routing paths that can match the same uri fragment throw when they are registere
 
 **Routing paths registered together in 4.0.0 can throw now.** Cases that differ from 4.0.0 :
 
-| Routing paths | 4.0.0 | Unreleased |
+| Routing paths | 4.0.0 | 4.1.0 |
 |---|---|---|
 | `/aab+`, `/a+bb` (in this order) | registered, `GET /aabb` -> `/aab+` | throws `duplicated plus routing` |
 | `/a+bb`, `/aab+` (in this order) | registered, `GET /aabb` -> `/a+bb` | throws `duplicated plus routing` |
@@ -40,6 +31,19 @@ This is classified as a bug fix, not a new restriction :
 
 To migrate, remove one of the routing paths, merge them into one routing function, or split them into patterns that don't overlap (e.g. `/colou?r` and `/colouu+r`).
 
+### Fixed
+
+- Files of `multipart/form-data` (`Buffer`) are not traversed when the request body is converted. Every byte of a file was visited before, even if `parseNumber` and `parseDate` are disabled, and the server was blocked for about 0.5 seconds per 1MB of uploaded files (seconds for a 10MB upload). ([#65](https://github.com/han41858/badak/pull/65))
+  - only plain objects and arrays from the request (JSON, form, multipart fields) are traversed. The converted values are not changed.
+- `Content-Type` of the request body is compared case-insensitively, e.g. `Application/JSON` is parsed as JSON. The request body was not parsed before, and `ctx.body` was `undefined`. ([#64](https://github.com/han41858/badak/pull/64))
+- absolute-form request targets with `http` or `https` (e.g. `GET http://example.com/users/7 HTTP/1.1`) are routed by their path and query, without normalizing the path. They responded `404` before. ([#64](https://github.com/han41858/badak/pull/64))
+  - other schemes (e.g. `ftp://`), an empty host (e.g. `http:///users/7`), userinfo (e.g. `http://user@host/`), and an invalid host or port respond `400`.
+  - a request target with a fragment (`#`) responds `400`, in origin-form too. `/a#b` was routed to the literal `a#b` (usually `404`), and `/a?b=1#c` passed `{ b: '1#c' }` before.
+  - `OPTIONS *` responds `404`, and other request targets not starting with `/` respond `400`.
+- The client closing the connection while sending the request body (`ECONNRESET`) is not logged by `catchErrorLog`, and not passed to Node.js with `preventError: false`. It was logged as `badak catch error : Error: aborted`, and badak tried to respond `500` to the closed connection. `after()` functions still run, and `res.writableEnded` is `false` in them. ([#68](https://github.com/han41858/badak/pull/68))
+  - only the abort while badak receives the request body is classified. Errors thrown by routing functions or middleware functions are logged and passed as before, even if the connection is closed and the error has a connection error code (e.g. `EPIPE`).
+  - a request whose client closed the connection while an async `auth()` function ran waited forever, and `after()` functions didn't run. It is handled the same way now.
+
 ### Documentation
 
 - `Usage` of README uses the 4.0.0 routing function signature (`ctx`), it showed the 3.x signature (`(user: User) => ...`). ([#66](https://github.com/han41858/badak/pull/66))
@@ -48,7 +52,9 @@ To migrate, remove one of the routing paths, merge them into one routing functio
 
 ### Others
 
+- HTTP boundary condition tests : client aborts, chunked bodies, large headers, long paths, static path traversal, query strings, methods. ([#63](https://github.com/han41858/badak/pull/63))
 - The npm publish workflow runs `yarn test:types` and `yarn test:types:dist` before publishing, same as CI. ([#67](https://github.com/han41858/badak/pull/67))
+- The routing specification for 5.0.0 is in [`docs/routing-spec-5.0.0.md`](https://github.com/han41858/badak/blob/main/docs/routing-spec-5.0.0.md) (Korean). 4.1.0 doesn't change the routing by it.
 
 ## 4.0.0 (2026-10-22)
 
