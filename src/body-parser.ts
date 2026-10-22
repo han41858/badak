@@ -135,9 +135,10 @@ export const parseBody = (req: IncomingMessage, bodyBuffer: Buffer, option: Para
 	const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
 
 	if (contentTypeInHeader) {
+		// media type is case-insensitive (RFC 9110), e.g. 'Application/JSON'
 		const [contentType] = contentTypeInHeader
 			.split(';')
-			.map((s: string): string => s.trim());
+			.map((s: string): string => s.trim().toLowerCase());
 
 		if (bodyBuffer.byteLength > 0) {
 			switch (contentType) {

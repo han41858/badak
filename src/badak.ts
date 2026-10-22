@@ -30,7 +30,7 @@ import { convertParam, parseRequestBody } from './body-parser.js';
 import { sendErrorResponse, sendRouteResult } from './response.js';
 import { checkStaticOption, loadStaticRule, sendStaticFile } from './static.js';
 import { encodeLiteralPath } from './route-segment.js';
-import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl } from './router.js';
+import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refineRouteRule, splitUrl, toOriginForm } from './router.js';
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
@@ -433,7 +433,7 @@ export class Badak {
 					}
 
 					const method: string = req.method.toUpperCase();
-					const { path: uriSanitized, queryStr } = splitUrl(req.url as string);
+					const { path: uriSanitized, queryStr } = splitUrl(toOriginForm(req.url as string));
 
 					const { rule: matchedRule, param: routeParam } = findRoute(this._routeRule, uriSanitized);
 					const params: Record<string, string> = (routeParam ?? {}) as Record<string, string>;

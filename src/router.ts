@@ -1,5 +1,6 @@
 import { RouteFunction, RouteFunctionObj, RouteOption, RouteRule, RouteRuleSeed, TypedObject } from './interfaces.js';
 import { METHOD } from './constants.js';
+import { HttpError } from './http-error.js';
 import { isValidBodyLimit, sift } from './util.js';
 import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from './question-pattern.js';
 import {
@@ -344,6 +345,46 @@ export interface RouteMatch {
 }
 
 // split request url into path and query string (without '?')
+// request target (RFC 9112 3.2) to origin-form ('/path?query')
+// - origin-form : as it is
+// - absolute-form (e.g. 'http://host/path?query', sent to proxies) : path and query, the authority is ignored
+//   only 'http' and 'https' (case-insensitive), the host should not be empty (RFC 9110 4.2.1)
+//   userinfo (e.g. 'http://user@host/') is an error (RFC 9110 4.2.4)
+//   the path is not normalized (e.g. dot segments), same as origin-form
+// - asterisk-form ('*', OPTIONS for the server) : no resource, 404
+// - authority-form ('host:port', CONNECT), other schemes, and others : 400
+// - a fragment ('#') is not a part of the request target in any form : 400
+export const toOriginForm = (target: string): string => {
+	if (target.includes('#')) {
+		throw new HttpError(400);
+	}
+
+	if (target.startsWith('/')) {
+		return target;
+	}
+
+	if (target === '*') {
+		throw new HttpError(404);
+	}
+
+	const absolute: RegExpMatchArray | null = target.match(/^https?:\/\/([^/?]*)(.*)$/i);
+
+	if (absolute === null) {
+		throw new HttpError(400);
+	}
+
+	const [, authority, rest] = absolute;
+
+	// host : reg-name or IPv4 (without ':'), or IP literal in brackets, then an optional port
+	if (!/^(?:\[[0-9A-Fa-f:.]+\]|[^:@[\]]+)(?::\d*)?$/.test(authority)) {
+		throw new HttpError(400);
+	}
+
+	return rest.startsWith('/')
+		? rest
+		: '/' + rest; // 'http://host' -> '/', 'http://host?a=1' -> '/?a=1'
+};
+
 export const splitUrl = (url: string): { path: string, queryStr: string | undefined } => {
 	if (url.includes('?')) {
 		const firstQuestionMarkIndex: number = url.indexOf('?');
