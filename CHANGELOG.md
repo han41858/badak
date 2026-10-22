@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## 5.0.1 (2026-10-22)
+
+This release fixes the delay of `stop()` with keep-alive connections. There is no API change.
 
 ### Fixed
 
-- `stop()` waited about 5 seconds (`keepAliveTimeout` of Node.js) or until the clients closed the connections, if there were in-flight requests on keep-alive connections (e.g. `fetch()`, `http.Agent` with `keepAlive`, browsers), because their connections became idle after the responses and were not closed (4.x too). The responses of in-flight requests and requests received while stopping have `Connection: close` if their headers are not sent yet. The connections of streaming responses, and of pipelined requests (more than one request on a connection), are closed after the last response, the responses of pipelined requests are not dropped.
+- `stop()` waited about 5 seconds (`keepAliveTimeout` of Node.js) or until the clients closed the connections, if there were in-flight requests on keep-alive connections (e.g. `fetch()`, `http.Agent` with `keepAlive`, browsers), because their connections became idle after the responses and were not closed (4.x too). The responses of in-flight requests and requests received while stopping have `Connection: close` if their headers are not sent yet. The connections of streaming responses, and of pipelined requests (more than one request on a connection), are closed after the last response, the responses of pipelined requests are not dropped. ([#77](https://github.com/han41858/badak/pull/77))
 
 ## 5.0.0 (2026-10-22)
 
