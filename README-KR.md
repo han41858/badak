@@ -99,27 +99,37 @@ const appWithLog: Badak = new Badak({
 
 라우팅 함수가 실행되기 전에 실행할 미들웨어 함수를 등록합니다.
 미들웨어 함수는 여러개를 지정할 수 있으며, 지정한 순서와 관계없이 병렬로 실행됩니다.
+`listen()` 전에 호출해야 합니다.
 
 미들웨어 함수에서 에러가 발생하면(거부된 Promise를 반환하는 경우 포함) 라우팅 함수는 실행되지 않으며,
 라우팅 함수에서 에러가 발생했을 때와 같은 방식으로 에러 상태 코드로 응답합니다.
-예를 들어 `throw new Error('Forbidden')`은 `403 Forbidden`으로, 그 외의 에러는 `500 Internal Server Error`로 응답합니다.
+예를 들어 `throw new HttpError(403)`은 `403 Forbidden`으로, 그 외의 에러는 `500 Internal Server Error`로 응답합니다.
 미들웨어 함수가 직접 응답한 경우(`res.end()` 등)에도 라우팅 함수는 실행되지 않습니다.
 
 ### `after(fnc: MiddlewareFunction): Promise<void>`
 
 라우팅 함수가 실행된 후에 실행할 미들웨어 함수를 등록합니다.
 미들웨어 함수는 여러개를 지정할 수 있으며, 지정한 순서와 관계없이 병렬로 실행됩니다.
+`listen()` 전에 호출해야 합니다.
 
 `after()` 함수는 클라이언트가 응답 전에 연결을 끊은 경우에도 모든 요청에 대해 실행됩니다.
 요청 본문을 보내는 중 클라이언트가 연결을 끊으면 라우팅 함수는 실행되지 않고 응답도 보내지 않으며, `after()` 함수에서 `res.writableEnded`는 `false`입니다.
 
 ### `config(key: string, value: unknown): Promise<void>`
 
-badak 앱이 실행되는 동작을 조정합니다.
+badak 앱이 실행되는 동작을 조정합니다. 키는 [`BadakOption`](#badakoption)과 같습니다 : `catchErrorLog`, `preventError`, `defaultMethod`, `parseNumber`, `parseDate`, `bodyLimit`.
+알 수 없는 키나 잘못된 값은 에러가 발생합니다.
+
+```typescript
+await app.config('parseNumber', true);
+await app.config('bodyLimit', 1024 * 1024);
+```
 
 ### `listen(port: number): Promise<void>`
 
 서버 응답을 시작합니다.
+`static()`과 `setSPARoot()`의 파일을 이때 불러와 라우트로 등록하며, 다른 라우트와 충돌하는지 검사합니다([요청 하나에 라우트 하나](#요청-하나에-라우트-하나) 참고).
+정적 파일 라우트가 충돌하면 `listen()`이 실패하고 서버는 시작하지 않습니다.
 
 ### `isRunning(): boolean`
 
@@ -143,6 +153,8 @@ HTTP 서버를 정지합니다.
 ### `route(rule: RouteRule): Promise<void>`
 
 라우팅 함수를 등록합니다.
+규칙 객체의 라우트를 모두 먼저 검사하고, 다른 라우트와 충돌하는 것이 없을 때만 등록합니다([요청 하나에 라우트 하나](#요청-하나에-라우트-하나) 참고).
+`listen()` 후에도 라우트를 등록할 수 있습니다.
 
 요청 경로와 일치하는 라우팅 규칙은 있지만 요청 메서드에 해당하는 라우팅 함수가 없으면,
 `405 Method Not Allowed`와 함께 사용할 수 있는 메서드 목록을 `Allow` 헤더로 응답합니다.
@@ -178,7 +190,7 @@ HTTP 서버를 정지합니다.
 알 수 없는 확장자이거나 확장자가 없는 파일은 파일 시그니처(예: PNG)로 판별하고, 그래도 알 수 없으면 `application/octet-stream`으로 응답합니다.
 텍스트 파일(`text/*`)과 JavaScript 파일은 `charset=utf-8`로 응답하므로 UTF-8로 저장해야 합니다.
 
-파일은 `listen()`을 실행할 때 메모리에 올라가므로, 파일을 바꾸면 서버를 다시 시작해야 반영됩니다.
+파일은 `listen()`을 실행할 때 메모리에 올라가므로, 파일을 바꾸면 `stop()` 후 `listen()`을 다시 호출해야 반영됩니다. 그 사이 삭제된 파일은 더 이상 제공하지 않습니다.
 
 정적 파일은 `ETag`(파일 내용 기준)와 `Last-Modified`(파일 수정 시각 기준)를 함께 응답하며,
 요청의 `If-None-Match`나 `If-Modified-Since`가 일치하면 본문 없이 `304 Not Modified`로 응답합니다.
@@ -235,8 +247,7 @@ app.get('/limited', () => {
 - `option.cause` : 로그용 원본 에러입니다.
 
 그 외의 에러는 에러 메시지 없이 `500 Internal Server Error`로 응답합니다.
-호환성을 위해 `new Error('Forbidden')`처럼 메시지가 상태 문구인 `Error`는 해당 상태 코드로 응답합니다
-(`Bad Request`, `Unauthorized`, `Forbidden`, `Not Found`, `Method Not Allowed`, `Not Acceptable`, `Payload Too Large`).
+에러 메시지를 상태 코드로 바꾸지 않습니다. `new Error('Forbidden')`은 `500`으로 응답하므로 `new HttpError(403)`을 사용하세요(5.0.0에서 변경).
 
 어떤 값이 `HttpError`인지는 `isHttpError(value)`로 확인할 수 있습니다.
 
@@ -254,8 +265,10 @@ export type MiddlewareFunction = (req: IncomingMessage, res: ServerResponse, res
 ### `RouteFunction`
 
 ```typescript
-export type RouteFunction = (ctx: ParamContext, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
+export type RouteFunction<T extends CheckedParamTypes<T> = ParamTypes> = (ctx: ParamContext<T>, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
 ```
+
+`T`는 요청 데이터의 이름 있는 제네릭입니다. [요청 데이터 제네릭 타입](#요청-데이터-제네릭-타입)을 참고하세요. 지정하지 않으면 `ctx`는 기본 타입의 `ParamContext`입니다.
 
 HTTP 요청에 반응할 라우팅 함수를 등록합니다.
 라우팅 함수가 반환한 값은 HTTP 응답으로 반환됩니다.
@@ -396,31 +409,35 @@ await app.route({
 
 ## 특수 라우팅
 
-`route()`나 `get()`, `post()`, `put()`, `delete()` 함수의 경로에 특수 라우팅을 사용할 수 있습니다.
+`route()`나 `get()`, `post()`, `put()`, `patch()`, `delete()` 함수의 경로에 특수 라우팅을 사용할 수 있습니다.
+**요청 하나에 매칭되는 라우트는 METHOD마다 하나뿐입니다.** 같은 요청 경로에 매칭될 수 있는 라우트를 등록하면 에러가 발생합니다. [요청 하나에 라우트 하나](#요청-하나에-라우트-하나)를 참고하세요.
+전체 명세는 [`docs/routing-spec-5.0.0.md`](https://github.com/han41858/badak/blob/main/docs/routing-spec-5.0.0.md)에 있습니다.
+
+| 패턴 | 의미 | 매칭 | 매칭 안 됨 |
+|---|---|---|---|
+| `users` | 문자 그대로 | `users` | `user` |
+| `:id` | 경로 조각 하나, 문자 1개 이상 | `7`, `me` | |
+| `*` | 경로 조각 하나, 문자 1개 이상 | `a.png` | |
+| `ab?cd` | `?` 바로 앞 문자 0~1번 | `acd`, `abcd` | `abbcd` |
+| `ab+cd` | `+` 바로 앞 문자 1번 이상 | `abcd`, `abbcd` | `acd` |
+| `ab*cd` | `ab`와 `cd` 사이에 아무 문자 0개 이상 | `abcd`, `abXYZcd` | `acd`, `aXcd` |
+| `*.png` | 아무 문자 다음에 `.png` | `a.png` | `a.jpg` |
+| `**` | 나머지 경로 전체, 폴백 | | |
+
+- `?`, `+`는 바로 앞 문자 하나에 적용됩니다. `*`는 와일드카드이며 앞 문자에 적용되지 않습니다.
+- 한 경로 조각에서 함께 쓸 수 있습니다. 예: `ab?c+d`, `a*b*c`, `*abc`.
+- 잘못된 패턴은 등록할 때 `invalid route '...'` 에러가 발생합니다. 앞 문자 없는 `?`, `+`(`?abc`), 연속된 문법 문자(`ab??`, `ab?*`, `a**b`), 맨 앞이 아닌 `:`(`ab:id`)가 해당합니다.
+- 다른 문자는 정규식에서 특별한 의미가 있는 문자(예: `.`, `(`, `)`)를 포함해 모두 문자 그대로 취급합니다. `/a.c?`는 `/a.c`와 `/a.`에 매칭되며, `/abc`에는 매칭되지 않습니다.
+- 퍼센트 인코딩된 문자는 항상 문자 그대로입니다. `/a%2Ab`는 `/a*b`(또는 `/a%2Ab`)에만 매칭되고, `%2A%2A`는 폴백이 아닌 일반 경로 조각 `**`입니다.
+- 매칭된 경로 조각은 `ctx.params`에 전달됩니다. `:` 라우팅은 이름(`{ id: '7' }`), `*`는 `'*'`, 그 밖에는 라우팅 패턴(`{ 'ab*cd': 'abXcd' }`)이 키입니다.
 
 ### `:` 라우팅
 
 `/:userId`로 라우팅 경로를 지정하고 `/user1`로 HTTP 요청을 보내면, 요청이 매칭되며 라우팅 함수의 `ctx.params`에 `{ userId: 'user1' }`이 전달됩니다.
 
-### `?` 라우팅
-
-`?`는 바로 앞 문자 하나를 선택적으로 만듭니다.
-`/users?`로 라우팅 경로를 지정하면 `/user`와 `/users` 경로를 매칭할 수 있습니다.
-매칭된 경로 조각은 `ctx.params`에 라우팅 패턴을 키로 하여 전달됩니다(예: `{ 'users?': 'user' }`).
-
-- 다른 문자는 정규식에서 특별한 의미가 있는 문자(예: `.`, `(`, `)`, `[`, `]`)를 포함해 모두 문자 그대로 취급합니다. `/a.c?`는 `/a.c`와 `/a.`에 매칭되며, `/abc`에는 매칭되지 않습니다.
-- `??`나, 한 경로 조각에서 `?`를 `+` 또는 `*`와 함께 쓰는 경로(예: `/ab?c+`)는 등록할 때 에러가 발생합니다.
-- 같은 경로 조각에 매칭될 수 있는 `?` 라우팅 경로는 등록 순서와 관계없이 함께 등록할 수 없습니다. 예를 들어 `/ab?c`와 `/a?bc`는 모두 `/abc`에 매칭되므로, 두 번째 경로를 등록할 때 `duplicated question routing` 에러가 발생합니다. `?` 라우팅 경로에 매칭되는 일반 경로(예: `/abc`와 `/ab?c`)도 같은 에러가 발생합니다.
-
-### `+` 라우팅
-
-`+`는 바로 앞 문자 하나를 1번 이상 반복하게 하며, 다른 문자는 문자 그대로 취급합니다.
-`/user1+`로 라우팅 경로를 지정하면 `/user1`과 `/user11` 등의 경로를 매칭할 수 있습니다.
-`++`나, 한 경로 조각에서 `+`를 `*`와 함께 쓰는 경로는 등록할 때 에러가 발생합니다.
-
 ### `*` 라우팅
 
-`*`는 경로 조각을 정확히 하나 매칭하며, 값은 `ctx.params['*']`로 전달됩니다.
+경로 조각 전체가 `*`이면 경로 조각을 정확히 하나 매칭하며, 값은 `ctx.params['*']`로 전달됩니다.
 
 ```typescript
 await app.get('/img/*', ({ params }) => params);
@@ -429,14 +446,10 @@ await app.get('/img/*', ({ params }) => params);
 // GET /img, /img/, /img/a/b -> 404
 ```
 
-경로 조각 안의 `*`는 바로 앞 문자와 함께 그 경로 조각 안의 임의의 문자를 매칭하며, 다른 문자는 문자 그대로 취급합니다.
-`/user1*`로 라우팅 경로를 지정하면 `/user`와 `/user1`, `/user11` 등의 경로를 매칭할 수 있습니다.
-한 경로 조각에는 `*`를 하나만 쓸 수 있으며, `*` 앞에 문자가 있어야 합니다(`/*abc`는 에러).
-
 ### `**` 라우팅
 
-`**`는 `/`를 포함한 나머지 경로 전체를 매칭합니다.
-나머지 경로는 `ctx.params['**']`로 전달되며, 각 경로 조각을 디코딩한 뒤 `/`로 연결한 문자열입니다.
+`**`는 `/`를 포함해 나머지 경로 전체에 매칭됩니다.
+나머지 경로는 `ctx.params['**']`로 전달되며, 경로 조각을 각각 디코딩한 뒤 `/`로 이어 붙인 값입니다.
 
 ```typescript
 await app.get('/files/**', ({ params, query }) => ({ params, query }));
@@ -445,24 +458,44 @@ await app.get('/files/**', ({ params, query }) => ({ params, query }));
 // GET /files/a/b?c=1       -> { params: { '**': 'a/b' }, query: { c: '1' } }
 ```
 
-- `**`는 라우팅 경로의 마지막 조각에만 사용할 수 있습니다. `/files/**/edit` 같은 경로는 등록할 때 에러가 발생합니다.
+- `**`는 라우팅 경로의 마지막 경로 조각이어야 합니다. `/files/**/edit` 같은 경로는 등록할 때 에러가 발생합니다.
 - 경로 조각 안의 `%2F`도 `/`로 디코딩되므로, `/files/a%2Fb`와 `/files/a/b`는 같은 값을 전달합니다.
 - 나머지 경로에 잘못된 퍼센트 인코딩이 있으면 `400 Bad Request`로 응답합니다.
-- `**`는 경로 조각 0개 이상을 매칭합니다. `/files/**`는 `/files`, `/files/`, `/files/a`, `/files/a/b`에 매칭되며, `/files`와 `/files/`에서 `**`는 `''`입니다. `/**`는 `/`에도 매칭됩니다.
-- `**`는 폴백입니다. 요청 경로가 다른 라우트에 완전히 매칭되지 않을 때만 사용합니다. [라우팅 우선순위](#라우팅-우선순위)를 참고하세요.
+- `**`는 경로 조각 0개 이상에 매칭됩니다. `/files/**`는 `/files`, `/files/`, `/files/a`, `/files/a/b`에 매칭되며, `/files`와 `/files/`의 `**`는 `''`입니다. `/**`는 `/`에도 매칭됩니다.
+- `**`는 폴백입니다. 요청 경로가 다른 라우트에 완전히 매칭되지 않을 때만 사용합니다. [요청 하나에 라우트 하나](#요청-하나에-라우트-하나)를 참고하세요.
 
-### 라우팅 우선순위
+### 요청 하나에 라우트 하나
 
-경로 조각마다 아래 순서로 매칭하며, 라우트를 등록한 순서와는 관계없습니다.
+METHOD가 같은 라우트는 경로 조각 수가 같고 모든 위치의 경로 조각이 같은 문자열에 매칭될 수 있으면 충돌합니다.
+충돌하면 등록 순서와 관계없이 두 번째 라우트를 등록할 때 `Conflicting routes for <METHOD>` 에러가 발생합니다. 라우트 사이에 우선순위는 없습니다.
 
-1. 일반 라우팅 (예: `/users/me`)
-2. `:` 라우팅 (예: `/users/:id`)
-3. `?` 라우팅
-4. `+` 라우팅
-5. `*` 라우팅 (`*`, `ab*cd`)
+| 라우트 | 결과 |
+|---|---|
+| `GET /users/me`, `GET /users/:id` | 충돌, 둘 다 `/users/me`에 매칭 |
+| `GET /img/*`, `GET /img/:id` | 충돌 |
+| `GET /abc`, `GET /ab+c` | 충돌, 둘 다 `/abc`에 매칭 |
+| `GET /ab*cd`, `GET /ab%2Acd` | 충돌, 둘 다 `/ab%2Acd`(`ab*cd`)에 매칭 |
+| `GET /a/:id/details`, `GET /a/b+/settings` | 등록됨, 마지막 경로 조각이 겹치지 않음 |
+| `GET /users/:id/a`, `GET /users/:name/b` | 등록됨 |
+| `GET /a/:id`, `POST /a/b+` | 등록됨, METHOD가 다름 |
+| `GET /users/:id`, `GET /users/:id` | 다시 등록, 나중 것으로 교체 |
 
-`**`는 요청 경로가 다른 라우트에 완전히 매칭되지 않을 때만 사용하며, 매칭된 경로에서 가장 깊은 `**`를 사용합니다.
-예를 들어 `setSPARoot('/')`(`/**`)를 사용해도 `/style.css`와 `/api/users`는 각자의 라우트가 처리하고, 나머지 경로는 `index.html`로 응답합니다.
+요청 경로에 매칭되는 라우트를 첫 번째 것만이 아니라 모두 찾고, METHOD로 라우팅 함수를 고릅니다.
+경로에 매칭되는 라우트는 있지만 해당 METHOD가 없으면, 매칭된 라우트 전체의 METHOD를 `Allow` 헤더에 담아 `405 Method Not Allowed`로 응답합니다.
+
+```typescript
+await app.get('/a/:id', getFnc);
+await app.post('/a/b+', postFnc);
+
+// GET  /a/bb -> getFnc, { id: 'bb' }
+// POST /a/bb -> postFnc, { 'b+': 'bb' }
+// PUT  /a/bb -> 405, Allow: GET, HEAD, POST
+```
+
+`**` 라우트는 다른 라우트와 비교하지 않습니다. 요청 경로가 라우트에 완전히 매칭되지 않을 때만 사용하며, 가장 깊은 것을 사용합니다.
+METHOD와 깊이(`**` 앞의 경로 조각 수)가 같은 `**` 라우트는 `**` 앞부분이 같은 경로에 매칭될 수 있으면 충돌합니다. 예를 들어 `/a/:id/**`와 `/a/b+/**`는 `Conflicting fallback routes for GET at depth 2` 에러가 발생합니다.
+
+예를 들어 `setSPARoot('/')`(`/**`)를 쓰면, `/style.css`와 `/api/users`는 각자의 라우트가 처리하고 그 밖의 경로는 `index.html`로 응답합니다.
 
 ```typescript
 await app.get('/**', spaFnc);
@@ -475,7 +508,10 @@ await app.get('/api/users/:id', userFnc);
 // GET /api           -> spaFnc, { '**': 'api' }
 ```
 
-경로는 라우트에 완전히 매칭되지만 그 메서드의 라우팅 함수가 없으면, `**`를 사용하지 않고 `405 Method Not Allowed`로 응답합니다.
+경로가 라우트에 완전히 매칭되지만 해당 METHOD의 라우팅 함수가 없으면, `**`를 사용하지 않고 `405 Method Not Allowed`로 응답합니다.
+
+`static()`과 `setSPARoot()`의 정적 파일 라우트는 `listen()`에서 등록되며 같은 방식으로 검사합니다. 예를 들어 `style.css`가 있는 `static('/', dir)`은 `GET /:slug`와 충돌합니다.
+충돌하면 `listen()`이 실패하고 서버는 시작하지 않습니다. 일부만 등록되지 않습니다.
 
 ### 비ASCII 경로와 퍼센트 인코딩
 
@@ -530,7 +566,10 @@ GET /path?             → query: {}
 GET /path?key          → query: { key: '' }
 GET /path?key=         → query: { key: '' }
 GET /path?key=value    → query: { key: 'value' }
+GET /path?a=1&a=2      → query: { a: ['1', '2'] }
 ```
+
+- 값은 `node:querystring`으로 디코딩합니다. 쿼리 문자열의 잘못된 퍼센트 인코딩은 원문 그대로 둡니다(예: `?a=%ZZ` → `{ a: '%ZZ' }`). 요청 경로처럼 `400`으로 응답하지 않습니다.
 
 ### 경로 파라미터와 본문
 
@@ -548,6 +587,27 @@ await app.patch('/users/:id', (ctx) => ctx);
 ```
 
 `parseNumber`와 `parseDate`는 query와 body의 문자열에만 적용하며 경로 캡처에는 적용하지 않습니다. Node.js의 `req`, `res`는 두 번째와 세 번째 인자로 그대로 전달됩니다.
+
+요청 본문은 `Content-Type`에 따라 파싱합니다(대소문자 구분 없음, `charset` 같은 파라미터는 무시).
+
+| `Content-Type` | `ctx.body` | `400 Bad Request` |
+|---|---|---|
+| `application/json` | 파싱한 JSON 값 | 잘못된 JSON, UTF-8 BOM으로 시작하는 JSON 포함 |
+| `application/x-www-form-urlencoded` | 문자열 값의 객체, 배열은 `key[]` | |
+| `multipart/form-data` | 객체 : 필드는 문자열, `text/plain` 파일은 UTF-8 문자열(아래 참고), 그 밖의 파일은 `Buffer`, 배열은 `key[]` | `boundary` 없음 |
+| `text/*`, `charset` 없음 또는 `charset=utf-8` | UTF-8 문자열 | 잘못된 UTF-8 |
+| `text/*`, 그 밖의 `charset`(예: `euc-kr`) | 디코딩하지 않은 원본 `Buffer` | |
+| 그 밖의 타입(예: `application/octet-stream`, `image/png`), 또는 `Content-Type` 없음 | 원본 `Buffer` | |
+
+- 본문이 비어 있으면 모든 타입에서 `undefined`입니다. `bodyLimit`을 넘는 본문은 `413 Payload Too Large`로 응답합니다.
+- `text/*`는 `charset`이 없으면 UTF-8로 봅니다(badak 정책). `charset`은 대소문자를 구분하지 않고 따옴표로 감쌀 수 있으며, `utf-8`과 `utf8`을 UTF-8로 봅니다.
+  UTF-8은 엄격하게 디코딩합니다. 잘못된 바이트는 `U+FFFD`로 바꾸지 않고 `400`으로 응답합니다. 그 밖의 charset은 디코딩하지 않으므로 필요하면 `Buffer`를 직접 디코딩하세요.
+- `charset`이 두 번 이상 있거나(예: `charset=utf-8; charset=euc-kr`) 값이 비어 있으면 모호하므로 원본 `Buffer`입니다.
+- 텍스트 본문 맨 앞의 UTF-8 BOM은 문자열에서 제거합니다. 바이트를 그대로 받으려면 다른 `Content-Type`(예: `application/octet-stream`)을 사용하세요.
+- `multipart/form-data`의 `text/plain` 파일(`Content-Type`이 없는 파일은 RFC 7578에 따라 `text/plain`)도 같은 규칙으로 문자열 또는 `Buffer`입니다.
+  바이너리 파일은 `Content-Type`(예: `image/png`, `application/octet-stream`)을 지정해 보내세요. `Content-Type` 없는 바이너리 파일은 UTF-8로 디코딩하므로 요청이 `400`이 됩니다. 브라우저와 `curl -F`는 파일에 `Content-Type`을 붙여 보냅니다.
+- `parseNumber`와 `parseDate`는 문자열과 `Buffer` 본문에 적용하지 않습니다.
+- JSON, form, multipart 본문의 원본 바이트는 제공하지 않습니다(예: 웹훅의 HMAC 서명 검증).
 
 ## 예제
 
@@ -589,7 +649,7 @@ await app.delete<{ params: { id: string } }>('/api/users/:id', ({ params }, req,
 
 ### 파일 업로드
 
-`multipart/form-data`의 필드는 문자열, 파일은 `Buffer`(`text/plain` 파일은 문자열)입니다.
+`multipart/form-data`의 필드는 문자열, 파일은 `Buffer`(`text/plain` 파일은 UTF-8 문자열)입니다.
 라우트의 `bodyLimit`으로 이 라우트에만 더 큰 본문을 허용할 수 있습니다.
 
 ```typescript

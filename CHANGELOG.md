@@ -1,5 +1,64 @@
 # Changelog
 
+## 5.0.0 (2026-10-22)
+
+This release makes a request match only one route per method : routes that can match the same request path throw when they are registered, without priority between them.
+`*` in a uri fragment is a wildcard, request bodies of other `Content-Type`s are available in `ctx.body`, and `Error` messages are not mapped to status codes.
+Check the route registration of your app first, see [Breaking changes](#breaking-changes) and [Migration](#migration). The full routing specification is in [`docs/routing-spec-5.0.0.md`](https://github.com/han41858/badak/blob/main/docs/routing-spec-5.0.0.md) (Korean).
+
+### Breaking changes
+
+- **A request matches only one route per method.** Routes of the same method conflict if they have the same number of uri fragments and every uri fragment can match the same characters, regardless of the kind of routing (normal, `:`, `?`, `+`, `*`). A conflict throws `Conflicting routes for <METHOD>` when it is registered, regardless of the registration order. There is no priority between routes, normal routing doesn't win over `:` routing anymore.
+- `**` routes are fallbacks, not compared with other routes. `**` routes of the same method and depth conflict if the parts before `**` can match the same path, and throw `Conflicting fallback routes for <METHOD> at depth <n>`.
+- Every route matching the request path is found, not only the first one by priority, and the routing function is selected by the method. `405 Method Not Allowed` has the methods of all matched routes in the `Allow` header.
+- `*` in a uri fragment is a wildcard : any characters, 0 or more. The character before it is literal. `ab*cd` matches `abcd` and `abXYZcd`, not `acd` and `aXcd`.
+- `?`, `+` and `*` can be combined in a uri fragment, e.g. `ab?c+d`, `a*b*c`, `*abc`. Adjacent syntax characters (`ab??`, `ab?*`, `a**b`), `?` or `+` without a character before it, and `:` not at the beginning throw `invalid route '...'`.
+- Static file routes of `static()` and `setSPARoot()` are checked in `listen()` with the other routes, at once. A conflict rejects `listen()` and nothing is registered partially. `listen()` after `stop()` doesn't duplicate the static cache.
+- Request bodies of `Content-Type`s that are not parsed are available in `ctx.body`, they were received and discarded (`ctx.body` was `undefined`, and the body couldn't be read from `req`). ([#73](https://github.com/han41858/badak/pull/73))
+  - `text/*` without `charset` or with `charset=utf-8` : a UTF-8 string, decoded strictly. Malformed UTF-8 responds `400`.
+  - `text/*` with another `charset`, an empty `charset`, or `charset` more than once : the original `Buffer`, not decoded.
+  - a UTF-8 BOM at the beginning is removed from the string.
+  - other types and no `Content-Type` : the original `Buffer`.
+  - `text/plain` files of `multipart/form-data` follow the same rule : malformed UTF-8 responds `400`, and another `charset` is a `Buffer`. They were decoded leniently as UTF-8 for any `charset` before.
+  - an empty body is `undefined`, `bodyLimit` and `auth()` before receiving the body are not changed. The original bytes of JSON, form and multipart bodies are not available yet.
+- An `Error` whose message is a status text is not mapped to the status code : `new Error('Forbidden')` responds `500`, it responded `403` before. Errors of other libraries with such messages (e.g. `Error('Not Found')`) responded `4xx` without being logged as server errors. Use `HttpError`, e.g. `new HttpError(403)`. The removed messages are `Bad Request`, `Unauthorized`, `Unauthenticated`, `Forbidden`, `Not Found`, `no rule`, `Method Not Allowed`, `Not Acceptable` and `Payload Too Large`. ([#71](https://github.com/han41858/badak/pull/71))
+  - a general `Error` thrown in `auth()` still responds `401` and is logged.
+- Error messages of route registration are changed : `duplicated colon/question/plus/asterisk routing` and `duplicated question and plus routing` are `Conflicting routes for <METHOD>:` with both paths, and syntax errors are `invalid route '<uri fragment>' : <reason>`.
+
+### Fixed
+
+- Static files deleted between `stop()` and `listen()` were still served from the previous cache, with their old contents (4.x too). `listen()` replaces the static routes of the previous `listen()` call, and keeps routes registered by the user. ([#70](https://github.com/han41858/badak/pull/70))
+
+### Others
+
+- Registering a value that is not a function as a routing function throws `route function should be Function`. It threw `middleware should be Function` before. ([#72](https://github.com/han41858/badak/pull/72))
+
+### Documentation
+
+- README : `config()` keys, `before()` and `after()` should be called before `listen()`, routes can be registered after `listen()`, static files after `stop()` and `listen()`, how the request body is parsed by `Content-Type` (including `400` for JSON with a UTF-8 BOM, and `undefined` for other types), and the query string with a malformed percent-encoding. ([#72](https://github.com/han41858/badak/pull/72))
+
+### Migration
+
+| If you ... | 4.x | 5.0.0 | then |
+|---|---|---|---|
+| register `/users/me` and `/users/:id` | `me` wins | throws | move one of them (e.g. `/me`), or branch on `me` in the `:id` routing function |
+| register `/files/readme` and `/files/*` | `readme` wins | throws | same as above |
+| use `static('/', dir)` with a route like `/:slug` | the file wins | `listen()` rejects if a file name matches | move the static files under a path, or use `setSPARoot()` |
+| register `/img/*` and `/img/:id` | `:id` wins | throws | keep one of them |
+| register `/a/:id` and `/a/b+` (or `?`, `*`) | `b+` is never used | throws | remove the unused route |
+| use `ab*cd` for `acd` or `aXcd` | matched | not matched | change the pattern, the character before `*` is literal |
+| use `user1*` (4.x README example) for `user` | matched | not matched | use `user*` |
+| use `*abc`, `a*b*c`, `ab?c+`, `ab?c*` | throws | registered | - |
+| register `/a/:id/x` and `/a/b+/y` | `/a/bb/y` responds `404` | `/a/bb/y` -> `/a/b+/y` | check the routes |
+| register `GET /a/:id` and `POST /a/b+` | `POST /a/bb` responds `405` | `POST /a/bb` -> `POST /a/b+` | check the routes |
+| register `/users/:id/a` and `/users/:name/b` | throws | registered | - |
+| register `/files/*` and `/files/**` | throws | registered | - |
+| register `/ab*` and `/xy*` | throws | registered | - |
+| check the error messages of route registration | `duplicated … routing` | `Conflicting routes for …` | change the expected messages |
+| throw `new Error('Forbidden')` (or another status text) for a status code | `403` | `500` | throw `new HttpError(403)` |
+| expect `ctx.body` to be `undefined` for `text/plain`, `application/octet-stream` or no `Content-Type` | `undefined` | a string or a `Buffer` | check `ctx.body` by its type |
+| send `text/plain` files of `multipart/form-data` in a charset other than UTF-8 | a broken string | a `Buffer` (or `400` for malformed UTF-8 without `charset`) | decode the `Buffer`, or send `charset` |
+
 ## 4.1.0 (2026-10-22)
 
 This release fixes request handling (multipart uploads blocking the server, `Content-Type` case, absolute-form request targets, client aborts) and the duplication check of `+` routing.
@@ -59,7 +118,7 @@ To migrate, remove one of the routing paths, merge them into one routing functio
 ## 4.0.0 (2026-10-22)
 
 This release changes the first argument of routing functions to `ParamContext` (`{ params, query, body }`), and redefines `?` routing and non-ASCII / percent-encoded path matching.
-Every route callback that reads the merged `param` object must be migrated, see [Breaking changes](#breaking-changes) and [Migration](#migration).
+Every route callback that reads the merged `param` object must be migrated, see [Breaking changes](#breaking-changes-1) and [Migration](#migration-1).
 
 ### Breaking changes
 
@@ -137,7 +196,7 @@ Cases that differ from 3.0.0 :
 
 This release fixes the routing rules of `**` and `*`.
 `setSPARoot()` serves static files and other routes now, they responded `index.html` before.
-The public API is not changed, but some requests are handled by a different route, see [Breaking changes](#breaking-changes-1) and [Migration](#migration-1).
+The public API is not changed, but some requests are handled by a different route, see [Breaking changes](#breaking-changes-2) and [Migration](#migration-2).
 
 ### Breaking changes
 
@@ -203,7 +262,7 @@ and runs `auth()` before receiving the request body.
 
 This release fixes many bugs found in request handling, routing and packaging,
 and adds `HttpError`, `PATCH`, `HEAD`, stream responses and a request body size limit.
-Several fixes change existing behavior, see [Breaking changes](#breaking-changes-2) and [Migration](#migration-2) first.
+Several fixes change existing behavior, see [Breaking changes](#breaking-changes-3) and [Migration](#migration-3) first.
 
 ### Breaking changes
 

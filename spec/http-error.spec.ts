@@ -355,15 +355,20 @@ describe('HttpError', () => {
 		});
 	});
 
-	it('old message mapping still works', async () => {
-		await app.get('/test', (): never => {
-			throw new Error('Forbidden');
+	// 5.0.0 : removed, use HttpError
+	['Bad Request', 'Unauthorized', 'Unauthenticated', 'Forbidden', 'Not Found', 'no rule', 'Method Not Allowed', 'Not Acceptable', 'Payload Too Large'].forEach((message: string): void => {
+		it(`Error('${ message }') is not mapped to a status code : 500`, async () => {
+			await app.get('/test', (): never => {
+				throw new Error(message);
+			});
+
+			await app.listen(TestPort);
+
+			await request(app.getHttpServer())
+				.get('/test')
+				.expect(500, 'Internal Server Error');
+
+			await app.stop();
 		});
-
-		await app.listen(TestPort);
-
-		await request(app.getHttpServer())
-			.get('/test')
-			.expect(403);
 	});
 });

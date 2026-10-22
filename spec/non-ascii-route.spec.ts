@@ -97,12 +97,14 @@ describe('non-ASCII & percent-encoded routing', () => {
 		});
 
 		([
-			['*', 'asterisk'],
+			['*', 'pattern'],
 			['**', 'doubleAsterisk'],
 			[':id', 'colon'],
-			['colou?r', 'question'],
-			['ab+c', 'plus'],
-			['ab*c', 'partialAsterisk']
+			['colou?r', 'pattern'],
+			['ab+c', 'pattern'],
+			['ab*c', 'pattern'],
+			['%2A', 'normal'],
+			['a%3Fb', 'normal']
 		] as [string, string][]).forEach(([routeKey, kind]: [string, string]): void => {
 			it(`${ routeKey } is ${ kind }`, () => {
 				expect(compileRouteSegment(routeKey).kind).to.be.eql(kind);
@@ -115,7 +117,7 @@ describe('non-ASCII & percent-encoded routing', () => {
 			});
 		});
 
-		['/a++b', '/ab+*c', '/a*b*c', '/*abc'].forEach((uri: string): void => {
+		['/a++b', '/ab+*c', '/a**b', '/ab?*c', '/?ab'].forEach((uri: string): void => {
 			it(`invalid syntax throws on registration : ${ uri }`, () => {
 				expect(() => build([uri])).to.throw('invalid');
 			});
@@ -142,7 +144,8 @@ describe('non-ASCII & percent-encoded routing', () => {
 			[`/${ enc('가가가나') }`, '/가+나', { '가+나': '가가가나' }],
 			[`/img/${ enc('한.png') }`, '/img/*', { '*': '한.png' }],
 			[`/${ enc('사진첩') }`, '/사진*', { '사진*': '사진첩' }],
-			[`/${ enc('사') }`, '/사진*', { '사진*': '사' }],
+			[`/${ enc('사진') }`, '/사진*', { '사진*': '사진' }],
+			[`/${ enc('사') }`, undefined, undefined],
 			[`/dir/${ enc('한') }/${ enc('글') }`, '/dir/**', { '**': '한/글' }],
 			[`/${ enc('한글x') }`, undefined, undefined],
 			[`/${ enc('나') }`, undefined, undefined]
@@ -445,9 +448,9 @@ describe('non-ASCII & percent-encoded routing', () => {
 		});
 
 		it('different spellings don\'t break duplication check of other routes', () => {
-			expect(() => build(['/%ED%95%9C%EA%B8%80', '/한?글'])).to.throw('duplicated question routing');
-			expect(() => build(['/a%62+c', '/abbc'])).to.throw('duplicated plus routing');
-			expect(() => build(['/:id', '/:%6Eame'])).to.throw('duplicated colon routing');
+			expect(() => build(['/%ED%95%9C%EA%B8%80', '/한?글'])).to.throw('Conflicting routes for GET');
+			expect(() => build(['/a%62+c', '/abbc'])).to.throw('Conflicting routes for GET');
+			expect(() => build(['/:id', '/:%6Eame'])).to.throw('Conflicting routes for GET');
 		});
 	});
 
@@ -514,14 +517,17 @@ describe('non-ASCII & percent-encoded routing', () => {
 			});
 		};
 
-		const uris: string[] = ['/한글', '/%EB%B0%94%EB%8B%A5', '/:name', '/색깔?', '/가+나', '/**'];
+		// patterns that don't overlap each other (5.0.0 : no priority between them)
+		const uris: string[] = ['/한글', '/%EB%B0%94%EB%8B%A5', '/다*', '/색깔?', '/가+나', '/**'];
 		const orders: string[][] = permutations(uris);
 
 		([
 			[`/${ enc('한글') }`, '/한글'],
 			[`/${ enc('바닥') }`, '/%EB%B0%94%EB%8B%A5'],
-			[`/${ enc('다른') }`, '/:name'],
-			[`/${ enc('가나') }`, '/:name'], // ':' before '+'
+			[`/${ enc('다른') }`, '/다*'],
+			[`/${ enc('가나') }`, '/가+나'],
+			[`/${ enc('색') }`, '/색깔?'],
+			[`/${ enc('나') }`, '/**'],
 			[`/${ enc('한글') }/x`, '/**']
 		] as [string, string][]).forEach(([url, expectedUri]: [string, string]): void => {
 			it(`${ decodeURIComponent(url) } -> ${ expectedUri } (${ orders.length } orders)`, () => {
