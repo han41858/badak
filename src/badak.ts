@@ -26,7 +26,7 @@ import {
 	METHOD
 } from './constants.js';
 import { HttpError, isHttpError } from './http-error.js';
-import { convertParam, parseRequestBody } from './body-parser.js';
+import { ClientAbortError, convertParam, parseRequestBody } from './body-parser.js';
 import { sendErrorResponse, sendRouteResult } from './response.js';
 import { checkStaticOption, loadStaticRule, sendStaticFile } from './static.js';
 import { encodeLiteralPath } from './route-segment.js';
@@ -34,7 +34,6 @@ import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refi
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
-	isClientAbortError,
 	isExistFile,
 	isFolder,
 	isResponseStarted,
@@ -510,10 +509,10 @@ export class Badak {
 				catch (e) {
 					const err: Error | TypedObject<unknown> = e as Error | TypedObject<unknown>;
 
-					// the client closed the connection (e.g. while sending the request body)
+					// the client closed the connection while sending the request body (classified in receiveBody())
 					// nothing can be responded, not a server error : not logged, not passed to Node.js
 					// after() functions still run, the response is not completed (res.writableEnded is false)
-					if (isClientAbortError(res, err)) {
+					if (err instanceof ClientAbortError) {
 						return;
 					}
 

@@ -1,5 +1,6 @@
 import { connect, Socket } from 'node:net';
-import { ServerResponse } from 'node:http';
+import { IncomingMessage } from 'node:http';
+import { Readable } from 'node:stream';
 
 import { afterEach, beforeEach } from 'mocha';
 import { expect } from 'chai';
@@ -7,31 +8,89 @@ import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
 import { ParamContext } from '../src/interfaces';
-import { isClientAbortError } from '../src/util';
+import { ClientAbortError, receiveBody } from '../src/body-parser';
 import { TestPort } from './test-util';
 
 
 // the client closes the connection : not a server error, nothing can be responded
 describe('client closes the connection', () => {
-	describe('isClientAbortError()', () => {
-		const resOf = (destroyed: boolean): ServerResponse => ({ destroyed }) as unknown as ServerResponse;
+	describe('receiveBody()', () => {
+		// IncomingMessage-like readable stream
+		const fakeReq = (): IncomingMessage => {
+			const stream: Readable = new Readable({ read (): void { /* pushed by the test */ } });
 
-		const aborted: Error = Object.assign(new Error('aborted'), { code: 'ECONNRESET' });
+			return Object.assign(stream, { headers: { 'content-length': '100' } }) as unknown as IncomingMessage;
+		};
 
-		([
-			['connection open, ECONNRESET', resOf(false), aborted, false],
-			['connection closed, aborted (ECONNRESET)', resOf(true), aborted, true],
-			['connection closed, EPIPE', resOf(true), Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }), true],
-			['connection closed, ECONNABORTED', resOf(true), Object.assign(new Error('x'), { code: 'ECONNABORTED' }), true],
-			['connection closed, ERR_STREAM_PREMATURE_CLOSE', resOf(true), Object.assign(new Error('x'), { code: 'ERR_STREAM_PREMATURE_CLOSE' }), true],
-			['connection closed, message aborted without code', resOf(true), new Error('aborted'), true],
-			['connection closed, other error', resOf(true), new Error('boom'), false],
-			['connection closed, not an Error', resOf(true), 'aborted', false],
-			['connection closed, null', resOf(true), null, false]
-		] as [string, ServerResponse, unknown, boolean][]).forEach(([name, res, err, expected]: [string, ServerResponse, unknown, boolean]): void => {
-			it(`${ name } -> ${ expected }`, () => {
-				expect(isClientAbortError(res, err)).to.be.eql(expected);
+		const resetError = (): Error => Object.assign(new Error('aborted'), { code: 'ECONNRESET' });
+
+		it('destroyed with ECONNRESET while receiving : ClientAbortError', async () => {
+			const req: IncomingMessage = fakeReq();
+			const received: Promise<Buffer> = receiveBody(req, 1000);
+
+			req.push('{"a":');
+			req.destroy(resetError());
+
+			const err: unknown = await received.then(() => undefined, (e: unknown) => e);
+
+			expect(err).to.be.instanceof(ClientAbortError);
+			expect((err as Error).cause).to.be.instanceof(Error);
+		});
+
+		it('destroyed before receiving (e.g. during async auth()) : ClientAbortError, not waiting forever', async () => {
+			const req: IncomingMessage = fakeReq();
+
+			req.on('error', (): void => {
+				// emitted before receiveBody() listens
 			});
+
+			req.destroy(resetError());
+			await new Promise((resolve): void => {
+				setImmediate(resolve);
+			});
+
+			const err: unknown = await receiveBody(req, 1000).then(() => undefined, (e: unknown) => e);
+
+			expect(err).to.be.instanceof(ClientAbortError);
+		});
+
+		it('closed without an error : ClientAbortError', async () => {
+			const req: IncomingMessage = fakeReq();
+			const received: Promise<Buffer> = receiveBody(req, 1000);
+
+			req.destroy();
+
+			const err: unknown = await received.then(() => undefined, (e: unknown) => e);
+
+			expect(err).to.be.instanceof(ClientAbortError);
+		});
+
+		[
+			Object.assign(new Error('internal failure'), { code: 'EPIPE' }),
+			new Error('aborted'),
+			new Error('boom')
+		].forEach((original: Error): void => {
+			it(`other stream error is not classified : ${ original.message } (${ (original as { code?: string }).code ?? 'no code' })`, async () => {
+				const req: IncomingMessage = fakeReq();
+				const received: Promise<Buffer> = receiveBody(req, 1000);
+
+				req.destroy(original);
+
+				const err: unknown = await received.then(() => undefined, (e: unknown) => e);
+
+				expect(err).to.be.equal(original);
+				expect(err).to.not.be.instanceof(ClientAbortError);
+			});
+		});
+
+		it('normal body : resolves', async () => {
+			const req: IncomingMessage = fakeReq();
+			const received: Promise<Buffer> = receiveBody(req, 1000);
+
+			req.push('{"a":1}');
+			req.push(null);
+
+			expect((await received).toString()).to.be.eql('{"a":1}');
 		});
 	});
 
@@ -39,6 +98,7 @@ describe('client closes the connection', () => {
 		let app: Badak;
 		let logs: unknown[][];
 		let unhandled: unknown[];
+		let savedListeners: NodeJS.UnhandledRejectionListener[] = [];
 
 		const originalConsoleError: typeof console.error = console.error;
 
@@ -72,12 +132,18 @@ describe('client closes the connection', () => {
 				logs.push(args);
 			};
 
+			// keep mocha's handler away, unhandled rejections are checked by the tests
+			savedListeners = process.listeners('unhandledRejection');
+			process.removeAllListeners('unhandledRejection');
 			process.on('unhandledRejection', onUnhandledRejection);
 		});
 
 		afterEach(async () => {
 			console.error = originalConsoleError;
 			process.off('unhandledRejection', onUnhandledRejection);
+			savedListeners.forEach((listener: NodeJS.UnhandledRejectionListener): void => {
+				process.on('unhandledRejection', listener);
+			});
 
 			if (app.isRunning()) {
 				await app.stop(0);
@@ -144,6 +210,69 @@ describe('client closes the connection', () => {
 
 			expect(logs).to.be.lengthOf(1);
 			expect(String(logs[0][0])).to.include('badak catch error');
+			expect(unhandled).to.be.eql([]);
+		});
+
+		// errors thrown by server code are not hidden, even if the connection is closed and the code looks like a connection error
+		[
+			['EPIPE', Object.assign(new Error('internal failure'), { code: 'EPIPE' })],
+			['ECONNRESET', Object.assign(new Error('upstream reset'), { code: 'ECONNRESET' })],
+			['message aborted', new Error('aborted')]
+		].forEach(([name, thrown]: (string | Error)[]): void => {
+			[true, false].forEach((preventError: boolean): void => {
+				it(`handler error after the client closed the connection (${ name as string }) : logged, preventError: ${ preventError }`, async () => {
+					app = new Badak({ catchErrorLog: true, preventError });
+
+					await app.get('/slow-error', async (): Promise<never> => {
+						await wait(80);
+						throw thrown;
+					});
+
+					await app.listen(TestPort);
+
+					await new Promise<void>((resolve): void => {
+						const socket: Socket = connect(TestPort, '127.0.0.1', (): void => {
+							socket.write('GET /slow-error HTTP/1.1\r\nHost: localhost\r\n\r\n');
+
+							setTimeout((): void => {
+								socket.destroy();
+								resolve();
+							}, 20);
+						});
+					});
+
+					await wait(150);
+
+					expect(logs).to.be.lengthOf(1);
+					expect(logs[0][1]).to.be.equal(thrown);
+
+					// passed to Node.js only with preventError: false, as before
+					expect(unhandled).to.be.eql(preventError ? [] : [thrown]);
+				});
+			});
+		});
+
+		it('client closes the connection during async auth() : not logged, after() runs, not waiting forever', async () => {
+			let afterRunFlag: boolean = false;
+
+			app = new Badak({ catchErrorLog: true });
+
+			await app.auth(async (): Promise<void> => {
+				await wait(80);
+			});
+
+			await app.after((): void => {
+				afterRunFlag = true;
+			});
+
+			await app.post('/upload', (): string => 'ok');
+			await app.listen(TestPort);
+
+			await abortWhileSendingBody();
+			await wait(150);
+
+			expect(afterRunFlag).to.be.true;
+			expect(logs).to.be.eql([]);
 			expect(unhandled).to.be.eql([]);
 		});
 

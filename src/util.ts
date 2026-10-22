@@ -26,22 +26,6 @@ export const isResponseStarted = (res: ServerResponse): boolean => {
 	return res.headersSent || res.writableEnded;
 };
 
-// error caused by the client closing the connection, e.g. while the request body is received
-// not a server error : nothing can be responded, and it is not logged
-const CONNECTION_ERROR_CODES: string[] = ['ECONNRESET', 'ECONNABORTED', 'EPIPE', 'ERR_STREAM_PREMATURE_CLOSE'];
-
-export const isClientAbortError = (res: ServerResponse, err: unknown): boolean => {
-	if (!res.destroyed) {
-		// the connection is open, the error is not caused by closing it
-		return false;
-	}
-
-	const code: unknown = (err as { code?: unknown } | null)?.code;
-
-	return (typeof code === 'string' && CONNECTION_ERROR_CODES.includes(code))
-		|| (err as { message?: unknown } | null)?.message === 'aborted';
-};
-
 // decode percent-encoded uri fragment, malformed encoding is client's fault
 export const decodeUriFrag = (uriFrag: string): string => {
 	try {
