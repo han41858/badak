@@ -71,7 +71,8 @@ export const createApp = async ({ token, log }: SampleAppOption): Promise<Badak>
 	// 2. access log, after the response
 	if (log !== undefined) {
 		await app.after((req: IncomingMessage, res: ServerResponse): void => {
-			log(`${ req.method } ${ req.url } ${ res.statusCode }`);
+			// res.writableEnded is false if the client closed the connection while sending the request body
+			log(`${ req.method } ${ req.url } ${ res.writableEnded ? res.statusCode : 'closed' }`);
 		});
 	}
 

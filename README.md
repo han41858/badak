@@ -114,6 +114,10 @@ Registers a middleware function to run **after** the routing function is execute
 Multiple middleware functions can be specified,
 and they are executed in parallel regardless of the order in which they are specified.
 
+`after()` functions run for every request, also if the client closed the connection before the response.
+If the client closed the connection while sending the request body, the routing function is not executed,
+no response is sent, and `res.writableEnded` is `false` in `after()` functions.
+
 ### `config(key: string, value: unknown): Promise<void>`
 
 Controls how badak apps run.
@@ -300,6 +304,7 @@ If an error occurs, a log is output to the console.
 - Logged : `5xx` `HttpError`, and other errors such as `Error`, including an error thrown in the `auth()` function.
 - Not logged : `4xx` `HttpError`, and `4xx` responses made by badak such as `404 Not Found`, `405 Method Not Allowed`,
   `400 Bad Request` (malformed body) and `413 Payload Too Large`, because they are intended client error responses.
+- Not logged : the client closing the connection, e.g. while sending the request body (`ECONNRESET`). It is not a server error, and nothing can be responded.
 
 The default is `true`.
 
@@ -646,6 +651,9 @@ await app.setSPARoot('/', path.join(__dirname, 'public'));
 
 ```typescript
 await app.after((req, res) => {
-	console.log(`${ req.method } ${ req.url } ${ res.statusCode }`);
+	// false if the client closed the connection while sending the request body
+	const status = res.writableEnded ? res.statusCode : 'closed';
+
+	console.log(`${ req.method } ${ req.url } ${ status }`);
 });
 ```

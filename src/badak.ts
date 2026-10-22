@@ -34,6 +34,7 @@ import { checkUriDuplication, findRoute, findRouteFunction, mergeRouteRule, refi
 import {
 	checkAbsolutePath,
 	checkAbsoluteUri,
+	isClientAbortError,
 	isExistFile,
 	isFolder,
 	isResponseStarted,
@@ -509,6 +510,13 @@ export class Badak {
 				catch (e) {
 					const err: Error | TypedObject<unknown> = e as Error | TypedObject<unknown>;
 
+					// the client closed the connection (e.g. while sending the request body)
+					// nothing can be responded, not a server error : not logged, not passed to Node.js
+					// after() functions still run, the response is not completed (res.writableEnded is false)
+					if (isClientAbortError(res, err)) {
+						return;
+					}
+
 					// HttpError of 4xx is an intended client error response, not logged
 					// 5xx and other errors (including Error('Forbidden')) are logged
 					if (
@@ -518,7 +526,10 @@ export class Badak {
 						console.error('badak catch error : %o', err);
 					}
 
-					sendErrorResponse(res, err, this._config.catchErrorLog, setResponseBody);
+					// the connection is closed already, don't respond
+					if (!res.destroyed) {
+						sendErrorResponse(res, err, this._config.catchErrorLog, setResponseBody);
+					}
 
 					if (!this._config.preventError) {
 						throw err;
