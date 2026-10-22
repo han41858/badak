@@ -102,7 +102,7 @@ const appWithLog: Badak = new Badak({
 
 미들웨어 함수에서 에러가 발생하면(거부된 Promise를 반환하는 경우 포함) 라우팅 함수는 실행되지 않으며,
 라우팅 함수에서 에러가 발생했을 때와 같은 방식으로 에러 상태 코드로 응답합니다.
-예를 들어 `throw new Error('Forbidden')`은 `403 Forbidden`으로, 그 외의 에러는 `500 Internal Server Error`로 응답합니다.
+예를 들어 `throw new HttpError(403)`은 `403 Forbidden`으로, 그 외의 에러는 `500 Internal Server Error`로 응답합니다.
 미들웨어 함수가 직접 응답한 경우(`res.end()` 등)에도 라우팅 함수는 실행되지 않습니다.
 
 ### `after(fnc: MiddlewareFunction): Promise<void>`
@@ -235,8 +235,7 @@ app.get('/limited', () => {
 - `option.cause` : 로그용 원본 에러입니다.
 
 그 외의 에러는 에러 메시지 없이 `500 Internal Server Error`로 응답합니다.
-호환성을 위해 `new Error('Forbidden')`처럼 메시지가 상태 문구인 `Error`는 해당 상태 코드로 응답합니다
-(`Bad Request`, `Unauthorized`, `Forbidden`, `Not Found`, `Method Not Allowed`, `Not Acceptable`, `Payload Too Large`).
+에러 메시지를 상태 코드로 바꾸지 않습니다. `new Error('Forbidden')`은 `500`으로 응답하므로 `new HttpError(403)`을 사용하세요(5.0.0에서 변경).
 
 어떤 값이 `HttpError`인지는 `isHttpError(value)`로 확인할 수 있습니다.
 

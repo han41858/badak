@@ -149,27 +149,6 @@ export const sendErrorResponse = (
 ): void => {
 	let responseBody: unknown;
 
-	interface HttpResStatusCode {
-		code: number;
-		message: string;
-	}
-
-	const statusCodes: HttpResStatusCode[] = [
-		{ code: 400, message: 'Bad Request' },
-		{ code: 401, message: 'Unauthorized' },
-		{ code: 401, message: 'Unauthenticated' },
-		{ code: 403, message: 'Forbidden' },
-		{ code: 404, message: 'Not Found' },
-		{ code: 404, message: 'no rule' },
-		{ code: 405, message: 'Method Not Allowed' },
-		{ code: 406, message: 'Not Acceptable' },
-		{ code: 413, message: 'Payload Too Large' }
-	];
-
-	const foundResult: HttpResStatusCode | undefined = statusCodes.find((def: HttpResStatusCode): boolean => {
-		return def.message == err.message;
-	});
-
 	// writing the error response must not throw again, it would escape the request handler
 	try {
 		if (isResponseStarted(res)) {
@@ -209,14 +188,11 @@ export const sendErrorResponse = (
 			setResponseBody(responseBody);
 			res.end(responseBody);
 		}
-		else if (foundResult) {
-			res.statusCode = foundResult.code;
-			res.end();
-		}
 		else {
 			res.statusCode = 500; // Internal Server Error
 
 			// don't expose internal error message to client, it is logged by catchErrorLog
+			// the message is not mapped to a status code, e.g. Error('Forbidden') is 500 (5.0.0), use HttpError(403)
 			// thrown non-Error value (e.g. throw { reason }) is sent as the body if serializable
 			const serialized: SerializedBody = (
 				!(err instanceof Error) && err !== undefined && err !== null

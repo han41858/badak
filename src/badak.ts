@@ -514,7 +514,11 @@ export class Badak {
 							}
 
 							// general Error from auth function is logged (e.g. DB failure in auth), responds 401
-							throw new Error('Unauthorized', { cause: e });
+							if (this._config.catchErrorLog) {
+								console.error('badak catch error : %o', e);
+							}
+
+							throw new HttpError(401, { cause: e });
 						}
 
 						if (isResponseStarted(res)) {
@@ -563,7 +567,7 @@ export class Badak {
 					}
 
 					// HttpError of 4xx is an intended client error response, not logged
-					// 5xx and other errors (including Error('Forbidden')) are logged
+					// 5xx and other errors (including Error('Forbidden'), it is 500) are logged
 					if (
 						this._config.catchErrorLog
 						&& !(isHttpError(err) && err.status < 500)
