@@ -407,37 +407,36 @@ so an unauthenticated request is rejected without receiving the body up to this 
 
 ## Special Routing
 
-Special routing can be used on the routes of the `route()`, `get()`, `post()`, `put()`, and `delete()` functions.
+Special routing can be used on the routes of the `route()`, `get()`, `post()`, `put()`, `patch()` and `delete()` functions.
+**A request matches only one route per method** : routes that can match the same request path throw an error when they are registered, see [One route per request](#one-route-per-request).
+The full specification is in [`docs/routing-spec-5.0.0.md`](https://github.com/han41858/badak/blob/main/docs/routing-spec-5.0.0.md) (Korean).
+
+| Pattern | Meaning | Matches | Doesn't match |
+|---|---|---|---|
+| `users` | literal | `users` | `user` |
+| `:id` | one uri fragment, 1 or more characters | `7`, `me` | |
+| `*` | one uri fragment, 1 or more characters | `a.png` | |
+| `ab?cd` | the character just before `?` 0 or 1 time | `acd`, `abcd` | `abbcd` |
+| `ab+cd` | the character just before `+` 1 or more times | `abcd`, `abbcd` | `acd` |
+| `ab*cd` | any characters (0 or more) between `ab` and `cd` | `abcd`, `abXYZcd` | `acd`, `aXcd` |
+| `*.png` | any characters, then `.png` | `a.png` | `a.jpg` |
+| `**` | the rest of the path, fallback | | |
+
+- `?` and `+` apply to the one character just before them. `*` is a wildcard and doesn't apply to the character before it.
+- They can be combined in a uri fragment, e.g. `ab?c+d`, `a*b*c`, `*abc`.
+- Invalid patterns throw `invalid route '...'` when they are registered : `?` or `+` without a character before it (`?abc`), adjacent syntax characters (`ab??`, `ab?*`, `a**b`), and `:` not at the beginning (`ab:id`).
+- Other characters are literal, including characters with special meaning in regular expressions (e.g. `.`, `(`, `)`). `/a.c?` matches `/a.c` and `/a.`, not `/abc`.
+- Percent-encoded characters are always literal. `/a%2Ab` matches only `/a*b` (or `/a%2Ab`), `%2A%2A` is a normal uri fragment `**`, not a fallback.
+- The matched uri fragment is in `ctx.params` : by the name for `:` routing (`{ id: '7' }`), by `'*'` for `*`, and by the routing pattern for others (`{ 'ab*cd': 'abXcd' }`).
 
 ### `:` routing
 
 If you specify a routing path with `/:userId` and send an HTTP request to `/user1`,
 the request is matched and `ctx.params` contains `{ userId: 'user1' }`.
 
-### `?` routing
-
-`?` makes the character just before it optional.
-If you specify the routing path as `/users?`, you can match the `/user` and `/users` paths.
-The matched fragment is available in `ctx.params`, keyed by the routing pattern, e.g. `{ 'users?': 'user' }`.
-
-- Other characters are literal, including characters with special meaning in regular expressions (e.g. `.`, `(`, `)`, `[`, `]`). `/a.c?` matches `/a.c` and `/a.`, not `/abc`.
-- `??`, and `?` with `+` or `*` in the same uri fragment (e.g. `/ab?c+`), throw an error when they are registered.
-- `?` routing paths that can match the same uri fragment can't be registered together, regardless of the registration order. For example, `/ab?c` and `/a?bc` both match `/abc`, so registering the second one throws `duplicated question routing`. A normal routing path matched by a `?` routing path (e.g. `/abc` and `/ab?c`) throws in the same way.
-
-### `+` routing
-
-`+` makes the character just before it repeat 1 or more times, other characters are literal.
-If you specify the routing path as `/user1+`, you can match paths such as `/user1` and `/user11`.
-The matched fragment is available in `ctx.params`, keyed by the routing pattern, e.g. `{ 'user1+': 'user11' }`.
-
-- Other characters are literal, including characters with special meaning in regular expressions.
-- `++`, and `+` with `*` in the same uri fragment, throw an error when they are registered.
-- `+` routing paths that can match the same uri fragment can't be registered together, regardless of the registration order. For example, `/aab+` and `/a+bb` both match `/aabb`, so registering the second one throws `duplicated plus routing`. A normal routing path matched by a `+` routing path (e.g. `/abbc` and `/ab+c`) throws in the same way.
-- A `?` routing path and a `+` routing path that can match the same uri fragment throw `duplicated question and plus routing`, e.g. `/colou?r` and `/colou+r` both match `/colour`.
-
 ### `*` routing
 
-`*` matches exactly one uri fragment; its value is available as `ctx.params['*']`.
+`*` as a whole uri fragment matches exactly one uri fragment; its value is available as `ctx.params['*']`.
 
 ```typescript
 await app.get('/img/*', ({ params }) => params);
@@ -445,10 +444,6 @@ await app.get('/img/*', ({ params }) => params);
 // GET /img/a.png -> { '*': 'a.png' }
 // GET /img, /img/, /img/a/b -> 404
 ```
-
-`*` in a uri fragment matches any characters in the uri fragment, together with the character just before it. Other characters are literal.
-If you specify a routing path as `/user1*`, you can match paths such as `/user`, `/user1`, and `/user11`.
-Only one `*` can be used in a uri fragment, and it should follow a character (`/*abc` throws an error).
 
 ### `**` routing
 
@@ -466,19 +461,39 @@ await app.get('/files/**', ({ params, query }) => ({ params, query }));
 - `%2F` in a uri fragment is decoded to `/` too, so `/files/a%2Fb` and `/files/a/b` pass the same value.
 - A malformed percent-encoding in the rest of the path responds `400 Bad Request`.
 - `**` matches 0 or more uri fragments. `/files/**` matches `/files`, `/files/`, `/files/a` and `/files/a/b`, and `**` is `''` for `/files` and `/files/`. `/**` matches `/` too.
-- `**` is a fallback. It is used only if the path doesn't match other routes fully, see [Routing priority](#routing-priority).
+- `**` is a fallback. It is used only if the path doesn't match other routes fully, see [One route per request](#one-route-per-request).
 
-### Routing priority
+### One route per request
 
-For each uri fragment, routes are matched in this order, regardless of the registration order.
+Routes of the same method conflict if they have the same number of uri fragments and every uri fragment can match the same characters.
+A conflict throws `Conflicting routes for <METHOD>` when the second one is registered, regardless of the registration order. There is no priority between routes.
 
-1. normal routing (e.g. `/users/me`)
-2. `:` routing (e.g. `/users/:id`)
-3. `?` routing
-4. `+` routing
-5. `*` routing (`*` and `ab*cd`)
+| Routes | Result |
+|---|---|
+| `GET /users/me`, `GET /users/:id` | conflict, both match `/users/me` |
+| `GET /img/*`, `GET /img/:id` | conflict |
+| `GET /abc`, `GET /ab+c` | conflict, both match `/abc` |
+| `GET /ab*cd`, `GET /ab%2Acd` | conflict, both match `/ab%2Acd` (`ab*cd`) |
+| `GET /a/:id/details`, `GET /a/b+/settings` | registered, the last uri fragments don't overlap |
+| `GET /users/:id/a`, `GET /users/:name/b` | registered |
+| `GET /a/:id`, `POST /a/b+` | registered, different methods |
+| `GET /users/:id`, `GET /users/:id` | registered again, the latter replaces the former |
 
-`**` is used only if the request path doesn't match a route fully, and the deepest `**` along the matched path is used.
+Every route matching the request path is found, not only the first one, and the routing function is selected by the method.
+If the path matches routes but none for the method, badak responds `405 Method Not Allowed` with the methods of all of them in the `Allow` header.
+
+```typescript
+await app.get('/a/:id', getFnc);
+await app.post('/a/b+', postFnc);
+
+// GET  /a/bb -> getFnc, { id: 'bb' }
+// POST /a/bb -> postFnc, { 'b+': 'bb' }
+// PUT  /a/bb -> 405, Allow: GET, HEAD, POST
+```
+
+`**` routes are not compared with other routes. They are used only if the request path doesn't match a route fully, and the deepest one is used.
+`**` routes of the same method and the same depth (the number of uri fragments before `**`) conflict if the parts before `**` can match the same path, e.g. `/a/:id/**` and `/a/b+/**` throw `Conflicting fallback routes for GET at depth 2`.
+
 For example, with `setSPARoot('/')` (`/**`), `/style.css` and `/api/users` are handled by their own routes, and other paths respond `index.html`.
 
 ```typescript
@@ -493,6 +508,9 @@ await app.get('/api/users/:id', userFnc);
 ```
 
 If the path matches a route fully but no routing function is registered for the method, badak responds `405 Method Not Allowed` without using `**`.
+
+Static file routes of `static()` and `setSPARoot()` are registered in `listen()` and checked in the same way, e.g. `static('/', dir)` with `style.css` conflicts with `GET /:slug`.
+A conflict rejects `listen()` and the server doesn't start. Nothing is registered partially.
 
 ### Non-ASCII and percent-encoded paths
 
