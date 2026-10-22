@@ -274,8 +274,10 @@ Middleware functions cannot change the arguments passed to the routing function.
 ### `RouteFunction`
 
 ```typescript
-export type RouteFunction = (ctx: ParamContext, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
+export type RouteFunction<T extends CheckedParamTypes<T> = ParamTypes> = (ctx: ParamContext<T>, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
 ```
+
+`T` is the named generic of the request fields, see [Generic request types](#generic-request-types). Without it, `ctx` is `ParamContext` with the default types.
 
 Register a routing function to respond to HTTP requests.
 The value returned by the routing function is returned as an HTTP response.
