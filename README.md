@@ -604,10 +604,20 @@ The request body is parsed by `Content-Type` (compared case-insensitively, param
 |---|---|---|
 | `application/json` | the parsed JSON value | malformed JSON, including JSON starting with a UTF-8 BOM |
 | `application/x-www-form-urlencoded` | an object of strings, `key[]` for arrays | |
-| `multipart/form-data` | an object : fields are strings, files are `Buffer` (or strings for `text/plain` files), `key[]` for arrays | no `boundary` |
-| other types (e.g. `text/plain`, `application/octet-stream`), or no `Content-Type` | `undefined` : the body is received up to `bodyLimit` and discarded, it can't be read from `req` | |
+| `multipart/form-data` | an object : fields are strings, `text/plain` files are UTF-8 strings (see below), other files are `Buffer`, `key[]` for arrays | no `boundary` |
+| `text/*` without `charset`, or with `charset=utf-8` | a UTF-8 string | malformed UTF-8 |
+| `text/*` with another `charset` (e.g. `euc-kr`) | the original `Buffer`, not decoded | |
+| other types (e.g. `application/octet-stream`, `image/png`), or no `Content-Type` | the original `Buffer` | |
 
-An empty body is `undefined` for every type. A body over `bodyLimit` responds `413 Payload Too Large`.
+- An empty body is `undefined` for every type. A body over `bodyLimit` responds `413 Payload Too Large`.
+- `text/*` is UTF-8 if `charset` is not specified (a badak policy). `charset` is case-insensitive and can be quoted, `utf-8` and `utf8` are UTF-8.
+  UTF-8 is decoded strictly : malformed bytes respond `400`, they are not replaced with `U+FFFD`. Other charsets are not decoded, decode the `Buffer` if needed.
+- `charset` more than once (e.g. `charset=utf-8; charset=euc-kr`) or an empty `charset` is ambiguous, the body is the original `Buffer`.
+- A UTF-8 BOM at the beginning of a text body is removed from the string. Use another `Content-Type` (e.g. `application/octet-stream`) to receive the bytes as they are.
+- A `text/plain` file of `multipart/form-data` (or a file without `Content-Type`, `text/plain` by RFC 7578) follows the same rule, a string or a `Buffer`.
+  Send binary files with their `Content-Type` (e.g. `image/png`, `application/octet-stream`) : a binary file without `Content-Type` is decoded as UTF-8, and the request responds `400`. Browsers and `curl -F` send it for files.
+- `parseNumber` and `parseDate` are not applied to string and `Buffer` bodies.
+- The original bytes of JSON, form and multipart bodies are not available (e.g. for HMAC signatures of webhooks).
 
 ## Examples
 
@@ -649,7 +659,7 @@ await app.delete<{ params: { id: string } }>('/api/users/:id', ({ params }, req,
 
 ### File upload
 
-For `multipart/form-data`, fields are strings, and files are `Buffer` (or strings for `text/plain` files).
+For `multipart/form-data`, fields are strings, and files are `Buffer` (or UTF-8 strings for `text/plain` files).
 `bodyLimit` of a route allows larger bodies for this route only.
 
 ```typescript

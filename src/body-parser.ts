@@ -127,114 +127,152 @@ export const convertParam = (param: TypedObject<unknown>, option: ParamConvertOp
 	return param;
 };
 
-// parse request body by content-type
-// throws on malformed body, caller should handle it
-export const parseBody = (req: IncomingMessage, bodyBuffer: Buffer, option: ParamConvertOption): TypedObject<unknown> | undefined => {
+// charset of 'text/*' : UTF-8 if not specified, a badak policy (docs : README, request body)
+// - no charset parameter : UTF-8
+// - one charset parameter of 'utf-8' or 'utf8' (case-insensitive, quoted or not) : UTF-8
+// - other charsets, an empty charset, or charset more than once (an error by RFC 6838 4.3) : not UTF-8, not decoded
+const isUtf8Charset = (contentTypeHeader: string): boolean => {
+	const charsets: string[] = [...contentTypeHeader.matchAll(/;\s*charset\s*=\s*(?:"([^"]*)"|([^;\s]*))/gi)]
+		.map((matching: RegExpMatchArray): string => (matching[1] ?? matching[2]).trim().toLowerCase());
+
+	return charsets.length === 0
+		|| (charsets.length === 1 && ['utf-8', 'utf8'].includes(charsets[0]));
+};
+
+// strict UTF-8 decoding, malformed UTF-8 is client's fault (400), not replaced with U+FFFD
+const decodeUtf8 = (buffer: Buffer): string => {
+	try {
+		return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+	}
+	catch (e: unknown) {
+		throw new HttpError(400, { cause: e });
+	}
+};
+
+const mediaTypeOf = (contentTypeHeader: string): string => {
+	return contentTypeHeader.split(';')[0].trim().toLowerCase();
+};
+
+// text decoded as UTF-8 if the charset is UTF-8 or not specified, otherwise the original bytes
+const textOrBuffer = (buffer: Buffer, contentTypeHeader: string): string | Buffer => {
+	return isUtf8Charset(contentTypeHeader)
+		? decodeUtf8(buffer)
+		: buffer;
+};
+
+// parse request body by content-type (media type is case-insensitive, RFC 9110)
+// - application/json, application/x-www-form-urlencoded, multipart/form-data : parsed, parseNumber & parseDate are applied
+// - text/* : string (UTF-8), or Buffer for other charsets
+// - other types, or no content-type : Buffer, the original bytes
+// - empty body : undefined
+// throws HttpError(400) on malformed body, caller should handle it
+export const parseBody = (req: IncomingMessage, bodyBuffer: Buffer, option: ParamConvertOption): unknown => {
+	if (bodyBuffer.byteLength === 0) {
+		return undefined;
+	}
+
+	const contentTypeInHeader: string | undefined = req.headers[HEADER_KEY.CONTENT_TYPE];
+
+	if (!contentTypeInHeader) {
+		return bodyBuffer;
+	}
+
+	const contentType: string = mediaTypeOf(contentTypeInHeader);
+
 	let param: TypedObject<unknown> | undefined;
 
-	const contentTypeInHeader: string = req.headers[HEADER_KEY.CONTENT_TYPE] as string;
+	switch (contentType) {
+		case 'multipart/form-data': {
+			const boundary: string | undefined = getMultipartBoundary(contentTypeInHeader);
 
-	if (contentTypeInHeader) {
-		// media type is case-insensitive (RFC 9110), e.g. 'Application/JSON'
-		const [contentType] = contentTypeInHeader
-			.split(';')
-			.map((s: string): string => s.trim().toLowerCase());
+			if (boundary === undefined) {
+				// boundary is mandatory for multipart/form-data
+				throw new HttpError(400);
+			}
 
-		if (bodyBuffer.byteLength > 0) {
-			switch (contentType) {
-				case 'multipart/form-data': {
-					const boundary: string | undefined = getMultipartBoundary(contentTypeInHeader);
+			parseMultipart(bodyBuffer, boundary).forEach((part: MultipartPart): void => {
+				let value: string | Buffer;
 
-					if (boundary === undefined) {
-						// boundary is mandatory for multipart/form-data
-						throw new HttpError(400);
-					}
+				if (part.filename === undefined) {
+					// normal field
+					value = part.data.toString();
+				}
+				else {
+					// file, text/plain is default by RFC 7578
+					// text/plain : string (UTF-8), or Buffer for other charsets, other files : Buffer
+					const fileContentType: string = part.contentType ?? CONTENT_TYPE.TEXT_PLAIN;
 
-					parseMultipart(bodyBuffer, boundary).forEach((part: MultipartPart): void => {
-						let value: string | Buffer;
-
-						if (part.filename === undefined) {
-							// normal field
-							value = part.data.toString();
-						}
-						else {
-							// file, text/plain is default by RFC 7578
-							const fileContentType: string = (part.contentType ?? CONTENT_TYPE.TEXT_PLAIN).toLowerCase();
-
-							value = fileContentType.startsWith(CONTENT_TYPE.TEXT_PLAIN)
-								? part.data.toString()
-								: part.data;
-						}
-
-						if (!param) {
-							param = {} as TypedObject<unknown>;
-						}
-
-						if (part.name.endsWith('[]')) {
-							// array
-							const arrayName: string = part.name.replace(/\[]$/g, '');
-
-							if (param[arrayName]) {
-								(param[arrayName] as Array<unknown>).push(value);
-							}
-							else {
-								param[arrayName] = [value];
-							}
-						}
-						else {
-							param[part.name] = value;
-						}
-					});
-					break;
+					value = mediaTypeOf(fileContentType) === CONTENT_TYPE.TEXT_PLAIN
+						? textOrBuffer(part.data, fileContentType)
+						: part.data;
 				}
 
-				case CONTENT_TYPE.APPLICATION_JSON:
-					if (bodyBuffer.byteLength > 0) {
-						try {
-							param = JSON.parse(bodyBuffer.toString());
-						}
-						catch (e: unknown) {
-							// malformed JSON is client's fault
-							throw new HttpError(400, { cause: e });
-						}
+				if (!param) {
+					param = {} as TypedObject<unknown>;
+				}
+
+				if (part.name.endsWith('[]')) {
+					// array
+					const arrayName: string = part.name.replace(/\[]$/g, '');
+
+					if (param[arrayName]) {
+						(param[arrayName] as Array<unknown>).push(value);
 					}
-					// no payload, but ok
-					break;
-
-				case CONTENT_TYPE.APPLICATION_WWW_FORM_URLENCODED:
-					if (bodyBuffer.byteLength > 0) {
-						// URLSearchParams decodes '+' and percent-encoding
-						new URLSearchParams(bodyBuffer.toString())
-							.forEach((value: string, key: string): void => {
-								if (!param) {
-									param = {} as TypedObject<unknown>;
-								}
-
-								if (key.endsWith('[]')) {
-									// array
-									const arrayName: string = key.replace(/\[]$/g, '');
-
-									if (param[arrayName] !== undefined) {
-										(param[arrayName] as Array<unknown>).push(value);
-									}
-									else {
-										param[arrayName] = [value];
-									}
-								}
-								else {
-									param[key] = value;
-								}
-							});
+					else {
+						param[arrayName] = [value];
 					}
-
-					// no payload, but ok
-					break;
-			}
-
-			if (param) {
-				param = convertParam(param, option);
-			}
+				}
+				else {
+					param[part.name] = value;
+				}
+			});
+			break;
 		}
+
+		case CONTENT_TYPE.APPLICATION_JSON:
+			try {
+				param = JSON.parse(bodyBuffer.toString());
+			}
+			catch (e: unknown) {
+				// malformed JSON is client's fault
+				throw new HttpError(400, { cause: e });
+			}
+			break;
+
+		case CONTENT_TYPE.APPLICATION_WWW_FORM_URLENCODED:
+			// URLSearchParams decodes '+' and percent-encoding
+			new URLSearchParams(bodyBuffer.toString())
+				.forEach((value: string, key: string): void => {
+					if (!param) {
+						param = {} as TypedObject<unknown>;
+					}
+
+					if (key.endsWith('[]')) {
+						// array
+						const arrayName: string = key.replace(/\[]$/g, '');
+
+						if (param[arrayName] !== undefined) {
+							(param[arrayName] as Array<unknown>).push(value);
+						}
+						else {
+							param[arrayName] = [value];
+						}
+					}
+					else {
+						param[key] = value;
+					}
+				});
+			break;
+
+		default:
+			// not parsed, parseNumber & parseDate are not applied
+			return contentType.startsWith('text/')
+				? textOrBuffer(bodyBuffer, contentTypeInHeader)
+				: bodyBuffer;
+	}
+
+	if (param) {
+		param = convertParam(param, option);
 	}
 
 	return param;
@@ -332,7 +370,7 @@ export const parseRequestBody = async (
 	req: IncomingMessage,
 	bodyLimit: number,
 	option: ParamConvertOption
-): Promise<TypedObject<unknown> | undefined> => {
+): Promise<unknown> => {
 	const bodyBuffer: Buffer = await receiveBody(req, bodyLimit);
 
 	// throws on malformed body

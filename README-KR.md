@@ -592,10 +592,20 @@ await app.patch('/users/:id', (ctx) => ctx);
 |---|---|---|
 | `application/json` | 파싱한 JSON 값 | 잘못된 JSON, UTF-8 BOM으로 시작하는 JSON 포함 |
 | `application/x-www-form-urlencoded` | 문자열 값의 객체, 배열은 `key[]` | |
-| `multipart/form-data` | 객체 : 필드는 문자열, 파일은 `Buffer`(`text/plain` 파일은 문자열), 배열은 `key[]` | `boundary` 없음 |
-| 그 밖의 타입(예: `text/plain`, `application/octet-stream`), 또는 `Content-Type` 없음 | `undefined` : 본문은 `bodyLimit`까지 받은 뒤 버리며, `req`에서 읽을 수 없음 | |
+| `multipart/form-data` | 객체 : 필드는 문자열, `text/plain` 파일은 UTF-8 문자열(아래 참고), 그 밖의 파일은 `Buffer`, 배열은 `key[]` | `boundary` 없음 |
+| `text/*`, `charset` 없음 또는 `charset=utf-8` | UTF-8 문자열 | 잘못된 UTF-8 |
+| `text/*`, 그 밖의 `charset`(예: `euc-kr`) | 디코딩하지 않은 원본 `Buffer` | |
+| 그 밖의 타입(예: `application/octet-stream`, `image/png`), 또는 `Content-Type` 없음 | 원본 `Buffer` | |
 
-본문이 비어 있으면 모든 타입에서 `undefined`입니다. `bodyLimit`을 넘는 본문은 `413 Payload Too Large`로 응답합니다.
+- 본문이 비어 있으면 모든 타입에서 `undefined`입니다. `bodyLimit`을 넘는 본문은 `413 Payload Too Large`로 응답합니다.
+- `text/*`는 `charset`이 없으면 UTF-8로 봅니다(badak 정책). `charset`은 대소문자를 구분하지 않고 따옴표로 감쌀 수 있으며, `utf-8`과 `utf8`을 UTF-8로 봅니다.
+  UTF-8은 엄격하게 디코딩합니다. 잘못된 바이트는 `U+FFFD`로 바꾸지 않고 `400`으로 응답합니다. 그 밖의 charset은 디코딩하지 않으므로 필요하면 `Buffer`를 직접 디코딩하세요.
+- `charset`이 두 번 이상 있거나(예: `charset=utf-8; charset=euc-kr`) 값이 비어 있으면 모호하므로 원본 `Buffer`입니다.
+- 텍스트 본문 맨 앞의 UTF-8 BOM은 문자열에서 제거합니다. 바이트를 그대로 받으려면 다른 `Content-Type`(예: `application/octet-stream`)을 사용하세요.
+- `multipart/form-data`의 `text/plain` 파일(`Content-Type`이 없는 파일은 RFC 7578에 따라 `text/plain`)도 같은 규칙으로 문자열 또는 `Buffer`입니다.
+  바이너리 파일은 `Content-Type`(예: `image/png`, `application/octet-stream`)을 지정해 보내세요. `Content-Type` 없는 바이너리 파일은 UTF-8로 디코딩하므로 요청이 `400`이 됩니다. 브라우저와 `curl -F`는 파일에 `Content-Type`을 붙여 보냅니다.
+- `parseNumber`와 `parseDate`는 문자열과 `Buffer` 본문에 적용하지 않습니다.
+- JSON, form, multipart 본문의 원본 바이트는 제공하지 않습니다(예: 웹훅의 HMAC 서명 검증).
 
 ## 예제
 
@@ -637,7 +647,7 @@ await app.delete<{ params: { id: string } }>('/api/users/:id', ({ params }, req,
 
 ### 파일 업로드
 
-`multipart/form-data`의 필드는 문자열, 파일은 `Buffer`(`text/plain` 파일은 문자열)입니다.
+`multipart/form-data`의 필드는 문자열, 파일은 `Buffer`(`text/plain` 파일은 UTF-8 문자열)입니다.
 라우트의 `bodyLimit`으로 이 라우트에만 더 큰 본문을 허용할 수 있습니다.
 
 ```typescript

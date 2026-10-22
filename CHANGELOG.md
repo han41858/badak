@@ -12,6 +12,13 @@ These changes break backward compatibility and are planned for 5.0.0. See [`docs
 - `*` in a uri fragment is a wildcard : any characters, 0 or more. The character before it is literal. `ab*cd` matches `abcd` and `abXYZcd`, not `acd` and `aXcd`.
 - `?`, `+` and `*` can be combined in a uri fragment, e.g. `ab?c+d`, `a*b*c`, `*abc`. Adjacent syntax characters (`ab??`, `ab?*`, `a**b`), `?` or `+` without a character before it, and `:` not at the beginning throw `invalid route '...'`.
 - Static file routes of `static()` and `setSPARoot()` are checked in `listen()` with the other routes, at once. A conflict rejects `listen()` and nothing is registered partially. `listen()` after `stop()` doesn't duplicate the static cache.
+- Request bodies of `Content-Type`s that are not parsed are available in `ctx.body`, they were received and discarded (`ctx.body` was `undefined`, and the body couldn't be read from `req`). ([#73](https://github.com/han41858/badak/pull/73))
+  - `text/*` without `charset` or with `charset=utf-8` : a UTF-8 string, decoded strictly. Malformed UTF-8 responds `400`.
+  - `text/*` with another `charset`, an empty `charset`, or `charset` more than once : the original `Buffer`, not decoded.
+  - a UTF-8 BOM at the beginning is removed from the string.
+  - other types and no `Content-Type` : the original `Buffer`.
+  - `text/plain` files of `multipart/form-data` follow the same rule : malformed UTF-8 responds `400`, and another `charset` is a `Buffer`. They were decoded leniently as UTF-8 for any `charset` before.
+  - an empty body is `undefined`, `bodyLimit` and `auth()` before receiving the body are not changed. The original bytes of JSON, form and multipart bodies are not available yet.
 - An `Error` whose message is a status text is not mapped to the status code : `new Error('Forbidden')` responds `500`, it responded `403` before. Errors of other libraries with such messages (e.g. `Error('Not Found')`) responded `4xx` without being logged as server errors. Use `HttpError`, e.g. `new HttpError(403)`. The removed messages are `Bad Request`, `Unauthorized`, `Unauthenticated`, `Forbidden`, `Not Found`, `no rule`, `Method Not Allowed`, `Not Acceptable` and `Payload Too Large`. ([#71](https://github.com/han41858/badak/pull/71))
   - a general `Error` thrown in `auth()` still responds `401` and is logged.
 - Error messages of route registration are changed : `duplicated colon/question/plus/asterisk routing` and `duplicated question and plus routing` are `Conflicting routes for <METHOD>:` with both paths, and syntax errors are `invalid route '<uri fragment>' : <reason>`.
@@ -43,6 +50,8 @@ These changes break backward compatibility and are planned for 5.0.0. See [`docs
 | register `/ab*` and `/xy*` | throws | registered | - |
 | check the error messages of route registration | `duplicated … routing` | `Conflicting routes for …` | change the expected messages |
 | throw `new Error('Forbidden')` (or another status text) for a status code | `403` | `500` | throw `new HttpError(403)` |
+| expect `ctx.body` to be `undefined` for `text/plain`, `application/octet-stream` or no `Content-Type` | `undefined` | a string or a `Buffer` | check `ctx.body` by its type |
+| send `text/plain` files of `multipart/form-data` in a charset other than UTF-8 | a broken string | a `Buffer` (or `400` for malformed UTF-8 without `charset`) | decode the `Buffer`, or send `charset` |
 
 ## 4.1.0 (2026-10-22)
 
