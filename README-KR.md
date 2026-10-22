@@ -26,34 +26,50 @@ yarn add badak
 ## 사용방법
 
 ```typescript
-import { Badak, RouteRule } from 'badak';
+import { Badak, HttpError } from 'badak';
 
 interface User {
+	id: string;
 	name: string;
 }
 
-const rule: RouteRule = {
-	users: {
-		GET: () => {
-			// 사용자 목록을 반환합니다.
-			return {
-				list: ['han', 'kim', 'lee']
-			};
-		},
-		POST: (user: User) => {
-			// 사용자를 추가합니다.
-			return {
-				result: 'ok'
-			};
-		}
-	}
-};
-
-
+const users: Map<string, User> = new Map();
 const app: Badak = new Badak();
-await app.route(rule);
+
+// 반환값이 응답이 됩니다 : 객체 -> JSON, 문자열 -> 텍스트
+await app.get('/users', () => [...users.values()]);
+
+// 경로 파라미터 타입 지정, 예: GET /users/7 -> params.id === '7'
+await app.get<{ params: { id: string } }>('/users/:id', ({ params }) => {
+	const user: User | undefined = users.get(params.id);
+
+	if (user === undefined) {
+		throw new HttpError(404);
+	}
+
+	return user;
+});
+
+// POST, PUT, PATCH 요청 본문을 파싱합니다 (JSON, form, multipart)
+// 검증은 하지 않으므로 사용 전에 확인해야 합니다
+await app.post('/users', ({ body }) => {
+	const name: unknown = (body as { name?: unknown } | undefined)?.name;
+
+	if (typeof name !== 'string') {
+		throw new HttpError(400, { body: { message: 'name is required' } });
+	}
+
+	const user: User = { id: String(users.size + 1), name };
+	users.set(user.id, user);
+
+	return user;
+});
+
 await app.listen(3000);
 ```
+
+라우팅 함수는 `ctx`(`{ params, query, body }`)와 Node.js의 `req`, `res`를 인자로 받습니다. [라우팅 인자](#라우팅-인자)를 참고하세요.
+인증, 파일 업로드, 스트리밍, SPA는 [예제](#예제)를 참고하세요.
 
 ## 메서드
 
@@ -528,3 +544,92 @@ await app.patch('/users/:id', (ctx) => ctx);
 ```
 
 `parseNumber`와 `parseDate`는 query와 body의 문자열에만 적용하며 경로 캡처에는 적용하지 않습니다. Node.js의 `req`, `res`는 두 번째와 세 번째 인자로 그대로 전달됩니다.
+
+## 예제
+
+[`sample/app.ts`](https://github.com/han41858/badak/blob/main/sample/app.ts)는 아래 예제를 모은 작은 앱이며, 현재 버전으로 테스트합니다. `npx tsx sample/index.ts`로 실행할 수 있습니다.
+
+### 인증과 공개 라우트
+
+`auth()`는 요청 본문을 받기 전에 실행됩니다. `{ auth: false }`인 라우트, 정적 파일, SPA는 인증을 거치지 않습니다.
+
+```typescript
+await app.auth((req) => {
+	if (req.headers.authorization !== `Bearer ${ token }`) {
+		throw new HttpError(401, { headers: { 'WWW-Authenticate': 'Bearer' } });
+	}
+});
+
+await app.get('/api/health', () => ({ status: 'ok' }), { auth: false });
+```
+
+### 상태 코드와 헤더
+
+`res`로 지정하고, 본문은 반환합니다.
+
+```typescript
+await app.post('/api/users', ({ body }, req, res) => {
+	const user: User = createUser(body); // body 검증, 잘못되면 HttpError(400)
+
+	res.statusCode = 201;
+	res.setHeader('Location', `/api/users/${ user.id }`);
+
+	return user;
+});
+
+await app.delete<{ params: { id: string } }>('/api/users/:id', ({ params }, req, res) => {
+	deleteUser(params.id);
+	res.statusCode = 204; // 반환값 없음 : 빈 본문
+});
+```
+
+### 파일 업로드
+
+`multipart/form-data`의 필드는 문자열, 파일은 `Buffer`(`text/plain` 파일은 문자열)입니다.
+라우트의 `bodyLimit`으로 이 라우트에만 더 큰 본문을 허용할 수 있습니다.
+
+```typescript
+await app.post('/api/files', ({ body }) => {
+	const { name, file } = body as { name?: string, file?: Buffer | string };
+
+	if (file === undefined) {
+		throw new HttpError(400);
+	}
+
+	return { name, size: Buffer.byteLength(file) };
+}, { bodyLimit: 10 * 1024 * 1024 });
+```
+
+### 스트리밍 응답
+
+```typescript
+import { Readable } from 'node:stream';
+
+await app.get('/api/users.csv', (ctx, req, res) => {
+	res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+
+	// rows : CSV 행, 필드는 이스케이프해야 합니다 (sample/app.ts의 toCsvField() 참고)
+	return Readable.from(['id,name\r\n', ...rows]);
+});
+```
+
+### API와 SPA
+
+API 라우트와 정적 파일을 먼저 찾고, 그 밖의 경로에는 `index.html`을 응답합니다.
+
+```typescript
+await app.get('/api/users', listUsers);
+await app.setSPARoot('/', path.join(__dirname, 'public'));
+
+// GET /api/users  -> listUsers
+// GET /app.css    -> public/app.css
+// GET /users/1    -> public/index.html
+```
+
+### 접근 로그
+
+```typescript
+await app.after((req, res) => {
+	console.log(`${ req.method } ${ req.url } ${ res.statusCode }`);
+});
+```

@@ -6,7 +6,8 @@
 	},
 	"include": [
 		"src",
-		"spec/types"
+		"spec/types",
+		"sample"
 	],
 	// override "exclude" of tsconfig.json, which excludes "spec"
 	"exclude": [

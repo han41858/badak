@@ -30,7 +30,7 @@
 		"test": "mocha",
 		"test:types": "tsc --project tsconfig.types.json",
 		"test:types:dist": "tsx ./scripts/check-dist-types.ts",
-		"lint": "eslint src spec"
+		"lint": "eslint src spec sample"
 	},
 	"repository": {
 		"type": "git",

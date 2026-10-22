@@ -1,35 +1,21 @@
-import { Badak } from '../src/badak';
-import { ParamContext } from '../src/interfaces';
+import { Badak } from '../src/index';
+import { createApp } from './app';
 
-const getUserList = async (): Promise<{ list: string[] }> => {
-	return {
-		list: ['han', 'kim', 'lee']
-	};
-};
 
-const addUser = async ({ body }: ParamContext): Promise<{ result: string }> => {
-	console.log('addUser()', body);
-
-	return {
-		result: 'ok'
-	};
-};
-
-const port = 9000;
-const app: Badak = new Badak();
+const port: number = 9000;
 
 (async (): Promise<void> => {
-	await app.route({
-		'users': {
-			'GET': getUserList,
-			'POST': addUser
-		}
+	const app: Badak = await createApp({
+		token: process.env.API_TOKEN ?? 'secret',
+		log: (line: string): void => console.log(line)
 	});
 
 	await app.listen(port);
+
+	console.log(`badak sample is listening... [port : ${ port }]`);
+	console.log(`curl -H 'Authorization: Bearer secret' -H 'Content-Type: application/json' -d '{"name":"han"}' localhost:${ port }/api/users`);
 })()
-	.then(() => {
-		console.log(`Badak is listening... [port : ${ port }]`);
-	}, (err) => {
-		console.error('Badak listen failed :', err.message);
+	.catch((err: Error): void => {
+		console.error('badak sample failed :', err.message);
+		process.exitCode = 1;
 	});
