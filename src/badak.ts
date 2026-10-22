@@ -435,7 +435,7 @@ export class Badak {
 					const method: string = req.method.toUpperCase();
 					const { path: uriSanitized, queryStr } = splitUrl(toOriginForm(req.url as string));
 
-					const { rule: matchedRule, param: routeParam } = findRoute(this._routeRule, uriSanitized);
+					const { rule: matchedRule, param: routeParam } = findRoute(this._routeRule, uriSanitized, method);
 					const params: Record<string, string> = (routeParam ?? {}) as Record<string, string>;
 					const { targetFncObj, allowedMethods } = findRouteFunction(matchedRule, method);
 

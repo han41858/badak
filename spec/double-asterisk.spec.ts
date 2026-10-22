@@ -81,7 +81,9 @@ describe('** routing', () => {
 			// matched in 2.1.0 with { '*': 'img' }
 			['/img/*', '/img', false, undefined],
 			['/img/*', '/img/', false, undefined],
-			['/img/user1*', '/img/user', true, { 'user1*': 'user' }],
+			// 5.0.0 : '*' is a wildcard, the character before it is literal
+			['/img/user1*', '/img/user', false, undefined],
+			['/img/user1*', '/img/user1', true, { 'user1*': 'user1' }],
 			['/img/user1*', '/img/user11', true, { 'user1*': 'user11' }],
 			['/img/user1*', '/img/user11/x', false, undefined]
 		] as [string, string, boolean, object | undefined][]).forEach(([uri, url, matched, param]: [string, string, boolean, object | undefined]): void => {
