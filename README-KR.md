@@ -110,6 +110,9 @@ const appWithLog: Badak = new Badak({
 라우팅 함수가 실행된 후에 실행할 미들웨어 함수를 등록합니다.
 미들웨어 함수는 여러개를 지정할 수 있으며, 지정한 순서와 관계없이 병렬로 실행됩니다.
 
+`after()` 함수는 클라이언트가 응답 전에 연결을 끊은 경우에도 모든 요청에 대해 실행됩니다.
+요청 본문을 보내는 중 클라이언트가 연결을 끊으면 라우팅 함수는 실행되지 않고 응답도 보내지 않으며, `after()` 함수에서 `res.writableEnded`는 `false`입니다.
+
 ### `config(key: string, value: unknown): Promise<void>`
 
 badak 앱이 실행되는 동작을 조정합니다.
@@ -292,6 +295,7 @@ badak 앱의 동작 방식을 지정합니다.
 - 기록함 : `5xx` `HttpError`, 그리고 `auth()` 함수에서 발생한 에러를 포함한 `Error` 등 그 외의 에러
 - 기록하지 않음 : `4xx` `HttpError`, 그리고 badak이 만드는 `404 Not Found`, `405 Method Not Allowed`,
   `400 Bad Request`(잘못된 본문), `413 Payload Too Large` 같은 `4xx` 응답. 의도된 클라이언트 에러 응답이기 때문입니다.
+- 기록하지 않음 : 요청 본문을 보내는 중 클라이언트가 연결을 끊은 경우 등(`ECONNRESET`). 서버 에러가 아니고, 응답할 수도 없기 때문입니다.
 
 기본값은 `true` 입니다.
 
@@ -630,6 +634,9 @@ await app.setSPARoot('/', path.join(__dirname, 'public'));
 
 ```typescript
 await app.after((req, res) => {
-	console.log(`${ req.method } ${ req.url } ${ res.statusCode }`);
+	// 요청 본문을 보내는 중 클라이언트가 연결을 끊었으면 false
+	const status = res.writableEnded ? res.statusCode : 'closed';
+
+	console.log(`${ req.method } ${ req.url } ${ status }`);
 });
 ```

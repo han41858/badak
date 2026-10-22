@@ -12,6 +12,9 @@
   - other schemes (e.g. `ftp://`), an empty host (e.g. `http:///users/7`), userinfo (e.g. `http://user@host/`), and an invalid host or port respond `400`.
   - a request target with a fragment (`#`) responds `400`, in origin-form too. `/a#b` was routed to the literal `a#b` (usually `404`), and `/a?b=1#c` passed `{ b: '1#c' }` before.
   - `OPTIONS *` responds `404`, and other request targets not starting with `/` respond `400`.
+- The client closing the connection while sending the request body (`ECONNRESET`) is not logged by `catchErrorLog`, and not passed to Node.js with `preventError: false`. It was logged as `badak catch error : Error: aborted`, and badak tried to respond `500` to the closed connection. `after()` functions still run, and `res.writableEnded` is `false` in them. ([#68](https://github.com/han41858/badak/pull/68))
+  - only the abort while badak receives the request body is classified. Errors thrown by routing functions or middleware functions are logged and passed as before, even if the connection is closed and the error has a connection error code (e.g. `EPIPE`).
+  - a request whose client closed the connection while an async `auth()` function ran waited forever, and `after()` functions didn't run. It is handled the same way now.
 
 Routing paths that can match the same uri fragment throw when they are registered, regardless of the registration order. ([#62](https://github.com/han41858/badak/pull/62))
 
