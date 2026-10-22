@@ -43,6 +43,10 @@ To migrate, remove one of the routing paths, merge them into one routing functio
 - `Examples` section in README : authentication and public routes, status code and headers, file upload, streaming response, API with a SPA, access log. ([#66](https://github.com/han41858/badak/pull/66))
 - `sample/` is an example app with these examples, including CSV fields escaped by RFC 4180 and prefixed against formulas in spreadsheet programs. It is type-checked by `yarn test:types`, linted, and tested by `spec/sample.spec.ts`. ([#66](https://github.com/han41858/badak/pull/66))
 
+### Others
+
+- The npm publish workflow runs `yarn test:types` and `yarn test:types:dist` before publishing, same as CI. ([#67](https://github.com/han41858/badak/pull/67))
+
 ## 4.0.0 (2026-10-22)
 
 This release changes the first argument of routing functions to `ParamContext` (`{ params, query, body }`), and redefines `?` routing and non-ASCII / percent-encoded path matching.
