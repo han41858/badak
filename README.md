@@ -407,7 +407,12 @@ The matched fragment is available in `ctx.params`, keyed by the routing pattern,
 
 `+` makes the character just before it repeat 1 or more times, other characters are literal.
 If you specify the routing path as `/user1+`, you can match paths such as `/user1` and `/user11`.
-`++`, and `+` with `*` in the same uri fragment, throw an error when they are registered.
+The matched fragment is available in `ctx.params`, keyed by the routing pattern, e.g. `{ 'user1+': 'user11' }`.
+
+- Other characters are literal, including characters with special meaning in regular expressions.
+- `++`, and `+` with `*` in the same uri fragment, throw an error when they are registered.
+- `+` routing paths that can match the same uri fragment can't be registered together, regardless of the registration order. For example, `/aab+` and `/a+bb` both match `/aabb`, so registering the second one throws `duplicated plus routing`. A normal routing path matched by a `+` routing path (e.g. `/abbc` and `/ab+c`) throws in the same way.
+- A `?` routing path and a `+` routing path that can match the same uri fragment throw `duplicated question and plus routing`, e.g. `/colou?r` and `/colou+r` both match `/colour`.
 
 ### `*` routing
 
