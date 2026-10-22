@@ -1,4 +1,5 @@
 import { Agent, IncomingMessage, request as httpRequest } from 'node:http';
+import { connect, Socket } from 'node:net';
 import { Readable } from 'node:stream';
 
 import { afterEach, beforeEach } from 'mocha';
@@ -212,5 +213,141 @@ describe('stop() with keep-alive connections', function () {
 		// aborted by the server
 		expect(closed.body).to.be.eql('data: 1\n\n');
 		expect(closed.error).to.be.a('string');
+	});
+
+	// requests are sent on one connection without waiting for the responses
+	// 'Connection: close' to a response drops the responses of the requests after it, Node.js closes the connection
+	describe('HTTP pipelining : requests on one connection', () => {
+		interface PipelinedResult {
+			// status lines of the responses, in order
+			statuses: string[];
+			data: string;
+			error?: string;
+		}
+
+		const requestOf = (uri: string): string => `GET ${ uri } HTTP/1.1\r\nHost: localhost\r\n\r\n`;
+
+		// sends the first requests, calls stop() after 50ms, and sends the late requests 50ms after stop()
+		const pipelined = async (uris: string[], lateUris: string[] = []): Promise<{ elapsed: number, result: PipelinedResult }> => {
+			const socket: Socket = connect(TestPort);
+			let data: string = '';
+			let error: string | undefined;
+
+			socket.on('data', (chunk: Buffer): void => {
+				data += chunk.toString();
+			});
+
+			socket.on('error', (err: NodeJS.ErrnoException): void => {
+				error = err.code ?? err.message;
+			});
+
+			const closed: Promise<void> = new Promise((resolve): void => {
+				socket.once('close', (): void => resolve());
+			});
+
+			socket.write(uris.map(requestOf).join(''));
+
+			await delay(50);
+
+			const stopped: Promise<number> = timedStop();
+
+			if (lateUris.length > 0) {
+				await delay(50);
+
+				socket.write(lateUris.map(requestOf).join(''));
+			}
+
+			const elapsed: number = await stopped;
+
+			// closed by the server
+			await closed;
+
+			const statuses: string[] = data.match(/HTTP\/1\.1 \d+/g) ?? [];
+
+			return { elapsed, result: { statuses, data, ...(error === undefined ? {} : { error }) } };
+		};
+
+		beforeEach(async () => {
+			await app.get('/first', async (): Promise<string> => {
+				await delay(handlerDelay);
+
+				return 'FIRST';
+			});
+
+			// finished after /first
+			await app.get('/second', async (): Promise<string> => {
+				await delay(handlerDelay + 100);
+
+				return 'SECOND';
+			});
+
+			// finished before /first, the response waits for it
+			await app.get('/fast', (): string => 'FAST');
+
+			await app.get('/chunks', (): Readable => {
+				const chunks: (string | null)[] = ['C1', 'C2', 'C3', null];
+
+				return new Readable({
+					read (): void {
+						const chunk: string | null | undefined = chunks.shift();
+
+						if (chunk === 'C1') {
+							this.push(chunk);
+						}
+						else {
+							setTimeout(() => this.push(chunk), 100);
+						}
+					}
+				});
+			});
+
+			await app.listen(TestPort);
+		});
+
+		// responses : the number of responses, bodies : the parts of the bodies in order
+		const expectBodies = (result: PipelinedResult, responses: number, bodies: string[]): void => {
+			expect(result.statuses).to.be.eql(Array(responses).fill('HTTP/1.1 200'));
+
+			// in order
+			let index: number = -1;
+
+			bodies.forEach((body: string): void => {
+				const next: number = result.data.indexOf(body, index + 1);
+
+				expect(next, `${ body } in ${ JSON.stringify(result.data) }`).to.be.above(index);
+
+				index = next;
+			});
+
+			expect(result.error).to.be.undefined;
+		};
+
+		it('a streaming response and a finished response after it : both are sent', async () => {
+			const { elapsed, result } = await pipelined(['/chunks', '/fast']);
+
+			expect(elapsed).to.be.below(stopLimit);
+			expectBodies(result, 2, ['C1', 'C2', 'C3', 'FAST']);
+		});
+
+		it('an in-flight response and a finished response after it : both are sent', async () => {
+			const { elapsed, result } = await pipelined(['/first', '/fast']);
+
+			expect(elapsed).to.be.below(stopLimit);
+			expectBodies(result, 2, ['FIRST', 'FAST']);
+		});
+
+		it('two in-flight responses : both are sent, the connection is not closed after the first one', async () => {
+			const { elapsed, result } = await pipelined(['/first', '/second']);
+
+			expect(elapsed).to.be.below(stopLimit);
+			expectBodies(result, 2, ['FIRST', 'SECOND']);
+		});
+
+		it('a request received after stop(), before the in-flight response : both are sent', async () => {
+			const { elapsed, result } = await pipelined(['/first'], ['/fast']);
+
+			expect(elapsed).to.be.below(stopLimit);
+			expectBodies(result, 2, ['FIRST', 'FAST']);
+		});
 	});
 });

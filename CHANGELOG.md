@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- `stop()` waited about 5 seconds (`keepAliveTimeout` of Node.js) or until the clients closed the connections, if there were in-flight requests on keep-alive connections (e.g. `fetch()`, `http.Agent` with `keepAlive`, browsers), because their connections became idle after the responses and were not closed (4.x too). The responses of in-flight requests have `Connection: close` if their headers are not sent yet, requests received while stopping too, and the connections of streaming responses are closed after the responses.
+- `stop()` waited about 5 seconds (`keepAliveTimeout` of Node.js) or until the clients closed the connections, if there were in-flight requests on keep-alive connections (e.g. `fetch()`, `http.Agent` with `keepAlive`, browsers), because their connections became idle after the responses and were not closed (4.x too). The responses of in-flight requests and requests received while stopping have `Connection: close` if their headers are not sent yet. The connections of streaming responses, and of pipelined requests (more than one request on a connection), are closed after the last response, the responses of pipelined requests are not dropped.
 
 ## 5.0.0 (2026-10-22)
 

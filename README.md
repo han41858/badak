@@ -152,7 +152,7 @@ Used to access badak internal members.
 Stop the HTTP server.
 It stops accepting new connections, closes idle keep-alive connections,
 and waits for in-flight requests to finish.
-The keep-alive connections of in-flight requests are closed after their responses (`Connection: close` if the response headers are not sent yet),
+The keep-alive connections of in-flight requests are closed after their responses (`Connection: close` if the response headers are not sent yet, after the last response for pipelined requests),
 so `stop()` doesn't wait for clients to close them.
 
 If `timeout` (ms) is specified, the remaining connections are closed forcibly after this time.
