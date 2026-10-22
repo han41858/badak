@@ -108,8 +108,8 @@ describe('sample app', () => {
 			.post('/api/files')
 			.set('Authorization', auth)
 			.field('name', 'logo')
-			.attach('file', Buffer.alloc(64 * 1024, 1), { filename: 'logo.png', contentType: 'image/png' })
-			.expect(200, { name: 'logo', size: 64 * 1024 });
+			.attach('file', Buffer.alloc(8 * 1024 * 1024, 1), { filename: 'logo.png', contentType: 'image/png' })
+			.expect(200, { name: 'logo', size: 8 * 1024 * 1024 });
 	});
 
 	it('file upload without a token : 401 before receiving the body', async () => {
