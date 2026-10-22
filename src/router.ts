@@ -189,13 +189,16 @@ interface RegisteredRoute {
 	method: METHOD;
 }
 
+// keys : the route keys of the current node, a stack shared by the recursion, copied only for a route
 const collectRoutes = (rule: RouteRule, keys: string[] = [], routes: RegisteredRoute[] = []): RegisteredRoute[] => {
 	for (const [key, value] of Object.entries(rule)) {
 		if (isMethodKey(key)) {
-			routes.push({ keys, method: key as METHOD });
+			routes.push({ keys: [...keys], method: key as METHOD });
 		}
 		else if (typeof value === 'object' && value !== null) {
-			collectRoutes(value as RouteRule, [...keys, key], routes);
+			keys.push(key);
+			collectRoutes(value as RouteRule, keys, routes);
+			keys.pop();
 		}
 	}
 
@@ -255,7 +258,7 @@ const checkRoutePair = (a: RegisteredRoute, b: RegisteredRoute): void => {
 const findConflictCandidates = (node: RouteRule, route: RegisteredRoute, depth: number, keys: string[], found: RegisteredRoute[]): void => {
 	if (depth === route.keys.length) {
 		if (node[route.method] !== undefined) {
-			found.push({ keys, method: route.method });
+			found.push({ keys: [...keys], method: route.method });
 		}
 
 		return;
@@ -288,7 +291,10 @@ const findConflictCandidates = (node: RouteRule, route: RegisteredRoute, depth: 
 		const child: unknown = node[childKey];
 
 		if (typeof child === 'object' && child !== null && keysIntersect(childKey, routeKey)) {
-			findConflictCandidates(child as RouteRule, route, depth + 1, [...keys, childKey], found);
+			// keys : a stack shared by the recursion, copied only for a candidate
+			keys.push(childKey);
+			findConflictCandidates(child as RouteRule, route, depth + 1, keys, found);
+			keys.pop();
 		}
 	}
 };
@@ -475,6 +481,15 @@ interface Candidate {
 	param: TypedObject<unknown> | undefined;
 }
 
+// [param key, uri fragment] of the matched pattern route keys, from the root
+type Capture = [key: string, value: string];
+
+const toParam = (captures: Capture[]): TypedObject<unknown> | undefined => {
+	return captures.length > 0
+		? Object.fromEntries(captures)
+		: undefined;
+};
+
 // param key of a matched uri fragment : the name for ':' routing, '*' for '*', the route key for other patterns
 const paramKeyOf = (routeKey: string, segment: RouteSegment): string => {
 	return segment.kind === 'colon'
@@ -524,17 +539,20 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string, method: st
 	const fullMatches: Candidate[] = [];
 	const fallbacks: (Candidate & { restStartIndex: number })[] = [];
 
-	const visit = (node: RouteRule, depth: number, param: TypedObject<unknown> | undefined): void => {
+	// captures : a stack shared by the recursion, params are made only for candidates
+	const captures: Capture[] = [];
+
+	const visit = (node: RouteRule, depth: number): void => {
 		const doubleAsteriskRule: unknown = node['**'];
 
 		if (typeof doubleAsteriskRule === 'object' && doubleAsteriskRule !== null && hasRouteFunction(doubleAsteriskRule as RouteRule)) {
 			// params matched before '**', e.g. ':id' of '/users/:id/**'
-			fallbacks.push({ node: doubleAsteriskRule as RouteRule, param, restStartIndex: depth });
+			fallbacks.push({ node: doubleAsteriskRule as RouteRule, param: toParam(captures), restStartIndex: depth });
 		}
 
 		if (depth === uriArr.length) {
 			if (hasRouteFunction(node)) {
-				fullMatches.push({ node, param });
+				fullMatches.push({ node, param: toParam(captures) });
 			}
 
 			return;
@@ -546,7 +564,7 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string, method: st
 		const normalRouteKey: string | undefined = findNormalRouteKey(node, uriFrag);
 
 		if (normalRouteKey !== undefined) {
-			visit(node[normalRouteKey] as RouteRule, depth + 1, param);
+			visit(node[normalRouteKey] as RouteRule, depth + 1);
 		}
 
 		// ':', '?', '+', '*' routing
@@ -554,12 +572,14 @@ export const findRoute = (routeRule: RouteRule, uriSanitized: string, method: st
 			const segment: RouteSegment = compileRouteSegment(routeKey);
 
 			if (matchPatternTokens(segmentTokens(segment), uriFrag)) {
-				visit(node[routeKey] as RouteRule, depth + 1, { ...param, [paramKeyOf(routeKey, segment)]: uriFrag });
+				captures.push([paramKeyOf(routeKey, segment), uriFrag]);
+				visit(node[routeKey] as RouteRule, depth + 1);
+				captures.pop();
 			}
 		}
 	};
 
-	visit(routeRule, 0, undefined);
+	visit(routeRule, 0);
 
 	if (fullMatches.length > 0) {
 		// matched fully, '**' is not used

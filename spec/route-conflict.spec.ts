@@ -233,6 +233,30 @@ describe('route conflicts and matching (5.0.0)', () => {
 		});
 	});
 
+	describe('deep routes and long request paths : no stack overflow, not quadratic', () => {
+		it('a request of 8,000 uri fragments (about the header size limit of Node.js)', () => {
+			const routeRule: RouteRule = build(['GET /a/:id', 'GET /**', 'GET /a/b+/**']);
+			const start: number = Date.now();
+
+			expect(match(routeRule, 'GET', '/' + Array(8000).fill('a').join('/')).name).to.be.eql('GET /**');
+			expect(Date.now() - start).to.be.below(500);
+		});
+
+		it('routes of 2,000 uri fragments, 2 branches alive at every depth', () => {
+			const deepA: string = '/' + Array.from({ length: 2000 }, (_: unknown, i: number): string => ':x' + i).join('/');
+			const deepB: string = '/' + Array(2000).fill('a*').join('/') + '/z';
+			const start: number = Date.now();
+
+			const routeRule: RouteRule = build([`GET ${ deepA }`, `GET ${ deepB }`]);
+
+			expect(match(routeRule, 'GET', '/' + Array(2000).fill('ab').join('/') + '/z').name).to.be.eql(`GET ${ deepB }`);
+			expect(match(routeRule, 'GET', '/' + Array(2000).fill('ab').join('/')).param).to.have.property('x1999', 'ab');
+
+			// params and route keys were copied at every depth before, about 5 seconds
+			expect(Date.now() - start).to.be.below(1000);
+		});
+	});
+
 	describe('random route sets : registration and matching agree with brute force', () => {
 		// deterministic pseudo random
 		let seed: number = 3;
