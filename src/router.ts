@@ -1,15 +1,16 @@
 import { RouteFunction, RouteFunctionObj, RouteOption, RouteRule, RouteRuleSeed, TypedObject } from './interfaces.js';
 import { METHOD } from './constants.js';
 import { HttpError } from './http-error.js';
-import { isValidBodyLimit, sift } from './util.js';
-import { matchPatternTokens, PatternToken, patternTokensIntersect } from './fragment-pattern.js';
-import { isQuestionPattern, matchQuestionPattern, parseQuestionPattern, questionPatternsIntersect } from './question-pattern.js';
+import { isValidBodyLimit } from './util.js';
+import { matchPatternTokens, patternTokensIntersect } from './fragment-pattern.js';
 import {
 	canonicalRouteKey,
 	compileRouteSegment,
 	findNormalRouteKey,
 	invalidateNormalRouteIndex,
+	patternRouteKeys,
 	RouteSegment,
+	segmentTokens,
 	tokenizeRequestPath
 } from './route-segment.js';
 
@@ -51,10 +52,6 @@ export const checkRouteFunctionObj = (value: unknown): void => {
  */
 
 const isMethodKey = (key: string): boolean => Object.values(METHOD).includes(key as METHOD);
-
-enum LOOP_CONTROL {
-	CONTINUE = 'C'
-}
 
 // '**' captures the rest of the path, so it is allowed only as the last uri fragment
 // e.g. '/files/**' is ok, '/files/**/edit' throws
@@ -114,31 +111,9 @@ export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: 
 				throw new Error('uri include space');
 			}
 
-			if (uriFrag.includes(':') && !uriFrag.startsWith(':')) {
-				throw new Error('invalid colon route');
-			}
-
-			if (uriFrag.includes('?')) {
-				if (uriFrag === '?') {
-					throw new Error('invalid question character');
-				}
-			}
-
-			if (uriFrag.includes('?') && uriFrag.startsWith('?')) {
-				throw new Error('invalid question route');
-			}
-
-			if (uriFrag.includes('+') && uriFrag.startsWith('+')) {
-				throw new Error('invalid plus route');
-			}
-
 			if (!Object.values(METHOD).includes(uriFrag as METHOD)) {
-				// throws for malformed percent-encoding, and invalid syntax ('??', '++', ...)
-				const segment: RouteSegment = compileRouteSegment(uriFrag);
-
-				if (segment.kind === 'question') {
-					parseQuestionPattern(uriFrag);
-				}
+				// throws for malformed percent-encoding and invalid syntax ('??', 'a**', '?a', 'a:b', ...)
+				compileRouteSegment(uriFrag);
 			}
 
 			if (Object.values(METHOD).includes(uriFrag as METHOD)) {
@@ -208,114 +183,206 @@ export const refineRouteRule = (rule: RouteRule | RouteRuleSeed, defaultMethod: 
 	return refinedRuleObj;
 };
 
-// check uri duplication among sibling uri fragments (same parent), call recursively
-export const checkUriDuplication = (currentRouteRule: RouteRule, newRouteRule: RouteRule): void => {
-	checkSiblingUriKeys(
-		sift([
-			...Object.keys(currentRouteRule),
-			...Object.keys(newRouteRule)
-		])
-			.filter((key: string): boolean => !isMethodKey(key))
-	);
+// a route : the route keys from the root ('/') and a method
+interface RegisteredRoute {
+	keys: string[];
+	method: METHOD;
+}
 
-	// current rule is checked already, so go deeper along new rule only
-	for (const [key, newChild] of Object.entries(newRouteRule)) {
-		if (isMethodKey(key) || typeof newChild !== 'object') {
-			continue;
+// keys : the route keys of the current node, a stack shared by the recursion, copied only for a route
+const collectRoutes = (rule: RouteRule, keys: string[] = [], routes: RegisteredRoute[] = []): RegisteredRoute[] => {
+	for (const [key, value] of Object.entries(rule)) {
+		if (isMethodKey(key)) {
+			routes.push({ keys: [...keys], method: key as METHOD });
+		}
+		else if (typeof value === 'object' && value !== null) {
+			keys.push(key);
+			collectRoutes(value as RouteRule, keys, routes);
+			keys.pop();
+		}
+	}
+
+	return routes;
+};
+
+// route keys are canonical, the same key is the same pattern
+const keysIntersect = (a: string, b: string): boolean => {
+	return a === b
+		|| patternTokensIntersect(segmentTokens(compileRouteSegment(a)), segmentTokens(compileRouteSegment(b)));
+};
+
+const sameKeys = (a: string[], b: string[]): boolean => {
+	return a.length === b.length && a.every((key: string, i: number): boolean => key === b[i]);
+};
+
+// '/' + route keys except the root marker
+const routePath = (keys: string[]): string => '/' + keys.slice(1).join('/');
+
+// throws if two routes of the same method can match the same request path (docs/routing-spec-5.0.0.md 4., 5.)
+// - routes without '**' : the same number of uri fragments, and every uri fragment intersects
+// - '**' routes : not compared with other routes, but with '**' routes of the same depth by the part before '**'
+// - the same keys : registered again, the route function is replaced
+const checkRoutePair = (a: RegisteredRoute, b: RegisteredRoute): void => {
+	if (a.method !== b.method || sameKeys(a.keys, b.keys)) {
+		return;
+	}
+
+	const fallbackA: boolean = a.keys[a.keys.length - 1] === '**';
+	const fallbackB: boolean = b.keys[b.keys.length - 1] === '**';
+
+	if (fallbackA !== fallbackB || a.keys.length !== b.keys.length) {
+		return;
+	}
+
+	const comparedLength: number = fallbackA
+		? a.keys.length - 1
+		: a.keys.length;
+
+	for (let i: number = 0; i < comparedLength; i++) {
+		if (!keysIntersect(a.keys[i], b.keys[i])) {
+			return;
+		}
+	}
+
+	const header: string = fallbackA
+		// depth : the number of uri fragments before '**'
+		? `Conflicting fallback routes for ${ a.method } at depth ${ comparedLength - 1 }:`
+		: `Conflicting routes for ${ a.method }:`;
+
+	throw new Error(`${ header }\n  ${ routePath(b.keys) }\n  ${ routePath(a.keys) }`);
+};
+
+// registered routes that can conflict with the route, found along the route tree
+// only the children whose route keys intersect with the route key of the same depth are followed
+// '**' children are compared only with '**' routes, at the same depth
+const findConflictCandidates = (node: RouteRule, route: RegisteredRoute, depth: number, keys: string[], found: RegisteredRoute[]): void => {
+	if (depth === route.keys.length) {
+		if (node[route.method] !== undefined) {
+			found.push({ keys: [...keys], method: route.method });
 		}
 
-		const currentChild: RouteRule | RouteRuleSeed | RouteFunction | undefined = currentRouteRule[key];
+		return;
+	}
 
-		checkUriDuplication(
-			typeof currentChild === 'object'
-				? currentChild as RouteRule
-				: {},
-			newChild as RouteRule
-		);
+	const routeKey: string = route.keys[depth];
+
+	if (routeKey === '**') {
+		// the last key
+		const doubleAsteriskRule: unknown = node['**'];
+
+		if (typeof doubleAsteriskRule === 'object' && doubleAsteriskRule !== null && (doubleAsteriskRule as RouteRule)[route.method] !== undefined) {
+			found.push({ keys: [...keys, '**'], method: route.method });
+		}
+
+		return;
+	}
+
+	const segment: RouteSegment = compileRouteSegment(routeKey);
+
+	// a literal route key : only the normal child of the same literal, and pattern children
+	const childKeys: string[] = segment.kind === 'normal'
+		? [
+			...(findNormalRouteKey(node, segment.literal) !== undefined ? [findNormalRouteKey(node, segment.literal) as string] : []),
+			...patternRouteKeys(node)
+		]
+		: Object.keys(node).filter((key: string): boolean => !isMethodKey(key) && key !== '**');
+
+	for (const childKey of childKeys) {
+		const child: unknown = node[childKey];
+
+		if (typeof child === 'object' && child !== null && keysIntersect(childKey, routeKey)) {
+			// keys : a stack shared by the recursion, copied only for a candidate
+			keys.push(childKey);
+			findConflictCandidates(child as RouteRule, route, depth + 1, keys, found);
+			keys.pop();
+		}
 	}
 };
 
-const checkSiblingUriKeys = (targetKeys: string[]): void => {
-	const segments: Map<string, RouteSegment> = new Map(
-		targetKeys.map((key: string): [string, RouteSegment] => [key, compileRouteSegment(key)])
-	);
+// check that each request path matches only one route per method, with the routes of currentRouteRule and newRouteRule
+// throws before anything is changed, the caller merges newRouteRule only if this passes
+export const checkUriDuplication = (currentRouteRule: RouteRule, newRouteRule: RouteRule): void => {
+	const newRoutes: RegisteredRoute[] = collectRoutes(newRouteRule);
 
-	// literal of normal uri fragments, decoded
-	// keys are canonical (refineRouteRule), the same path in different spellings is already one key
-	const normalLiterals: Map<string, string> = new Map();
+	newRoutes.forEach((newRoute: RegisteredRoute, i: number): void => {
+		// registered routes, found along the route tree
+		const candidates: RegisteredRoute[] = [];
 
-	for (const [key, segment] of segments) {
-		if (segment.kind === 'normal') {
-			normalLiterals.set(segment.literal, key);
+		findConflictCandidates(currentRouteRule, newRoute, 0, [], candidates);
+
+		for (const candidate of candidates) {
+			checkRoutePair(newRoute, candidate);
 		}
+
+		// new routes before this one (keys of one rule object)
+		for (const other of newRoutes.slice(0, i)) {
+			checkRoutePair(newRoute, other);
+		}
+	});
+};
+
+// copy of the route tree : nodes and option objects are copied, route functions are shared
+export const cloneRouteRule = (rule: RouteRule): RouteRule => {
+	const copied: RouteRule = {};
+
+	for (const [key, value] of Object.entries(rule)) {
+		copied[key] = typeof value === 'object' && value !== null
+			? cloneRouteRule(value as RouteRule) as RouteRule[string]
+			: value;
 	}
 
-	// colon routing
-	const colonRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.startsWith(':'));
-	if (colonRouteArr.length > 1) {
-		throw new Error('duplicated colon routing');
-	}
+	return copied;
+};
 
-	// question routing, same pattern interpretation as request matching
-	const questionRouteArr: string[] = targetKeys.filter((uri: string): boolean => isQuestionPattern(uri));
-	if (questionRouteArr.length > 0) {
-		// question pattern and normal uri fragments (literal)
-		const matchingResult: string | undefined = questionRouteArr.find((pattern: string): boolean => {
-			return [...normalLiterals.keys()].some((literal: string): boolean => matchQuestionPattern(pattern, literal));
-		});
+const routeFunctionOf = (value: unknown): unknown => {
+	return typeof value === 'object' && value !== null
+		? (value as RouteFunctionObj).fnc
+		: value;
+};
 
-		if (matchingResult !== undefined) {
-			throw new Error('duplicated question routing');
-		}
+// remove the routes of rule from tree, only if the route function is the same (not replaced after rule was merged)
+// nodes without routes are removed too
+export const removeRouteRule = (tree: RouteRule, rule: RouteRule): void => {
+	for (const route of collectRoutes(rule)) {
+		const path: RouteRule[] = [tree];
 
-		// question patterns that can match the same uri fragment, e.g. 'ab?c' and 'a?bc' for 'abc'
-		for (let i: number = 0; i < questionRouteArr.length; i++) {
-			for (let j: number = i + 1; j < questionRouteArr.length; j++) {
-				if (questionPatternsIntersect(questionRouteArr[i], questionRouteArr[j])) {
-					throw new Error(`duplicated question routing : ${ questionRouteArr[i] }, ${ questionRouteArr[j] }`);
-				}
+		for (const key of route.keys) {
+			const child: unknown = path[path.length - 1][key];
+
+			if (typeof child !== 'object' || child === null) {
+				break;
 			}
+
+			path.push(child as RouteRule);
 		}
-	}
 
-	// plus routing, same pattern interpretation as request matching
-	const plusRouteArr: string[] = targetKeys.filter((uri: string): boolean => segments.get(uri)?.kind === 'plus');
-	if (plusRouteArr.length > 0) {
-		const tokensOf = (uri: string): PatternToken[] => (segments.get(uri) as { kind: 'plus', tokens: PatternToken[] }).tokens;
+		if (path.length !== route.keys.length + 1) {
+			continue;
+		}
 
-		// plus pattern and normal uri fragments (literal)
-		for (const plusUri of plusRouteArr) {
-			for (const [literal, normalUri] of normalLiterals) {
-				if (matchPatternTokens(tokensOf(plusUri), literal)) {
-					throw new Error(`duplicated plus routing : ${ plusUri }, ${ normalUri }`);
-				}
+		const node: RouteRule = path[path.length - 1];
+		// the route function in rule, the keys exist (collected from rule)
+		const registered: unknown = route.keys
+			.reduce((one: RouteRule, key: string): RouteRule => one[key] as RouteRule, rule)[route.method];
+
+		if (routeFunctionOf(node[route.method]) !== routeFunctionOf(registered)) {
+			continue;
+		}
+
+		delete node[route.method];
+
+		// remove empty nodes from the deepest
+		for (let depth: number = route.keys.length; depth > 0; depth--) {
+			const parent: RouteRule = path[depth - 1];
+
+			invalidateNormalRouteIndex(parent);
+
+			if (Object.keys(path[depth]).length > 0) {
+				break;
 			}
+
+			delete parent[route.keys[depth - 1]];
 		}
-
-		// plus patterns that can match the same uri fragment, e.g. 'aab+' and 'a+bb' for 'aabb'
-		for (let i: number = 0; i < plusRouteArr.length; i++) {
-			for (let j: number = i + 1; j < plusRouteArr.length; j++) {
-				if (patternTokensIntersect(tokensOf(plusRouteArr[i]), tokensOf(plusRouteArr[j]))) {
-					throw new Error(`duplicated plus routing : ${ plusRouteArr[i] }, ${ plusRouteArr[j] }`);
-				}
-			}
-		}
-
-		// question and plus patterns that can match the same uri fragment, e.g. 'colou?r' and 'colou+r' for 'colour'
-		for (const questionUri of questionRouteArr) {
-			for (const plusUri of plusRouteArr) {
-				if (patternTokensIntersect(parseQuestionPattern(questionUri), tokensOf(plusUri))) {
-					throw new Error(`duplicated question and plus routing : ${ questionUri }, ${ plusUri }`);
-				}
-			}
-		}
-	}
-
-	// asterisk routing, encoded '*' (%2A) is literal
-	const asteriskRouteArr: string[] = targetKeys.filter((uri: string): boolean => uri.includes('*'));
-
-	if (asteriskRouteArr.length > 1) {
-		throw new Error('duplicated asterisk routing');
 	}
 };
 
@@ -409,224 +476,139 @@ const hasRouteFunction = (rule: RouteRule): boolean => {
 	return Object.values(METHOD).some((method: METHOD): boolean => rule[method] !== undefined);
 };
 
-// find the rule object matching the request path
-// '**' is a fallback : it is used only if the path doesn't match other routes fully,
-// and the deepest '**' along the matched path is used
-// throws HttpError(400) for malformed percent-encoding in a matched uri fragment
-export const findRoute = (routeRule: RouteRule, uriSanitized: string): RouteMatch => {
-	let param: TypedObject<unknown> | undefined;
+interface Candidate {
+	node: RouteRule;
+	param: TypedObject<unknown> | undefined;
+}
 
-	// '**' fallback candidate
-	let fallback: {
-		rule: RouteRule;
-		param: TypedObject<unknown> | undefined;
-		restStartIndex: number;
-	} | undefined;
+// [param key, uri fragment] of the matched pattern route keys, from the root
+type Capture = [key: string, value: string];
 
-	// record '**' child of the node, restStartIndex : index of the uri fragment after the node
-	const recordFallback = (node: RouteRule, restStartIndex: number): void => {
+const toParam = (captures: Capture[]): TypedObject<unknown> | undefined => {
+	return captures.length > 0
+		? Object.fromEntries(captures)
+		: undefined;
+};
+
+// param key of a matched uri fragment : the name for ':' routing, '*' for '*', the route key for other patterns
+const paramKeyOf = (routeKey: string, segment: RouteSegment): string => {
+	return segment.kind === 'colon'
+		? segment.name
+		: routeKey;
+};
+
+// candidates have the route functions of different methods, at most one per method (checked on registration)
+const selectCandidate = (candidates: Candidate[], method: string): RouteMatch => {
+	// HEAD is handled by GET route function
+	const ruleMethod: string = method === 'HEAD'
+		? METHOD.GET
+		: method;
+
+	if (candidates.length === 1) {
+		return { rule: candidates[0].node, param: candidates[0].param };
+	}
+
+	// route functions of all candidates, for the method and the 405 Allow header
+	const rule: RouteRule = {};
+
+	for (const candidate of candidates) {
+		for (const one of Object.values(METHOD)) {
+			if (candidate.node[one] !== undefined && rule[one] === undefined) {
+				rule[one] = candidate.node[one];
+			}
+		}
+	}
+
+	const selected: Candidate = candidates.find((candidate: Candidate): boolean => candidate.node[ruleMethod] !== undefined)
+		?? candidates[0];
+
+	return { rule, param: selected.param };
+};
+
+// find the route matching the request path (docs/routing-spec-5.0.0.md 6.)
+// every child matching a uri fragment is followed, not only the first one by priority
+// each node of the route tree has a fixed depth, so a node is visited at most once
+// - routes matching the path fully are used, the route function is selected by the method
+// - '**' is a fallback : used only if no route matches the path fully, the deepest '**' is used
+// method : params are taken from the route of the method (HEAD : GET), for the 405 Allow header the rule has all methods
+// throws HttpError(400) for malformed percent-encoding
+export const findRoute = (routeRule: RouteRule, uriSanitized: string, method: string = METHOD.GET): RouteMatch => {
+	// uri fragments are decoded separately after split by real '/', '%2F' is a '/' in a uri fragment
+	const uriArr: string[] = tokenizeRequestPath(uriSanitized);
+
+	const fullMatches: Candidate[] = [];
+	const fallbacks: (Candidate & { restStartIndex: number })[] = [];
+
+	// captures : a stack shared by the recursion, params are made only for candidates
+	const captures: Capture[] = [];
+
+	const visit = (node: RouteRule, depth: number): void => {
 		const doubleAsteriskRule: unknown = node['**'];
 
-		if (typeof doubleAsteriskRule === 'object' && doubleAsteriskRule !== null) {
-			fallback = {
-				rule: doubleAsteriskRule as RouteRule,
-				// params matched before '**', e.g. ':id' of '/users/:id/**'
-				param: param !== undefined
-					? { ...param }
-					: undefined,
-				restStartIndex
-			};
+		if (typeof doubleAsteriskRule === 'object' && doubleAsteriskRule !== null && hasRouteFunction(doubleAsteriskRule as RouteRule)) {
+			// params matched before '**', e.g. ':id' of '/users/:id/**'
+			fallbacks.push({ node: doubleAsteriskRule as RouteRule, param: toParam(captures), restStartIndex: depth });
+		}
+
+		if (depth === uriArr.length) {
+			if (hasRouteFunction(node)) {
+				fullMatches.push({ node, param: toParam(captures) });
+			}
+
+			return;
+		}
+
+		const uriFrag: string = uriArr[depth];
+
+		// normal routing, by the literal of route keys (e.g. '%ED%95%9C' and '한' are the same)
+		const normalRouteKey: string | undefined = findNormalRouteKey(node, uriFrag);
+
+		if (normalRouteKey !== undefined) {
+			visit(node[normalRouteKey] as RouteRule, depth + 1);
+		}
+
+		// ':', '?', '+', '*' routing
+		for (const routeKey of patternRouteKeys(node)) {
+			const segment: RouteSegment = compileRouteSegment(routeKey);
+
+			if (matchPatternTokens(segmentTokens(segment), uriFrag)) {
+				captures.push([paramKeyOf(routeKey, segment), uriFrag]);
+				visit(node[routeKey] as RouteRule, depth + 1);
+				captures.pop();
+			}
 		}
 	};
 
-	let checkTargetRule: RouteRule | undefined = routeRule;
+	visit(routeRule, 0);
 
-	// uri fragments are decoded separately after split by real '/', '%2F' is a '/' in a uri fragment
-	// throws HttpError(400) for malformed percent-encoding
-	const uriArr: string[] = tokenizeRequestPath(uriSanitized);
-
-	// find target function
-	// use 'for' instead of 'forEach' to break
-	for (let depthIter: number = 0; depthIter < uriArr.length; depthIter++) {
-		let loopControl: LOOP_CONTROL | undefined;
-
-		recordFallback(checkTargetRule, depthIter);
-
-		const routeRuleKeyArr: string[] = Object.keys(checkTargetRule);
-
-		const uriFrag: string = uriArr[depthIter];
-
-
-		// normal routing, compared with the literal of route keys (e.g. '%ED%95%9C' and '한' are the same)
-		const normalRouteKey: string | undefined = findNormalRouteKey(checkTargetRule, uriFrag);
-
-		if (normalRouteKey !== undefined) {
-			checkTargetRule = checkTargetRule[normalRouteKey] as RouteRule;
-
-			loopControl = LOOP_CONTROL.CONTINUE;
-		}
-
-		if (!loopControl) {
-			// colon routing
-			const colonParam: string | undefined = routeRuleKeyArr.find((_uriFrag: string): boolean => {
-				return _uriFrag.startsWith(':');
-			});
-
-			if (colonParam !== undefined) {
-				checkTargetRule = checkTargetRule[colonParam] as RouteRule;
-
-				if (param === undefined) {
-					param = {};
-				}
-
-				// if (param.matcher === undefined) {
-				// 	param.matcher = [];
-				// }
-
-				// param.matcher.push(colonParam);
-				param[colonParam.replace(':', '')] = uriFrag;
-
-				loopControl = LOOP_CONTROL.CONTINUE;
-			}
-		}
-
-		if (!loopControl) {
-			// question routing
-			// question patterns of siblings don't overlap (checked on registration), at most one matches
-			const targetQuestionKey: string | undefined = routeRuleKeyArr
-				.filter((routeRuleKey: string): boolean => isQuestionPattern(routeRuleKey))
-				.find((questionKey: string): boolean => matchQuestionPattern(questionKey, uriFrag));
-
-			if (targetQuestionKey !== undefined) {
-				checkTargetRule = checkTargetRule[targetQuestionKey] as RouteRule;
-
-				if (param === undefined) {
-					param = {};
-				}
-
-				// if (param.matcher === undefined) {
-				// 	param.matcher = [];
-				// }
-
-				// param.matcher.push(targetQuestionKey);
-				param[targetQuestionKey] = uriFrag;
-
-				loopControl = LOOP_CONTROL.CONTINUE;
-			}
-		}
-
-		if (!loopControl) {
-			// plus routing
-			// other characters are literal, compared with the decoded uri fragment
-			const targetPlusKey: string | undefined = routeRuleKeyArr.find((routeRuleKey: string): boolean => {
-				const segment: RouteSegment | undefined = isMethodKey(routeRuleKey)
-					? undefined
-					: compileRouteSegment(routeRuleKey);
-
-				return segment?.kind === 'plus' && matchPatternTokens(segment.tokens, uriFrag);
-			});
-
-			if (targetPlusKey !== undefined) {
-				checkTargetRule = checkTargetRule[targetPlusKey] as RouteRule;
-
-				if (param === undefined) {
-					param = {};
-				}
-
-				// if (param.matcher === undefined) {
-				// 	param.matcher = [];
-				// }
-
-				// param.matcher.push(targetPlusKey);
-				param[targetPlusKey] = uriFrag;
-
-				loopControl = LOOP_CONTROL.CONTINUE;
-			}
-		}
-
-		if (!loopControl) {
-			// asterisk routing
-			if (routeRuleKeyArr.includes('*')) {
-				checkTargetRule = checkTargetRule['*'] as RouteRule;
-
-				if (param === undefined) {
-					param = {};
-				}
-
-				param['*'] = uriFrag;
-
-				loopControl = LOOP_CONTROL.CONTINUE;
-			}
-		}
-
-		if (!loopControl) {
-			// partial asterisk routing
-			// 'ab*cd', 'user1*', not '*' and '**', other characters are literal
-			const targetAsteriskKey: string | undefined = routeRuleKeyArr.find((routeRuleKey: string): boolean => {
-				const segment: RouteSegment | undefined = isMethodKey(routeRuleKey)
-					? undefined
-					: compileRouteSegment(routeRuleKey);
-
-				return segment?.kind === 'partialAsterisk' && segment.regExp.test(uriFrag);
-			});
-
-
-			if (targetAsteriskKey !== undefined) {
-				checkTargetRule = checkTargetRule[targetAsteriskKey] as RouteRule;
-
-				if (param === undefined) {
-					param = {};
-				}
-
-				// if (param.matcher === undefined) {
-				// 	param.matcher = [];
-				// }
-
-				// param.matcher.push(targetAsteriskKey);
-				param[targetAsteriskKey] = uriFrag;
-
-				loopControl = LOOP_CONTROL.CONTINUE;
-			}
-		}
-
-		if (loopControl === undefined) {
-			// not found
-			checkTargetRule = undefined;
-			break;
-		}
-		// loopControl === LoopControl.Continue : continue
+	if (fullMatches.length > 0) {
+		// matched fully, '**' is not used
+		return selectCandidate(fullMatches, method);
 	}
 
-	if (checkTargetRule !== undefined) {
-		// '**' of the last node matches no more uri fragment, e.g. '/files' of '/files/**'
-		recordFallback(checkTargetRule, uriArr.length);
+	if (fallbacks.length > 0) {
+		const deepest: number = Math.max(...fallbacks.map((one: { restStartIndex: number }): number => one.restStartIndex));
+		const matched: RouteMatch = selectCandidate(
+			fallbacks.filter((one: { restStartIndex: number }): boolean => one.restStartIndex === deepest),
+			method
+		);
 
-		if (hasRouteFunction(checkTargetRule)) {
-			// matched fully, '**' is not used
-			return {
-				rule: checkTargetRule,
-				param
-			};
-		}
-	}
-
-	if (fallback !== undefined) {
 		return {
-			rule: fallback.rule,
+			rule: matched.rule,
 			param: {
-				...fallback.param,
+				...matched.param,
 				// rest of the path after '**', each uri fragment is decoded and joined with '/'
 				// e.g. '/files/**' : '/files/a/b%20c' -> 'a/b c', '/files' -> ''
 				'**': uriArr
-					.slice(fallback.restStartIndex)
-						.join('/')
+					.slice(deepest)
+					.join('/')
 			}
 		};
 	}
 
 	return {
-		rule: checkTargetRule,
-		param
+		rule: undefined,
+		param: undefined
 	};
 };
 

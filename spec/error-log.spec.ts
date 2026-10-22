@@ -110,9 +110,10 @@ describe('error log policy', () => {
 			expect(logs).to.be.lengthOf(1);
 		});
 
-		it('Error(\'Forbidden\') (403 by message mapping)', async () => {
+		// 5.0.0 : the message is not mapped to a status code
+		it('Error(\'Forbidden\') (500, not mapped to 403)', async () => {
 			await app.listen(TestPort);
-			await request(app.getHttpServer()).get('/legacy').expect(403);
+			await request(app.getHttpServer()).get('/legacy').expect(500, 'Internal Server Error');
 
 			expect(logs).to.be.lengthOf(1);
 		});

@@ -102,10 +102,11 @@ Don't read the request body (`req`) in this function or in `before()`, badak res
 Registers a middleware function to run **before** the routing function is executed.
 Multiple middleware functions can be specified,
 and they are executed in parallel regardless of the order in which they are specified.
+It should be called before `listen()`.
 
 If a middleware function throws an error (or returns a rejected Promise), the routing function is not executed
 and badak responds with an error status code, in the same way as an error thrown in the routing function.
-For example, `throw new Error('Forbidden')` responds `403 Forbidden`, and other errors respond `500 Internal Server Error`.
+For example, `throw new HttpError(403)` responds `403 Forbidden`, and other errors respond `500 Internal Server Error`.
 If a middleware function responds by itself (e.g. `res.end()`), the routing function is not executed either.
 
 ### `after(fnc: MiddlewareFunction): Promise<void>`
@@ -113,6 +114,7 @@ If a middleware function responds by itself (e.g. `res.end()`), the routing func
 Registers a middleware function to run **after** the routing function is executed.
 Multiple middleware functions can be specified,
 and they are executed in parallel regardless of the order in which they are specified.
+It should be called before `listen()`.
 
 `after()` functions run for every request, also if the client closed the connection before the response.
 If the client closed the connection while sending the request body, the routing function is not executed,
@@ -120,11 +122,19 @@ no response is sent, and `res.writableEnded` is `false` in `after()` functions.
 
 ### `config(key: string, value: unknown): Promise<void>`
 
-Controls how badak apps run.
+Controls how badak apps run. The keys are the same as [`BadakOption`](#badakoption) : `catchErrorLog`, `preventError`, `defaultMethod`, `parseNumber`, `parseDate` and `bodyLimit`.
+An unknown key or an invalid value throws an error.
+
+```typescript
+await app.config('parseNumber', true);
+await app.config('bodyLimit', 1024 * 1024);
+```
 
 ### `listen(port: number): Promise<void>`
 
 The server starts responding.
+Files of `static()` and `setSPARoot()` are loaded and registered as routes here, and checked for conflicts with other routes (see [One route per request](#one-route-per-request)).
+If a static file route conflicts, `listen()` rejects and the server doesn't start.
 
 ### `isRunning(): boolean`
 
@@ -151,6 +161,8 @@ because `stop()` doesn't resolve until they finish.
 ### `route(rule: RouteRule): Promise<void>`
 
 Register a routing function.
+All routes of the rule object are checked first, and registered only if none of them conflicts with other routes (see [One route per request](#one-route-per-request)).
+Routes can be registered after `listen()` too.
 
 If a request matches a registered path but no routing function is registered for its method,
 badak responds `405 Method Not Allowed` with the `Allow` header listing the available methods.
@@ -187,7 +199,7 @@ For an unknown extension or a file without extension, it is determined by the fi
 and `application/octet-stream` is used if it is not known either.
 Text files (`text/*`) and JavaScript files are served with `charset=utf-8`, so save them in UTF-8.
 
-Files are loaded into memory when `listen()` is called, so restart the server to serve changed files.
+Files are loaded into memory when `listen()` is called, so call `stop()` and `listen()` again to serve changed files. Files deleted before that are not served anymore.
 
 Static files are served with `ETag` (from the file content) and `Last-Modified` (from the file modification time),
 and respond `304 Not Modified` without the body if `If-None-Match` or `If-Modified-Since` of the request matches.
@@ -244,8 +256,7 @@ app.get('/limited', () => {
 - `option.cause` : the original error, for logging.
 
 Other errors respond `500 Internal Server Error`, without the error message.
-For compatibility, an `Error` whose message is a status text such as `new Error('Forbidden')` responds with the matching status code
-(`Bad Request`, `Unauthorized`, `Forbidden`, `Not Found`, `Method Not Allowed`, `Not Acceptable`, `Payload Too Large`).
+The message is not mapped to a status code : `new Error('Forbidden')` responds `500`, use `new HttpError(403)` (changed in 5.0.0).
 
 Use `isHttpError(value)` to check if a value is an `HttpError`.
 
@@ -263,8 +274,10 @@ Middleware functions cannot change the arguments passed to the routing function.
 ### `RouteFunction`
 
 ```typescript
-export type RouteFunction = (ctx: ParamContext, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
+export type RouteFunction<T extends CheckedParamTypes<T> = ParamTypes> = (ctx: ParamContext<T>, req: IncomingMessage, res: ServerResponse) => unknown | Promise<unknown>;
 ```
+
+`T` is the named generic of the request fields, see [Generic request types](#generic-request-types). Without it, `ctx` is `ParamContext` with the default types.
 
 Register a routing function to respond to HTTP requests.
 The value returned by the routing function is returned as an HTTP response.
@@ -407,37 +420,36 @@ so an unauthenticated request is rejected without receiving the body up to this 
 
 ## Special Routing
 
-Special routing can be used on the routes of the `route()`, `get()`, `post()`, `put()`, and `delete()` functions.
+Special routing can be used on the routes of the `route()`, `get()`, `post()`, `put()`, `patch()` and `delete()` functions.
+**A request matches only one route per method** : routes that can match the same request path throw an error when they are registered, see [One route per request](#one-route-per-request).
+The full specification is in [`docs/routing-spec-5.0.0.md`](https://github.com/han41858/badak/blob/main/docs/routing-spec-5.0.0.md) (Korean).
+
+| Pattern | Meaning | Matches | Doesn't match |
+|---|---|---|---|
+| `users` | literal | `users` | `user` |
+| `:id` | one uri fragment, 1 or more characters | `7`, `me` | |
+| `*` | one uri fragment, 1 or more characters | `a.png` | |
+| `ab?cd` | the character just before `?` 0 or 1 time | `acd`, `abcd` | `abbcd` |
+| `ab+cd` | the character just before `+` 1 or more times | `abcd`, `abbcd` | `acd` |
+| `ab*cd` | any characters (0 or more) between `ab` and `cd` | `abcd`, `abXYZcd` | `acd`, `aXcd` |
+| `*.png` | any characters, then `.png` | `a.png` | `a.jpg` |
+| `**` | the rest of the path, fallback | | |
+
+- `?` and `+` apply to the one character just before them. `*` is a wildcard and doesn't apply to the character before it.
+- They can be combined in a uri fragment, e.g. `ab?c+d`, `a*b*c`, `*abc`.
+- Invalid patterns throw `invalid route '...'` when they are registered : `?` or `+` without a character before it (`?abc`), adjacent syntax characters (`ab??`, `ab?*`, `a**b`), and `:` not at the beginning (`ab:id`).
+- Other characters are literal, including characters with special meaning in regular expressions (e.g. `.`, `(`, `)`). `/a.c?` matches `/a.c` and `/a.`, not `/abc`.
+- Percent-encoded characters are always literal. `/a%2Ab` matches only `/a*b` (or `/a%2Ab`), `%2A%2A` is a normal uri fragment `**`, not a fallback.
+- The matched uri fragment is in `ctx.params` : by the name for `:` routing (`{ id: '7' }`), by `'*'` for `*`, and by the routing pattern for others (`{ 'ab*cd': 'abXcd' }`).
 
 ### `:` routing
 
 If you specify a routing path with `/:userId` and send an HTTP request to `/user1`,
 the request is matched and `ctx.params` contains `{ userId: 'user1' }`.
 
-### `?` routing
-
-`?` makes the character just before it optional.
-If you specify the routing path as `/users?`, you can match the `/user` and `/users` paths.
-The matched fragment is available in `ctx.params`, keyed by the routing pattern, e.g. `{ 'users?': 'user' }`.
-
-- Other characters are literal, including characters with special meaning in regular expressions (e.g. `.`, `(`, `)`, `[`, `]`). `/a.c?` matches `/a.c` and `/a.`, not `/abc`.
-- `??`, and `?` with `+` or `*` in the same uri fragment (e.g. `/ab?c+`), throw an error when they are registered.
-- `?` routing paths that can match the same uri fragment can't be registered together, regardless of the registration order. For example, `/ab?c` and `/a?bc` both match `/abc`, so registering the second one throws `duplicated question routing`. A normal routing path matched by a `?` routing path (e.g. `/abc` and `/ab?c`) throws in the same way.
-
-### `+` routing
-
-`+` makes the character just before it repeat 1 or more times, other characters are literal.
-If you specify the routing path as `/user1+`, you can match paths such as `/user1` and `/user11`.
-The matched fragment is available in `ctx.params`, keyed by the routing pattern, e.g. `{ 'user1+': 'user11' }`.
-
-- Other characters are literal, including characters with special meaning in regular expressions.
-- `++`, and `+` with `*` in the same uri fragment, throw an error when they are registered.
-- `+` routing paths that can match the same uri fragment can't be registered together, regardless of the registration order. For example, `/aab+` and `/a+bb` both match `/aabb`, so registering the second one throws `duplicated plus routing`. A normal routing path matched by a `+` routing path (e.g. `/abbc` and `/ab+c`) throws in the same way.
-- A `?` routing path and a `+` routing path that can match the same uri fragment throw `duplicated question and plus routing`, e.g. `/colou?r` and `/colou+r` both match `/colour`.
-
 ### `*` routing
 
-`*` matches exactly one uri fragment; its value is available as `ctx.params['*']`.
+`*` as a whole uri fragment matches exactly one uri fragment; its value is available as `ctx.params['*']`.
 
 ```typescript
 await app.get('/img/*', ({ params }) => params);
@@ -445,10 +457,6 @@ await app.get('/img/*', ({ params }) => params);
 // GET /img/a.png -> { '*': 'a.png' }
 // GET /img, /img/, /img/a/b -> 404
 ```
-
-`*` in a uri fragment matches any characters in the uri fragment, together with the character just before it. Other characters are literal.
-If you specify a routing path as `/user1*`, you can match paths such as `/user`, `/user1`, and `/user11`.
-Only one `*` can be used in a uri fragment, and it should follow a character (`/*abc` throws an error).
 
 ### `**` routing
 
@@ -466,19 +474,39 @@ await app.get('/files/**', ({ params, query }) => ({ params, query }));
 - `%2F` in a uri fragment is decoded to `/` too, so `/files/a%2Fb` and `/files/a/b` pass the same value.
 - A malformed percent-encoding in the rest of the path responds `400 Bad Request`.
 - `**` matches 0 or more uri fragments. `/files/**` matches `/files`, `/files/`, `/files/a` and `/files/a/b`, and `**` is `''` for `/files` and `/files/`. `/**` matches `/` too.
-- `**` is a fallback. It is used only if the path doesn't match other routes fully, see [Routing priority](#routing-priority).
+- `**` is a fallback. It is used only if the path doesn't match other routes fully, see [One route per request](#one-route-per-request).
 
-### Routing priority
+### One route per request
 
-For each uri fragment, routes are matched in this order, regardless of the registration order.
+Routes of the same method conflict if they have the same number of uri fragments and every uri fragment can match the same characters.
+A conflict throws `Conflicting routes for <METHOD>` when the second one is registered, regardless of the registration order. There is no priority between routes.
 
-1. normal routing (e.g. `/users/me`)
-2. `:` routing (e.g. `/users/:id`)
-3. `?` routing
-4. `+` routing
-5. `*` routing (`*` and `ab*cd`)
+| Routes | Result |
+|---|---|
+| `GET /users/me`, `GET /users/:id` | conflict, both match `/users/me` |
+| `GET /img/*`, `GET /img/:id` | conflict |
+| `GET /abc`, `GET /ab+c` | conflict, both match `/abc` |
+| `GET /ab*cd`, `GET /ab%2Acd` | conflict, both match `/ab%2Acd` (`ab*cd`) |
+| `GET /a/:id/details`, `GET /a/b+/settings` | registered, the last uri fragments don't overlap |
+| `GET /users/:id/a`, `GET /users/:name/b` | registered |
+| `GET /a/:id`, `POST /a/b+` | registered, different methods |
+| `GET /users/:id`, `GET /users/:id` | registered again, the latter replaces the former |
 
-`**` is used only if the request path doesn't match a route fully, and the deepest `**` along the matched path is used.
+Every route matching the request path is found, not only the first one, and the routing function is selected by the method.
+If the path matches routes but none for the method, badak responds `405 Method Not Allowed` with the methods of all of them in the `Allow` header.
+
+```typescript
+await app.get('/a/:id', getFnc);
+await app.post('/a/b+', postFnc);
+
+// GET  /a/bb -> getFnc, { id: 'bb' }
+// POST /a/bb -> postFnc, { 'b+': 'bb' }
+// PUT  /a/bb -> 405, Allow: GET, HEAD, POST
+```
+
+`**` routes are not compared with other routes. They are used only if the request path doesn't match a route fully, and the deepest one is used.
+`**` routes of the same method and the same depth (the number of uri fragments before `**`) conflict if the parts before `**` can match the same path, e.g. `/a/:id/**` and `/a/b+/**` throw `Conflicting fallback routes for GET at depth 2`.
+
 For example, with `setSPARoot('/')` (`/**`), `/style.css` and `/api/users` are handled by their own routes, and other paths respond `index.html`.
 
 ```typescript
@@ -493,6 +521,9 @@ await app.get('/api/users/:id', userFnc);
 ```
 
 If the path matches a route fully but no routing function is registered for the method, badak responds `405 Method Not Allowed` without using `**`.
+
+Static file routes of `static()` and `setSPARoot()` are registered in `listen()` and checked in the same way, e.g. `static('/', dir)` with `style.css` conflicts with `GET /:slug`.
+A conflict rejects `listen()` and the server doesn't start. Nothing is registered partially.
 
 ### Non-ASCII and percent-encoded paths
 
@@ -547,7 +578,10 @@ GET /path?             → query: {}
 GET /path?key          → query: { key: '' }
 GET /path?key=         → query: { key: '' }
 GET /path?key=value    → query: { key: 'value' }
+GET /path?a=1&a=2      → query: { a: ['1', '2'] }
 ```
+
+- Values are decoded by `node:querystring`. A malformed percent-encoding in the query string is kept as it is (e.g. `?a=%ZZ` → `{ a: '%ZZ' }`), it doesn't respond `400` like the request path.
 
 ### Route captures and body
 
@@ -565,6 +599,27 @@ await app.patch('/users/:id', (ctx) => ctx);
 ```
 
 `parseNumber` and `parseDate` apply to query and body strings, but never to path captures. The original Node.js `req` and `res` are still available as the second and third callback parameters.
+
+The request body is parsed by `Content-Type` (compared case-insensitively, parameters like `charset` are ignored) :
+
+| `Content-Type` | `ctx.body` | `400 Bad Request` |
+|---|---|---|
+| `application/json` | the parsed JSON value | malformed JSON, including JSON starting with a UTF-8 BOM |
+| `application/x-www-form-urlencoded` | an object of strings, `key[]` for arrays | |
+| `multipart/form-data` | an object : fields are strings, `text/plain` files are UTF-8 strings (see below), other files are `Buffer`, `key[]` for arrays | no `boundary` |
+| `text/*` without `charset`, or with `charset=utf-8` | a UTF-8 string | malformed UTF-8 |
+| `text/*` with another `charset` (e.g. `euc-kr`) | the original `Buffer`, not decoded | |
+| other types (e.g. `application/octet-stream`, `image/png`), or no `Content-Type` | the original `Buffer` | |
+
+- An empty body is `undefined` for every type. A body over `bodyLimit` responds `413 Payload Too Large`.
+- `text/*` is UTF-8 if `charset` is not specified (a badak policy). `charset` is case-insensitive and can be quoted, `utf-8` and `utf8` are UTF-8.
+  UTF-8 is decoded strictly : malformed bytes respond `400`, they are not replaced with `U+FFFD`. Other charsets are not decoded, decode the `Buffer` if needed.
+- `charset` more than once (e.g. `charset=utf-8; charset=euc-kr`) or an empty `charset` is ambiguous, the body is the original `Buffer`.
+- A UTF-8 BOM at the beginning of a text body is removed from the string. Use another `Content-Type` (e.g. `application/octet-stream`) to receive the bytes as they are.
+- A `text/plain` file of `multipart/form-data` (or a file without `Content-Type`, `text/plain` by RFC 7578) follows the same rule, a string or a `Buffer`.
+  Send binary files with their `Content-Type` (e.g. `image/png`, `application/octet-stream`) : a binary file without `Content-Type` is decoded as UTF-8, and the request responds `400`. Browsers and `curl -F` send it for files.
+- `parseNumber` and `parseDate` are not applied to string and `Buffer` bodies.
+- The original bytes of JSON, form and multipart bodies are not available (e.g. for HMAC signatures of webhooks).
 
 ## Examples
 
@@ -606,7 +661,7 @@ await app.delete<{ params: { id: string } }>('/api/users/:id', ({ params }, req,
 
 ### File upload
 
-For `multipart/form-data`, fields are strings, and files are `Buffer` (or strings for `text/plain` files).
+For `multipart/form-data`, fields are strings, and files are `Buffer` (or UTF-8 strings for `text/plain` files).
 `bodyLimit` of a route allows larger bodies for this route only.
 
 ```typescript

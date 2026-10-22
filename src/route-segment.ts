@@ -14,7 +14,7 @@
 import { METHOD } from './constants.js';
 import { RouteRule } from './interfaces.js';
 import { decodeUriFrag } from './util.js';
-import { PatternToken } from './fragment-pattern.js';
+import { literalTokens, PatternToken, WILDCARD } from './fragment-pattern.js';
 
 
 // split request path and decode each uri fragment, the first element is '/' for the root
@@ -91,80 +91,77 @@ export const normalizeLiteral = (routeKey: string): string => {
 		.join('');
 };
 
-const escapeRegExpChar = (char: string): string => {
-	return /[\\^$.*+?()[\]{}|/]/.test(char)
-		? '\\' + char
-		: char;
-};
-
 export type RouteSegment =
-	{ kind: 'normal', literal: string }
-	| { kind: 'colon' }
-	| { kind: 'question' } // see question-pattern.ts
-	| { kind: 'plus', tokens: PatternToken[] } // see fragment-pattern.ts
-	| { kind: 'partialAsterisk', regExp: RegExp }
-	| { kind: 'asterisk' }
-	| { kind: 'doubleAsterisk' };
+	{ kind: 'normal', literal: string } // literal characters only, compared by the decoded literal
+	| { kind: 'colon', name: string } // ':id', one wildcard
+	| { kind: 'pattern', tokens: PatternToken[] } // '?', '+' or '*' (including '*' as a whole uri fragment)
+	| { kind: 'doubleAsterisk' }; // '**', the rest of the path (fallback)
 
 const segmentCache: Map<string, RouteSegment> = new Map();
 
-// '+' makes the character just before it repeat 1 or more times, e.g. 'ab+c' : 'abc', 'abbc'
-const compilePlus = (routeKey: string): RouteSegment => {
-	if (routeKey.includes('*')) {
-		throw new Error(`invalid plus route, '+' can't be used with '*' : ${ routeKey }`);
-	}
+const COLON_TOKENS: PatternToken[] = [WILDCARD];
 
+// tokens of a uri fragment pattern, for matching and intersection (see fragment-pattern.ts)
+// '**' has no tokens, it is not a pattern of one uri fragment
+export const segmentTokens = (segment: RouteSegment): PatternToken[] => {
+	switch (segment.kind) {
+		case 'normal':
+			return literalTokens(segment.literal);
+
+		case 'colon':
+			return COLON_TOKENS;
+
+		case 'pattern':
+			return segment.tokens;
+
+		case 'doubleAsterisk':
+			throw new Error('\'**\' is not a pattern of one uri fragment');
+	}
+};
+
+const invalidRoute = (routeKey: string, reason: string): Error => {
+	return new Error(`invalid route '${ routeKey }' : ${ reason }`);
+};
+
+// parse a uri fragment pattern from the parts of the original route key (docs/routing-spec-5.0.0.md 2.)
+// syntax characters are unencoded '?', '+' and '*', percent-encoded characters are always literal
+const compilePattern = (routeKey: string, parts: RawPart[]): RouteSegment => {
 	const tokens: PatternToken[] = [];
 
-	for (const part of splitRouteKey(routeKey, '+')) {
-		if ('syntax' in part) {
-			const last: PatternToken | undefined = tokens[tokens.length - 1];
+	parts.forEach((part: RawPart, i: number): void => {
+		if (!('syntax' in part)) {
+			tokens.push({ char: part.literal, optional: false, repeat: false });
+			return;
+		}
 
-			if (last === undefined || last.repeat === true) {
-				// '+' at the beginning, or '++'
-				throw new Error(`invalid plus route : ${ routeKey }`);
-			}
+		if (i > 0 && 'syntax' in parts[i - 1]) {
+			// '??', '++', '?+', '?*', '*?', '**' in a uri fragment, ...
+			throw invalidRoute(routeKey, 'routing syntax characters can\'t be adjacent, \'**\' is allowed only as a whole uri fragment');
+		}
 
-			last.repeat = true;
+		if (part.syntax === '*') {
+			tokens.push({ ...WILDCARD });
+			return;
+		}
+
+		const last: PatternToken | undefined = tokens[tokens.length - 1];
+
+		if (last === undefined) {
+			throw invalidRoute(routeKey, `'${ part.syntax }' should follow a character`);
+		}
+
+		if (part.syntax === '?') {
+			last.optional = true;
 		}
 		else {
-			tokens.push({ char: part.literal, optional: false, repeat: false });
+			last.repeat = true;
 		}
-	}
+	});
 
-	return { kind: 'plus', tokens };
+	return { kind: 'pattern', tokens };
 };
 
-// '*' in a uri fragment : the character just before '*' and '*' match any characters (0 or more)
-// e.g. 'ab*cd' : 'acd', 'abcd', 'abxcd', 'user1*' : 'user', 'user1', 'user11', same as 3.0.0
-const compilePartialAsterisk = (routeKey: string): RouteSegment => {
-	const parts: RawPart[] = splitRouteKey(routeKey, '*');
-	const asteriskIndex: number = parts.findIndex((part: RawPart): boolean => 'syntax' in part);
-
-	if (parts.filter((part: RawPart): boolean => 'syntax' in part).length > 1) {
-		throw new Error(`invalid asterisk route, only one '*' in a uri fragment : ${ routeKey }`);
-	}
-
-	if (asteriskIndex === 0) {
-		// no character before '*', it never matched until 3.0.0
-		throw new Error(`invalid asterisk route, '*' should follow a character : ${ routeKey }`);
-	}
-
-	const toSource = (literalParts: RawPart[]): string => {
-		return literalParts
-			.map((part: RawPart): string => escapeRegExpChar((part as { literal: string }).literal))
-			.join('');
-	};
-
-	// the character just before '*' is a part of the wildcard
-	const prefix: RawPart[] = parts.slice(0, Math.max(asteriskIndex - 1, 0));
-	const suffix: RawPart[] = parts.slice(asteriskIndex + 1);
-
-	return {
-		kind: 'partialAsterisk',
-		regExp: new RegExp(`^${ toSource(prefix) }[\\s\\S]*${ toSource(suffix) }$`, 'u')
-	};
-};
+const SYNTAX_CHARS: string = '?+*';
 
 // interpret a route key, throws for an invalid route key
 export const compileRouteSegment = (routeKey: string): RouteSegment => {
@@ -179,23 +176,22 @@ export const compileRouteSegment = (routeKey: string): RouteSegment => {
 	if (routeKey === '**') {
 		segment = { kind: 'doubleAsterisk' };
 	}
-	else if (routeKey === '*') {
-		segment = { kind: 'asterisk' };
-	}
 	else if (routeKey.startsWith(':')) {
-		segment = { kind: 'colon' };
-	}
-	else if (routeKey.includes('?')) {
-		segment = { kind: 'question' };
-	}
-	else if (routeKey.includes('+')) {
-		segment = compilePlus(routeKey);
-	}
-	else if (routeKey.includes('*')) {
-		segment = compilePartialAsterisk(routeKey);
+		// the rest is the param name, percent-encoded characters are decoded (e.g. ':%69d' -> 'id')
+		// throws for malformed percent-encoding
+		segment = { kind: 'colon', name: normalizeLiteral(routeKey.slice(1)) };
 	}
 	else {
-		segment = { kind: 'normal', literal: normalizeLiteral(routeKey) };
+		if (routeKey.includes(':')) {
+			throw invalidRoute(routeKey, '\':\' is routing syntax only at the beginning of a uri fragment');
+		}
+
+		// throws for malformed percent-encoding
+		const parts: RawPart[] = splitRouteKey(routeKey, SYNTAX_CHARS);
+
+		segment = parts.some((part: RawPart): boolean => 'syntax' in part)
+			? compilePattern(routeKey, parts)
+			: { kind: 'normal', literal: parts.map((part: RawPart): string => (part as { literal: string }).literal).join('') };
 	}
 
 	segmentCache.set(routeKey, segment);
@@ -220,7 +216,7 @@ const encodeChar = (char: string): string => {
  * routing syntax is kept, literal characters are decoded except characters in KEEP_ENCODED
  */
 export const canonicalRouteKey = (routeKey: string): string => {
-	if (routeKey === '*' || routeKey === '**') {
+	if (routeKey === '**') {
 		return routeKey;
 	}
 
@@ -229,23 +225,10 @@ export const canonicalRouteKey = (routeKey: string): string => {
 		return ':' + normalizeLiteral(routeKey.slice(1));
 	}
 
-	let syntaxChars: string = '';
+	// throws for an invalid route key
+	compileRouteSegment(routeKey);
 
-	switch (compileRouteSegment(routeKey).kind) {
-		case 'question':
-			syntaxChars = '?';
-			break;
-
-		case 'plus':
-			syntaxChars = '+';
-			break;
-
-		case 'partialAsterisk':
-			syntaxChars = '*';
-			break;
-	}
-
-	return splitRouteKey(routeKey, syntaxChars)
+	return splitRouteKey(routeKey, SYNTAX_CHARS)
 		.map((part: RawPart): string => {
 			if ('syntax' in part) {
 				return part.syntax;
@@ -260,15 +243,19 @@ export const canonicalRouteKey = (routeKey: string): string => {
 
 const isMethodKey = (key: string): boolean => Object.values(METHOD).includes(key as METHOD);
 
-// normal route keys of a node by literal, for request matching
-const normalIndexCache: WeakMap<RouteRule, Map<string, string>> = new WeakMap();
+// route keys of a node for request matching : normal route keys by literal, and pattern route keys (':', '?', '+', '*')
+interface RouteIndex {
+	normal: Map<string, string>;
+	patterns: string[];
+}
 
-// route key of a normal route matching the decoded uri fragment
-export const findNormalRouteKey = (node: RouteRule, uriFrag: string): string | undefined => {
-	let index: Map<string, string> | undefined = normalIndexCache.get(node);
+const routeIndexCache: WeakMap<RouteRule, RouteIndex> = new WeakMap();
+
+const routeIndexOf = (node: RouteRule): RouteIndex => {
+	let index: RouteIndex | undefined = routeIndexCache.get(node);
 
 	if (index === undefined) {
-		index = new Map();
+		index = { normal: new Map(), patterns: [] };
 
 		for (const key of Object.keys(node)) {
 			if (isMethodKey(key)) {
@@ -279,19 +266,32 @@ export const findNormalRouteKey = (node: RouteRule, uriFrag: string): string | u
 
 			if (segment.kind === 'normal') {
 				// route keys are canonical, the same literal is one key
-				index.set(segment.literal, key);
+				index.normal.set(segment.literal, key);
+			}
+			else if (segment.kind !== 'doubleAsterisk') {
+				index.patterns.push(key);
 			}
 		}
 
-		normalIndexCache.set(node, index);
+		routeIndexCache.set(node, index);
 	}
 
-	return index.get(uriFrag);
+	return index;
+};
+
+// route key of a normal route matching the decoded uri fragment
+export const findNormalRouteKey = (node: RouteRule, uriFrag: string): string | undefined => {
+	return routeIndexOf(node).normal.get(uriFrag);
+};
+
+// pattern route keys of a node, '**' is not included
+export const patternRouteKeys = (node: RouteRule): string[] => {
+	return routeIndexOf(node).patterns;
 };
 
 // called when the keys of a node are changed
 export const invalidateNormalRouteIndex = (node: RouteRule): void => {
-	normalIndexCache.delete(node);
+	routeIndexCache.delete(node);
 };
 
 // route key for a literal path segment, e.g. a static file name

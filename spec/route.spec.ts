@@ -1171,8 +1171,7 @@ describe('route()', () => {
 		describe('duplication detected regardless of registration order', () => {
 			[
 				['/users/:id/profile', '/users/:name/profile'],
-				['/users/a?b', '/users/ab'],
-				['/a/:x', '/a/:y/b']
+				['/users/a?b', '/users/ab']
 			].forEach(([first, second]: string[]): void => {
 				[
 					[first, second],
@@ -1197,6 +1196,20 @@ describe('route()', () => {
 								}
 							})
 						);
+					});
+				});
+			});
+		});
+
+		describe('routes with different numbers of uri fragments don\'t conflict (5.0.0)', () => {
+			[
+				['/a/:x', '/a/:y/b'],
+				['/users/:id/a', '/users/:name/b']
+			].forEach(([first, second]: string[]): void => {
+				[[first, second], [second, first]].forEach(([a, b]: string[]): void => {
+					it(`${ a } & ${ b }`, async () => {
+						await app.get(a, emptyFnc);
+						await app.get(b, emptyFnc);
 					});
 				});
 			});
@@ -1804,16 +1817,15 @@ describe('route()', () => {
 				}));
 			});
 
-			it('** & *', () => {
-				app.get('*', () => {
-					// do nothing
-				});
+			// 5.0.0 : '*' is one uri fragment, '**' is a fallback for the rest, they don't conflict
+			it('** & *', async () => {
+				await app.get('/*', (): string => '*');
+				await app.get('/**', (): string => '**');
+				await app.listen(TestPort);
 
-				return promiseFail(
-					app.get('**', () => {
-						// do nothing
-					})
-				);
+				await request(app.getHttpServer()).get('/a').expect(200, '*');
+				await request(app.getHttpServer()).get('/a/b').expect(200, '**');
+				await request(app.getHttpServer()).get('/').expect(200, '**');
 			});
 
 			describe('**', () => {
@@ -1968,6 +1980,9 @@ describe('route()', () => {
 						invalidUrls.push(
 							prefix + '/a',
 							prefix + '/bd',
+							// 5.0.0 : the character before '*' is literal
+							prefix + '/acd',
+							prefix + '/axcd',
 							// should match whole uri fragment
 							prefix + '/xabcd',
 							prefix + '/abcdx'
@@ -1996,14 +2011,15 @@ describe('route()', () => {
 
 					await app.listen(TestPort);
 
-					// README example
+					// README example, 5.0.0 : '*' is a wildcard, '1' is literal
 					validUrls.push(
-						'/user',
 						'/user1',
-						'/user11'
+						'/user11',
+						'/user1x'
 					);
 
 					invalidUrls.push(
+						'/user',
 						'/use',
 						'/xuser1'
 					);
@@ -2288,12 +2304,17 @@ describe('route()', () => {
 			expect(rootRouting['ij*lk']).to.have.property('GET');
 			expect((rootRouting['ij*lk'] as RouteRuleSeed)['GET']).to.be.a('function');
 
+			// 5.0.0 : 'ij' and 'lk' are literal, '*' is any characters
 			await request(app.getHttpServer())
 				.get('/ilk')
-				.expect(200);
+				.expect(404);
 
 			await request(app.getHttpServer())
 				.get('/ijlk')
+				.expect(200);
+
+			await request(app.getHttpServer())
+				.get('/ijxlk')
 				.expect(200);
 
 			await request(app.getHttpServer())

@@ -5,6 +5,7 @@ import { expect } from 'chai';
 import { agent as request } from 'supertest';
 
 import { Badak } from '../src/badak';
+import { HttpError } from '../src/http-error';
 import { ParamContext } from '../src/interfaces';
 import { MiddlewareFunction, RouteFunction, TypedObject } from '../src/interfaces';
 import { emptyAsyncFnc, emptyFnc, promiseFail } from './test-util';
@@ -425,13 +426,16 @@ describe('middleware', () => {
 					expect(throwTestRouteRunFlag).to.be.false;
 				});
 
+				// 5.0.0 : Error('Unauthorized') and Error('Forbidden') are 500, not mapped by the message
 				[
-					['Unauthorized', 401],
-					['Forbidden', 403]
-				].forEach(([message, code]: (string | number)[]): void => {
-					it(`Error('${ message }') responds ${ code }`, async () => {
+					[new HttpError(401), 401],
+					[new HttpError(403), 403],
+					[new Error('Unauthorized'), 500],
+					[new Error('Forbidden'), 500]
+				].forEach(([thrown, code]: (Error | number)[]): void => {
+					it(`${ (thrown as Error).name }('${ (thrown as Error).message }') responds ${ code as number }`, async () => {
 						await app.before(() => {
-							throw new Error(message as string);
+							throw thrown;
 						});
 
 						await app.listen(port);
@@ -452,7 +456,7 @@ describe('middleware', () => {
 					});
 
 					await app.before(() => {
-						throw new Error('Forbidden');
+						throw new HttpError(403);
 					});
 
 					await app.listen(port);

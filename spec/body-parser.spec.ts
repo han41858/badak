@@ -123,9 +123,15 @@ describe('body-parser', () => {
 				.to.throw(HttpError).with.property('status', 400);
 		});
 
-		it('no content-type or empty body : undefined', () => {
-			expect(parseBody(fakeReq({}), Buffer.from('{"a":1}'), noConvert)).to.be.undefined;
+		// 5.0.0 : the original bytes, it was undefined
+		it('no content-type : Buffer', () => {
+			expect(parseBody(fakeReq({}), Buffer.from('{"a":1}'), noConvert)).to.be.eql(Buffer.from('{"a":1}'));
+		});
+
+		it('empty body : undefined', () => {
+			expect(parseBody(fakeReq({}), Buffer.alloc(0), noConvert)).to.be.undefined;
 			expect(parseBody(fakeReq({ 'content-type': 'application/json' }), Buffer.alloc(0), noConvert)).to.be.undefined;
+			expect(parseBody(fakeReq({ 'content-type': 'text/plain' }), Buffer.alloc(0), noConvert)).to.be.undefined;
 		});
 	});
 
