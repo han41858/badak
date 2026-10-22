@@ -4,10 +4,29 @@
 
 ### Fixed
 
-- `+` routing paths that can match the same uri fragment throw `duplicated plus routing` when they are registered, regardless of the registration order. Only the shortest uri fragment of each `+` routing path was compared before, so e.g. `/aab+` and `/a+bb` (both match `/aabb`) could be registered together, and the route used for `/aabb` depended on the registration order. ([#62](https://github.com/han41858/badak/pull/62))
-- A `?` routing path and a `+` routing path that can match the same uri fragment throw `duplicated question and plus routing` when they are registered, e.g. `/colou?r` and `/colou+r` for `/colour`. They could be registered together before, and the `+` routing path was never used for those uri fragments. ([#62](https://github.com/han41858/badak/pull/62))
-  - routing paths registered together in 4.0.0 can throw now. Remove one of them, or merge them into one routing function.
-- `+` routing matches uri fragments without regular expressions, the duplication check and request matching use the same interpretation. Patterns like `a+a+a+…b` don't backtrack for long uri fragments. ([#62](https://github.com/han41858/badak/pull/62))
+Routing paths that can match the same uri fragment throw when they are registered, regardless of the registration order. ([#62](https://github.com/han41858/badak/pull/62))
+
+- `+` routing paths, e.g. `/aab+` and `/a+bb` for `/aabb`, throw `duplicated plus routing`. Only the shortest uri fragment of each `+` routing path (e.g. `aab` and `abb`) was compared before.
+- a `?` routing path and a `+` routing path, e.g. `/colou?r` and `/colou+r` for `/colour`, throw `duplicated question and plus routing`. They were not compared before.
+- `+` routing matches uri fragments without regular expressions, the duplication check and request matching use the same interpretation. Patterns like `a+a+a+…b` don't backtrack for long uri fragments.
+
+**Routing paths registered together in 4.0.0 can throw now.** Cases that differ from 4.0.0 :
+
+| Routing paths | 4.0.0 | Unreleased |
+|---|---|---|
+| `/aab+`, `/a+bb` (in this order) | registered, `GET /aabb` -> `/aab+` | throws `duplicated plus routing` |
+| `/a+bb`, `/aab+` (in this order) | registered, `GET /aabb` -> `/a+bb` | throws `duplicated plus routing` |
+| `/colou?r`, `/colou+r` (any order) | registered, `GET /colour` -> `/colou?r`, `/colou+r` is used only for `/colouur`, `/colouuur`, … | throws `duplicated question and plus routing` |
+| `/ab?c`, `/ab+c` (any order) | registered, `GET /abc` -> `/ab?c`, `GET /abbc` -> `/ab+c` | throws `duplicated question and plus routing` |
+| `/ab+c`, `/abbc` | throws `duplicated plus routing` | not changed |
+| `/ab?c`, `/ab+d`, `/a+`, `/b+` | registered | not changed, patterns that don't overlap are registered together in any order |
+
+This is classified as a bug fix, not a new restriction :
+
+- the same rule is applied already for `?` routing (4.0.0, [#57](https://github.com/han41858/badak/pull/57)) and for `+` routing and normal routing. `+` & `+`, and `?` & `+` were the cases left out.
+- the affected combinations were ambiguous : the route used for a request depended on the registration order (`+` & `+`), or one of the routes was never used for the overlapping uri fragments (`?` & `+`). Combinations without an overlapping uri fragment behave the same as 4.0.0.
+
+To migrate, remove one of the routing paths, merge them into one routing function, or split them into patterns that don't overlap (e.g. `/colou?r` and `/colouu+r`).
 
 ## 4.0.0 (2026-10-22)
 

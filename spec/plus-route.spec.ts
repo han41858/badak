@@ -216,7 +216,7 @@ describe('+ routing', () => {
 		};
 
 		([
-			// + and + : a common uri fragment longer than the shortest uri fragments
+			// + and + : '/aab+' and '/a+bb' were registered together in 4.0.0, the common uri fragment is longer than the shortest ones
 			[['/aab+', '/a+bb'], 'duplicated plus routing'],
 			[['/xa+y', '/xaa+y'], 'duplicated plus routing'],
 			[['/ab+c', '/abb+c'], 'duplicated plus routing'],
@@ -264,6 +264,48 @@ describe('+ routing', () => {
 
 				checkUriDuplication({}, one);
 			}).to.throw('duplicated question and plus routing');
+		});
+
+		it('patterns that don\'t overlap are registered together in every order, and match the same routes', () => {
+			const uris: string[] = ['/ab?c', '/ab+d', '/x+y', '/xz?', '/abe'];
+
+			const permutations = (arr: string[]): string[][] => {
+				return arr.length <= 1
+					? [arr]
+					: arr.flatMap((one: string, i: number): string[][] => {
+						return permutations([...arr.slice(0, i), ...arr.slice(i + 1)])
+							.map((rest: string[]): string[] => [one, ...rest]);
+					});
+			};
+
+			const requests: [string, string | undefined][] = [
+				['/ac', '/ab?c'],
+				['/abc', '/ab?c'],
+				['/abd', '/ab+d'],
+				['/abbbd', '/ab+d'],
+				['/xy', '/x+y'],
+				['/xxxy', '/x+y'],
+				['/x', '/xz?'],
+				['/xz', '/xz?'],
+				['/abe', '/abe'],
+				['/abbc', undefined],
+				['/xzy', undefined]
+			];
+
+			const orders: string[][] = permutations(uris);
+
+			// 5! = 120 registration orders
+			expect(orders.length).to.be.eql(120);
+
+			orders.forEach((order: string[]): void => {
+				const routeRule: RouteRule = build(order);
+
+				requests.forEach(([url, expected]: [string, string | undefined]): void => {
+					const matched: string | undefined = (findRouteFunction(findRoute(routeRule, url).rule, 'GET').targetFncObj as RouteFunction | undefined)?.name;
+
+					expect(matched, `${ url }, order : ${ order.join(', ') }`).to.be.eql(expected);
+				});
+			});
 		});
 
 		it('matching : at most one of ? and + routes matches, the result doesn\'t depend on the registration order', () => {
