@@ -1,6 +1,6 @@
 {
 	"name": "badak",
-	"version": "5.0.1",
+	"version": "5.0.2",
 	"description": "node.js Server framework based on Promise and TypeScript",
 	"type": "commonjs",
 	"exports": {

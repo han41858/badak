@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 5.0.2 (2026-10-29)
+
+This patch release improves error handling for concurrent `before()` middleware functions. There are no API changes.
 
 ### Fixed
 
