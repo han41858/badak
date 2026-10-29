@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `before()` waits for all concurrently running hooks to settle before handling failures, including synchronous exceptions. When several hooks fail, the first failure in registration order determines the HTTP error response.
+
 ## 5.0.1 (2026-10-22)
 
 This release fixes the delay of `stop()` with keep-alive connections. There is no API change.

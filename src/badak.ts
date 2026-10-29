@@ -532,11 +532,18 @@ export class Badak {
 					// run before middleware functions in parallel
 					// before functions can't modify parameters
 					// if one of them throws, route function is not executed and the error is handled below like route errors
-					await Promise.all(
-						this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): void | Promise<void> => {
-							return middlewareFnc(req, res);
+					const beforeResults = await Promise.allSettled(
+						this._middlewaresBefore.map((middlewareFnc: MiddlewareFunction): Promise<void> => {
+							return Promise.resolve().then(() => middlewareFnc(req, res));
 						})
 					);
+
+					// all hooks settle before routing or error response; choose the first failure by registration order
+					const beforeFailure = beforeResults.find((result) => result.status === 'rejected');
+
+					if (beforeFailure?.status === 'rejected') {
+						throw beforeFailure.reason;
+					}
 
 					if (isResponseStarted(res)) {
 						// before() middleware responded already (e.g. 429), skip routing
