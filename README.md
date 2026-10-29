@@ -101,7 +101,7 @@ Don't read the request body (`req`) in this function or in `before()`, badak res
 
 Registers a middleware function to run **before** the routing function is executed.
 Multiple middleware functions can be specified,
-and they are executed in parallel regardless of the order in which they are specified.
+and they run concurrently without depending on registration order. All hooks settle before routing proceeds. If multiple hooks fail, the error from the earliest registered failing hook is used, regardless of which fails first.
 It should be called before `listen()`.
 
 If a middleware function throws an error (or returns a rejected Promise), the routing function is not executed
