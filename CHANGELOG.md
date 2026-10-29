@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- `before()` waits for all concurrently running hooks to settle before handling failures, including synchronous exceptions. When several hooks fail, the first failure in registration order determines the HTTP error response.
+- When a `before()` middleware function failed, the error response and `after()` didn't wait for the other `before()` middleware functions still running, and their errors were lost (e.g. `ERR_HTTP_HEADERS_SENT` writing a header after the response). All `before()` middleware functions settle before routing or the error response now. When several of them fail, the first failure in registration order is responded, not the first one in time. Middleware functions registered after a function that throws synchronously are called now, they were not called before. ([#79](https://github.com/han41858/badak/pull/79))
 
 ## 5.0.1 (2026-10-22)
 
